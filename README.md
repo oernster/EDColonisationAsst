@@ -157,3 +157,5 @@ The current state is shown in the header via the “Keep awake” indicator in [
 If you have cloned the repository and want to build or run EDCA from source (backend/frontend dev, tests, installer builds), see:
 
 - [`DEVELOPMENT_README.md`](DEVELOPMENT_README.md:1)
+
+Elite Dangerous is a trademark of Frontier Developments plc. This tool is not affiliated with Frontier. 

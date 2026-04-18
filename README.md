@@ -1,7 +1,5 @@
 # Elite Dangerous Colonisation Assistant
 
-# Elite Dangerous Colonisation Assistant
-
 Track colonisation sites and fleet carrier activity automatically from your journal files.
 
 No spreadsheets. No manual tracking. Runs locally.

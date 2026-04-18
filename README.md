@@ -1,13 +1,42 @@
 # Elite Dangerous Colonisation Assistant
 
-Elite Dangerous Colonisation Assistant (EDCA) helps you track in‑game colonisation efforts and related construction sites through a local web UI.
+# Elite Dangerous Colonisation Assistant
+
+Track colonisation sites and fleet carrier activity automatically from your journal files.
+
+No spreadsheets. No manual tracking. Runs locally.
+
+---
+
+### What it does
+
+* Tracks colonisation construction sites directly from your journal data
+* Shows fleet carrier cargo and market orders in one place
+* Updates automatically as you play
+* Runs entirely locally (no external services, no accounts)
+
+---
 
 <img width="1582" height="1248" alt="{D494D007-E38F-465D-9AF5-BF34A431AEF3}" src="https://github.com/user-attachments/assets/9b73bf79-8524-4c58-bd9e-ae8e70fc08ec" />
 <img width="1581" height="1180" alt="{173686A9-ADF6-4BC7-A637-A72F629DFEF4}" src="https://github.com/user-attachments/assets/e52917a0-dc5f-4938-b708-5151eb1f7060" />
 
 ---
 
-### If you like it please buy me a coffee: [Donation link](https://www.paypal.com/ncp/payment/Z36XJEEA4MNV6)
+## Quick start (Windows)
+
+1. Go to the project’s **Releases** page
+2. Download the latest installer:
+   EDColonisationAsstInstaller.exe
+3. Run it and follow the installer
+4. Launch **Elite: Dangerous Colonisation Assistant**
+
+Your browser will open automatically at:
+
+http://127.0.0.1:8000/app/
+
+EDCA will begin reading your journal files immediately.
+
+---
 
 ## Fleet carrier data and journal updates
 
@@ -15,27 +44,13 @@ EDCA's Fleet Carrier view (cargo and market orders) is built **entirely** from t
 
 This has two important consequences:
 
-- If you change your carrier's market in‑game but the game does **not** emit new journal events (such as `CarrierTradeOrder` entries), EDCA cannot see that change and the UI will continue to show the last state that was recorded in the journals.
-- To ensure EDCA shows valid, up‑to‑date carrier commodity data, you may occasionally need to:
-  - Open the Carrier Management screen and adjust or re‑apply your commodity orders (even if only by toggling/cancelling and re‑creating them), so that the game writes fresh carrier trade events to the journal.
-  - Wait a moment for the journal watcher to ingest the new lines and for the UI to refresh.
+* If you change your carrier's market in-game but the game does **not** emit new journal events (such as `CarrierTradeOrder` entries), EDCA cannot see that change and the UI will continue to show the last state that was recorded in the journals.
+* To ensure EDCA shows valid, up-to-date carrier commodity data, you may occasionally need to:
+
+  * Open the Carrier Management screen and adjust or re-apply your commodity orders (even if only by toggling/cancelling and re-creating them), so that the game writes fresh carrier trade events to the journal.
+  * Wait a moment for the journal watcher to ingest the new lines and for the UI to refresh.
 
 EDCA cannot force Elite Dangerous to write new journal data; it can only reflect what is actually present in your local `Journal.*.log` files.
-
-## Get the app on Windows
-
-For normal Windows use, download the prebuilt installer (no Python or Node.js required):
-
-1. Go to the project’s **GitHub Releases** page.
-2. Download the latest Windows installer executable, typically named:
-
-   ```text
-   EDColonisationAsstInstaller.exe
-   ```
-
-3. Double‑click it and follow the on‑screen instructions (Install / Repair / Uninstall).
-4. After installation, launch **Elite: Dangerous Colonisation Assistant** from the
-   Start Menu or Desktop shortcut.
 
 > **Note:** Because this is not a code‑signed commercial product, Windows SmartScreen
 > (and some antivirus tools) may warn that the installer or runtime is from an

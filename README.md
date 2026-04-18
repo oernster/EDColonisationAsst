@@ -10,7 +10,7 @@ No spreadsheets. No manual tracking. Runs locally.
 
 ### What it does
 
-Replaces manual tracking (spreadsheets, notes, Discord posts) with automatic, journal-driven state.
+Replaces manual tracking with automatic, journal-driven state.
 
 - Tracks colonisation construction sites directly from your journal data  
 - Shows fleet carrier cargo and market orders in one place  

@@ -10,10 +10,12 @@ No spreadsheets. No manual tracking. Runs locally.
 
 ### What it does
 
-* Tracks colonisation construction sites directly from your journal data
-* Shows fleet carrier cargo and market orders in one place
-* Updates automatically as you play
-* Runs entirely locally (no external services, no accounts)
+Replaces manual tracking (spreadsheets, notes, Discord posts) with automatic, journal-driven state.
+
+- Tracks colonisation construction sites directly from your journal data  
+- Shows fleet carrier cargo and market orders in one place  
+- Updates automatically as you play  
+- Runs entirely locally (no external services, no accounts) 
 
 ---
 

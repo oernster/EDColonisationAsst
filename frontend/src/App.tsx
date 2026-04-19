@@ -79,6 +79,7 @@ function App() {
   const [commanderName, setCommanderName] = useState<string | null>(null);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
   const keepAwakeStorageKey = 'edcaKeepAwakeEnabled';
+  const currentSystemRef = useRef<string | null>(currentSystem);
 
   const readKeepAwakeEnabled = () => {
     try {
@@ -94,6 +95,10 @@ function App() {
 
   // Initialise from localStorage synchronously to avoid a "flash" of Off in tests/UI.
   const [keepAwakeEnabled, setKeepAwakeEnabled] = useState<boolean>(() => readKeepAwakeEnabled());
+
+  useEffect(() => {
+    currentSystemRef.current = currentSystem;
+  }, [currentSystem]);
 
   // Initialise theme mode from localStorage so we remember the user's choice.
   useEffect(() => {
@@ -145,13 +150,11 @@ function App() {
     }
 
     // Refresh selected system snapshot.
-    if (currentSystem) {
-      try {
-        const data = await api.getSystemData(currentSystem);
-        setSystemData(data);
-      } catch {
-        // Ignore; system may not exist anymore or backend may be busy.
-      }
+    const selectedSystem = currentSystemRef.current;
+
+    if (selectedSystem) {
+      const data = await api.getSystemData(selectedSystem);
+      setSystemData(data);
     }
   };
 

@@ -239,5 +239,5 @@ backend/commander.yaml
 backend/src/colonization.db
 
 # installation files
-EDColonizationAsstInstaller.exe
-EDColonizationAsst.exe
+EDColonisationAsstInstaller.exe
+EDColonisationAsst.exe

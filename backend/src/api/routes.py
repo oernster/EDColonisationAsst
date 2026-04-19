@@ -20,6 +20,7 @@ from ..repositories.colonisation_repository import IColonisationRepository
 from ..services.data_aggregator import IDataAggregator
 from ..services.system_tracker import ISystemTracker
 from ..utils.logger import get_logger
+from ..services.change_bus import change_bus
 
 logger = get_logger(__name__)
 
@@ -81,8 +82,13 @@ async def get_watcher_status() -> dict:
 
     running = bool(getattr(watcher, "is_running", lambda: False)()) if watcher else False
     watched = str(getattr(watcher, "watched_directory", lambda: None)() or "") if watcher else ""
-    poller_running = (
-        bool(getattr(watcher, "poller_running", lambda: False)()) if watcher else False
+    watchdog_status = (
+        getattr(watcher, "watchdog_status", lambda: {"configured": False, "alive": False})()
+        if watcher
+        else {"configured": False, "alive": False}
+    )
+    poller_status = (
+        getattr(watcher, "poller_status", lambda: {"running": False})() if watcher else {"running": False}
     )
 
     handler = getattr(watcher, "_handler", None) if watcher else None  # noqa: SLF001
@@ -96,6 +102,9 @@ async def get_watcher_status() -> dict:
             "last_processed_at": getattr(handler, "last_processed_at", None),
             "last_processed_file": getattr(handler, "last_processed_file", None),
             "last_error": getattr(handler, "last_error", None),
+            "last_events_parsed": getattr(handler, "last_events_parsed", None),
+            "last_updated_systems": getattr(handler, "last_updated_systems", None),
+            "last_depot_market_ids": getattr(handler, "last_depot_market_ids", None),
         }
 
     return {
@@ -103,7 +112,8 @@ async def get_watcher_status() -> dict:
         "configured_directory_exists": journal_dir.exists(),
         "watcher_running": running,
         "watcher_directory": watched or None,
-        "poller_running": poller_running,
+        "watchdog": watchdog_status,
+        "poller": poller_status,
         "handler": handler_diag,
     }
 
@@ -310,31 +320,10 @@ async def reload_journals() -> dict:
             processed_files.append(journal_file.name)
             total_events += len(file_events)
 
-    # Push updates to any connected UIs.
-    #
-    # - Per-system UPDATE messages refresh subscribed system views.
-    # - A global REFRESH message prompts clients to refetch system list + current selection
-    #   (useful if the currently selected system changed, or if the list of systems changed).
+    # Notify UI clients (AJAX long-poll) that data changed.
     try:
-        from ..api.websocket import notify_system_update, notify_global_refresh
-
-        # Broadcast per-system updates for all known systems.
-        try:
-            updated_systems = await _repository.get_all_systems()
-        except Exception:
-            updated_systems = []
-
-        for system_name in updated_systems:
-            try:
-                await notify_system_update(system_name)
-            except Exception:
-                # Best-effort; do not fail the API response.
-                pass
-
-        # Always broadcast a global refresh hint as a safety net.
-        await notify_global_refresh()
+        await change_bus.bump()
     except Exception:
-        # Never fail the debug endpoint due to WebSocket notification issues.
         pass
 
     return {

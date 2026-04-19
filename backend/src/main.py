@@ -19,7 +19,8 @@ from .api.routes import router as colonisation_router, set_dependencies
 from .api.settings import router as settings_router
 from .api.journal import router as journal_router
 from .api.carriers import router as carriers_router
-from .api.websocket import websocket_endpoint, set_aggregator, notify_system_update
+from .api.changes import router as changes_router
+from .services.change_bus import change_bus
 
 # Setup logging
 setup_logging()
@@ -191,19 +192,17 @@ async def _sync_latest_journals_best_effort(
             parser=parser,
             system_tracker=system_tracker,
             repository=repository,
-            update_callback=notify_system_update,
+            update_callback=None,
             loop=loop,
         )
 
         for jf in tail:
             await handler._process_file(jf)
 
+        # Signal UI clients (AJAX long-poll) that data may have changed.
         try:
-            from .api.websocket import notify_global_refresh
-
-            await notify_global_refresh()
+            await change_bus.bump()
         except Exception:
-            # No-op if websocket layer isn't ready.
             pass
     except Exception as exc:  # noqa: BLE001
         logger.exception("Best-effort latest journal sync failed: %s", exc)
@@ -252,9 +251,8 @@ async def lifespan(app: FastAPI):
     app.state.system_tracker = system_tracker
     app.state.file_watcher = file_watcher
 
-    # Set dependencies for API routes and WebSocket layer
+    # Set dependencies for API routes
     set_dependencies(repository, aggregator, system_tracker)
-    set_aggregator(aggregator)
 
     # Perform a one-time initial import of existing journals when the
     # colonisation database is empty. This ensures that on a fresh
@@ -283,8 +281,17 @@ async def lifespan(app: FastAPI):
         # Non-fatal.
         pass
 
-    # Set update callback for file watcher
-    file_watcher.set_update_callback(notify_system_update)
+    # Set update callback for file watcher.
+    #
+    # WebSockets have been removed. The UI now uses AJAX long-polling and
+    # refetches via REST when the backend bumps the change sequence.
+    async def _update_callback(_system_name: str) -> None:
+        try:
+            await change_bus.bump()
+        except Exception:
+            pass
+
+    file_watcher.set_update_callback(_update_callback)
 
     # Start watching journal directory for incremental updates
     journal_dir = Path(config.journal.directory)
@@ -363,9 +370,9 @@ app.include_router(colonisation_router)
 app.include_router(settings_router)
 app.include_router(journal_router)
 app.include_router(carriers_router)
+app.include_router(changes_router)
 
-# WebSocket endpoint
-app.add_api_websocket_route("/ws/colonisation", websocket_endpoint)
+# WebSocket endpoint removed (replaced by /api/changes/longpoll).
 
 
 @app.get("/")

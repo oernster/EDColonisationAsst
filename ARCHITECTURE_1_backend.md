@@ -15,7 +15,7 @@ This document focuses on the **Python backend** of the Elite: Dangerous Colonisa
 - **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130)
 - **File watching**: `watchdog` in [`FileWatcher`](backend/src/services/file_watcher.py:1)
 - **HTTP client**: `httpx` (for Inara) in [`backend/src/services/inara_service.py`](backend/src/services/inara_service.py:1)
-- **WebSockets**: FastAPI WebSocket support in [`backend/src/api/websocket.py`](backend/src/api/websocket.py:1)
+- **Live updates**: AJAX long-polling via [`backend/src/api/changes.py`](backend/src/api/changes.py:1) backed by [`ChangeBus`](backend/src/services/change_bus.py:1)
 - **Logging**: Standard library logging configured in [`backend/src/utils/logger.py`](backend/src/utils/logger.py:1)
 - **Tests**: `pytest` + plugins under [`backend/tests/unit`](backend/tests/unit:1)
 
@@ -37,7 +37,7 @@ backend/
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── routes.py                  # Core REST API under /api
-│   │   ├── websocket.py               # /ws/colonisation endpoint, broadcast
+│   │   ├── changes.py                 # /api/changes/longpoll endpoint (AJAX live updates)
 │   │   ├── settings.py                # /api/settings endpoints
 │   │   ├── carriers.py                # /api/carriers endpoints (Fleet carriers)
 │   │   └── journal.py                 # /api/journal/status, etc.
@@ -98,7 +98,6 @@ On startup, the lifespan context manager `lifespan(app)`:
 3. Stores them on `app.state` and wires dependencies:
 
    - [`set_dependencies`](backend/src/api/routes.py:35) for REST routes.
-   - [`set_aggregator`](backend/src/api/websocket.py:1) for the WebSocket layer.
 
 4. Performs a **one‑time initial import** of existing journals when the DB is empty, using `_prime_colonisation_database_if_empty`:
 
@@ -111,7 +110,7 @@ On startup, the lifespan context manager `lifespan(app)`:
 
 5. Configures the `FileWatcher`:
 
-   - Calls `file_watcher.set_update_callback(notify_system_update)` so that changes trigger WebSocket broadcasts via [`notify_system_update`](backend/src/api/websocket.py:1).
+   - Calls `file_watcher.set_update_callback(...)` so that changes bump the in-process change sequence used by AJAX long-polling (`/api/changes/longpoll`).
    - Starts watching the journal directory with `file_watcher.start_watching(journal_dir)`, handling errors non‑fatally so the API can still start even if watching fails.
 
 On shutdown, the lifespan handler stops the `FileWatcher` and its watchdog observer via `file_watcher.stop_watching()`.
@@ -323,7 +322,7 @@ Concurrency:
        - Merge new snapshot state with any existing site, ensuring we never regress progress values.
   5. For `ColonisationContributionEvent`:
      - Invokes `_process_contribution` to call `repository.update_commodity`.
-  6. Tracks which systems were updated and invokes the optional `update_callback(system_name)`; in production this is wired to `notify_system_update` to broadcast updates over WebSockets.
+  6. Tracks which systems were updated and invokes the optional `update_callback(system_name)`; in production this bumps the in-process change sequence used by AJAX long-polling.
 
 ### 6.3 First‑run vs incremental ingestion
 
@@ -365,18 +364,18 @@ These methods power:
 - `GET /api/system`
 - `GET /api/system/commodities`
 - `GET /api/sites`
-- WebSocket notifications via `notify_system_update`.
+- AJAX long-poll notifications via `/api/changes/longpoll`.
 
 ---
 
-## 8. REST and WebSocket APIs (backend facets)
+## 8. REST and live update APIs (backend facets)
 
 The backend’s colonisation APIs are defined in:
 
 - [`backend/src/api/routes.py`](backend/src/api/routes.py:1)
 - [`backend/src/api/journal.py`](backend/src/api/journal.py:1)
 - [`backend/src/api/settings.py`](backend/src/api/settings.py:1)
-- [`backend/src/api/websocket.py`](backend/src/api/websocket.py:1)
+- [`backend/src/api/changes.py`](backend/src/api/changes.py:1)
 
 Key colonisation endpoints:
 
@@ -391,12 +390,11 @@ Key colonisation endpoints:
 - `GET /api/stats` – high-level stats from the repository.
 - `POST /api/debug/reload-journals` – explicit full re‑import using the same pipeline as the first‑run preload.
 
-WebSocket endpoint:
+Live updates:
 
-- `WS /ws/colonisation`:
-
-  - Manages client subscriptions per system.
-  - Pushes updated `SystemColonisationData` when journals change and ingestion updates the repository.
+- `GET /api/changes/longpoll?since=<seq>&timeout_s=<seconds>`
+- The response is `{ "seq": <int>, "changed": <bool> }`.
+- Clients long-poll in a loop; when `changed` is true they refetch the relevant REST endpoints.
 
 ---
 
@@ -410,7 +408,7 @@ Backend tests under [`backend/tests/unit`](backend/tests/unit:1) cover:
 - Repository behaviour and commodity updates: [`test_repository.py`](backend/tests/unit/test_repository.py:1)
 - System tracker and journal utilities: [`test_system_tracker_and_utils.py`](backend/tests/unit/test_system_tracker_and_utils.py:1)
 - API routes: [`test_api_routes.py`](backend/tests/unit/test_api_routes.py:1), [`test_api_journal_and_settings.py`](backend/tests/unit/test_api_journal_and_settings.py:1)
-- WebSocket notification & manager: [`test_websocket.py`](backend/tests/unit/test_websocket.py:1)
+- Live update long-poll is exercised indirectly via API wiring tests and frontend integration.
 - Runtime/launcher/tray stack: [`test_runtime_components.py`](backend/tests/unit/test_runtime_components.py:1), [`test_runtime_entry.py`](backend/tests/unit/test_runtime_entry.py:1), [`test_launcher.py`](backend/tests/unit/test_launcher.py:1), [`test_tray_app.py`](backend/tests/unit/test_tray_app.py:1)
 
 The first‑run preload logic and DB versioning are exercised indirectly via:

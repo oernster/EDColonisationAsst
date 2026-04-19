@@ -312,7 +312,7 @@ The API will be available at:
 
 - REST API: `http://localhost:8000`
 - API docs (Swagger): `http://localhost:8000/docs`
-- WebSocket: `ws://localhost:8000/ws/colonisation`
+- Live updates (AJAX long-poll): `http://localhost:8000/api/changes/longpoll`
 
 #### Production server
 
@@ -426,7 +426,7 @@ backend/
 
 ### Backend API overview
 
-The backend exposes REST endpoints and a WebSocket. Key routes (actual implementation in [`backend/src/api/routes.py`](backend/src/api/routes.py:1)):
+The backend exposes REST endpoints plus a **live update** endpoint implemented as **AJAX long-polling**. Key routes (actual implementation in [`backend/src/api/routes.py`](backend/src/api/routes.py:1) and [`backend/src/api/changes.py`](backend/src/api/changes.py:1)):
 
 #### REST
 
@@ -443,46 +443,24 @@ The backend exposes REST endpoints and a WebSocket. Key routes (actual implement
   - `GET /api/settings`, `POST /api/settings` – get/update app settings (including journal directory and Inara config).
   - `GET /api/journal/status` – minimal view of the current system from journal files.
 
-#### WebSocket
+#### Live updates (AJAX long-poll)
 
-`WS /ws/colonisation` – real-time updates (see [`backend/src/api/websocket.py`](backend/src/api/websocket.py:1) for full details).
+`GET /api/changes/longpoll?since=<seq>&timeout_s=<seconds>` – blocks until the backend detects new journal ingestion, or until the timeout elapses.
 
-Typical message flow:
+Response:
 
-- **Subscribe to system:**
+```json
+{
+  "seq": 42,
+  "changed": true
+}
+```
 
-  ```json
-  {
-    "type": "subscribe",
-    "system_name": "LHS 1234"
-  }
-  ```
+Client contract:
 
-- **Unsubscribe from system:**
-
-  ```json
-  {
-    "type": "unsubscribe",
-    "system_name": "LHS 1234"
-  }
-  ```
-
-- **Update notification (server → client):**
-
-  ```json
-  {
-    "type": "update",
-    "system_name": "LHS 1234",
-    "data": {
-      "construction_sites": [...],
-      "total_sites": 2,
-      "completed_sites": 1,
-      "in_progress_sites": 1,
-      "completion_percentage": 50.0
-    },
-    "timestamp": "2025-11-29T01:00:00Z"
-  }
-  ```
+- Keep `seq` and call long-poll in a loop.
+- When `changed: true`, refetch the relevant REST endpoints (usually `/api/systems` and `/api/system?name=...`).
+- When `changed: false`, wait briefly and long-poll again.
 
 ### Backend architecture
 
@@ -496,7 +474,7 @@ The backend follows SOLID principles and a clean layered approach:
   - Data aggregator
   - Inara service wrapper
 - **Repositories** – data access layer (SQLite persistence via [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:65)).
-- **API** – REST and WebSocket endpoints.
+- **API** – REST endpoints + live update long-poll endpoint.
 
 Key components:
 
@@ -505,7 +483,7 @@ Key components:
 3. **System Tracker** – tracks the commander’s current system and station.
 4. **Data Aggregator** – merges local journal data (and, in future, Inara data) into system/site summaries.
 5. **Repository** – thread-safe, lock-protected access to persisted colonisation data in SQLite.
-6. **WebSocket Manager** – manages client connections and broadcasts updates on system changes.
+6. **ChangeBus** – in-process change sequence used by `/api/changes/longpoll`.
 
 ### Backend configuration
 
@@ -522,9 +500,7 @@ server:
   cors_origins:
     - "http://localhost:5173"
 
-websocket:
-  ping_interval: 30
-  reconnect_attempts: 5
+  # Note: websocket config is legacy and currently unused (live updates use AJAX long-polling).
 
 logging:
   level: "INFO"
@@ -816,7 +792,7 @@ Backend will be available at:
 
 - API:  http://localhost:8000
 - Docs: http://localhost:8000/docs
-- WS:   ws://localhost:8000/ws/colonisation
+- Live updates: http://localhost:8000/api/changes/longpoll
 
 ```bash
 # Terminal 2 – frontend (Vite + React)
@@ -1203,7 +1179,7 @@ Regardless of OS, the bundle needs:
 
 ### 3. All‑in‑one desktop app wrappers
 
-If you prefer a single desktop window rather than “browser + local server”, you can wrap the existing HTTP/WebSocket API with:
+If you prefer a single desktop window rather than “browser + local server”, you can wrap the existing HTTP API (REST + long-poll) with:
 
 - Electron
 - Tauri
@@ -1213,7 +1189,7 @@ In this model:
 
 - The React UI runs inside the desktop shell.
 - It communicates with the Python backend over:
-  - `http://localhost:8000` and `ws://localhost:8000/ws/colonisation`, or
+  - `http://localhost:8000` (REST) and `http://localhost:8000/api/changes/longpoll` (AJAX live updates), or
   - Embedded Python bindings (more complex).
 
 Pros:
@@ -1253,4 +1229,4 @@ That document describes:
 
 - How to call the backend APIs from a GameGlass-embedded web app.
 - Which endpoints to use for system/site lists and aggregated commodity “shopping lists”.
-- How to consume the WebSocket endpoint for live updates.
+- How to consume the `/api/changes/longpoll` endpoint for live updates.

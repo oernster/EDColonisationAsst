@@ -19,8 +19,6 @@ from .api_models import (
     SystemResponse,
     SiteResponse,
     ErrorResponse,
-    WebSocketMessage,
-    WebSocketMessageType,
 )
 
 __all__ = [
@@ -41,6 +39,4 @@ __all__ = [
     "SystemResponse",
     "SiteResponse",
     "ErrorResponse",
-    "WebSocketMessage",
-    "WebSocketMessageType",
 ]

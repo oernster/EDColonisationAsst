@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ThemeProvider, createTheme, CssBaseline, Container, Box, Typography, Tabs, Tab, Link, Button, Chip, Tooltip } from '@mui/material';
 import { SystemSelector } from './components/SystemSelector/SystemSelector';
 import { SiteList } from './components/SiteList/SiteList';
@@ -6,7 +6,6 @@ import { FleetCarriersPanel } from './components/FleetCarriers/FleetCarriersPane
 import { useColonisationStore } from './stores/colonisationStore';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { api } from './services/api';
-import { useColonisationWebSocket } from './hooks/useColonisationWebSocket';
 import { useKeepAwake } from './hooks/useKeepAwake';
 import { isMobileOrTablet } from './utils/device';
 
@@ -70,7 +69,6 @@ function App() {
     error,
     settingsVersion,
     setSystemData,
-    setError,
     setAllSystems,
   } = useColonisationStore();
   const [currentTab, setCurrentTab] = useState(0);
@@ -157,12 +155,49 @@ function App() {
     }
   };
 
-  // Establish a WebSocket connection for live colonisation updates. The REST
-  // calls in SystemSelector provide the initial snapshot; this hook keeps the
-  // currently selected system in sync when journal events arrive.
-  useColonisationWebSocket(currentSystem, setSystemData, setError, () => {
-    void refreshFromBackend();
-  });
+  // AJAX long-poll loop: wait for backend ingestion changes, then refetch.
+  // This replaces the old WebSocket live update mechanism.
+  const changeSeqRef = useRef<number>(0);
+  useEffect(() => {
+    let cancelled = false;
+    let backoffMs = 500;
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        window.setTimeout(() => resolve(), ms);
+      });
+
+    const run = async () => {
+      while (!cancelled) {
+        const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+        const timeoutS = hidden ? 60 : 25;
+
+        try {
+          const res = await api.longPollChanges(changeSeqRef.current, timeoutS);
+          changeSeqRef.current = res.seq;
+          backoffMs = 500;
+
+          if (res.changed) {
+            await refreshFromBackend();
+          } else {
+            // Safety net: long-polling should normally block for many seconds.
+            // If the backend returns immediately with changed=false (misconfig,
+            // proxy, or test mocks), avoid a tight loop that can consume CPU/memory.
+            await sleep(250);
+          }
+        } catch {
+          await sleep(backoffMs);
+          backoffMs = Math.min(backoffMs * 2, 30000);
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const loadMeta = async () => {

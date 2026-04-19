@@ -53,6 +53,20 @@ export const api = {
     const response = await axios.get(`${API_BASE_URL}/health`);
     return response.data;
   },
+
+  // Long-poll for backend change notifications (AJAX live updates)
+  async longPollChanges(
+    since: number,
+    timeout_s: number = 25,
+  ): Promise<{ seq: number; changed: boolean }> {
+    const response = await axios.get<{ seq: number; changed: boolean }>(
+      `${API_BASE_URL}/changes/longpoll`,
+      {
+        params: { since, timeout_s },
+      },
+    );
+    return response.data;
+  },
  
   // Get app settings
   async getAppSettings(): Promise<AppSettings> {

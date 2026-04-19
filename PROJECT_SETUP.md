@@ -149,9 +149,11 @@ server:
   cors_origins:
     - "http://localhost:5173"
 
-websocket:
-  ping_interval: 30
-  reconnect_attempts: 5
+  # websocket: (legacy / unused)
+  # Live updates are implemented using AJAX long-polling at /api/changes/longpoll.
+  # websocket:
+  #   ping_interval: 30
+  #   reconnect_attempts: 5
 
 logging:
   level: "INFO"
@@ -434,9 +436,11 @@ npm run preview
 - **Solution**: Ensure backend is running on port 8000
 - Check proxy configuration in `vite.config.ts`
 
-**Problem**: WebSocket connection fails
-- **Solution**: Verify WebSocket endpoint in frontend code matches backend
-- Check CORS settings in backend
+**Problem**: Live updates not working
+- **Solution**: Verify the long-poll endpoint is reachable:
+  - `GET /api/changes/longpoll?since=0&timeout_s=1`
+  - Trigger a journal change and confirm it returns `changed: true`.
+- Check CORS settings in backend.
 
 **Problem**: Build errors
 - **Solution**: Clear node_modules and reinstall:
@@ -451,7 +455,7 @@ npm run preview
 2. **Start with Tests**: Begin with test-driven development
 3. **Implement Backend**: Start with journal parser and data models
 4. **Implement Frontend**: Build UI components incrementally
-5. **Integration**: Connect frontend to backend via WebSocket
+5. **Integration**: Connect frontend to backend via REST + AJAX long-poll (`/api/changes/longpoll`)
 6. **Testing**: Comprehensive testing at each stage
 7. **Documentation**: Keep docs updated as you build
 

@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from ..config import get_config, AppConfig, get_config_paths
 from ..models.api_models import AppSettings
+from ..services.change_bus import change_bus
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -93,8 +94,6 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
     # journal_directory in settings would not take effect until the user restarts
     # the whole application.
     try:
-        from .websocket import notify_global_refresh
-
         changed = old_journal_dir is None or old_journal_dir != settings.journal_directory
 
         # When called via FastAPI, `request` is provided. In unit tests this
@@ -108,8 +107,8 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
             await file_watcher.stop_watching()
             await file_watcher.start_watching(Path(settings.journal_directory))
 
-        # Prompt connected clients to refetch their data.
-        await notify_global_refresh()
+        # Prompt connected clients (AJAX long-poll) to refetch their data.
+        await change_bus.bump()
     except Exception:
         # Never fail settings save due to watcher restart issues.
         pass

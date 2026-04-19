@@ -71,45 +71,7 @@ class HealthResponse(BaseModel):
         description="Whether journal directory is accessible"
     )
 
-
-class WebSocketMessageType(str, Enum):
-    """WebSocket message types"""
-
-    SUBSCRIBE = "subscribe"
-    UNSUBSCRIBE = "unsubscribe"
-    UPDATE = "update"
-    # Global refresh hint: clients should refetch system list + selected system.
-    REFRESH = "refresh"
-    SYSTEM_CHANGED = "system_changed"
-    ERROR = "error"
-    PING = "ping"
-    PONG = "pong"
-
-
-class WebSocketMessage(BaseModel):
-    """WebSocket message model"""
-
-    type: WebSocketMessageType = Field(description="Message type")
-    system_name: Optional[str] = Field(
-        None, description="System name for subscribe/update"
-    )
-    data: Optional[Dict[str, Any]] = Field(None, description="Message data")
-    timestamp: Optional[str] = Field(None, description="Message timestamp")
-    error: Optional[str] = Field(None, description="Error message if type is error")
-
-
-class SubscribeMessage(BaseModel):
-    """Subscribe to system updates"""
-
-    type: WebSocketMessageType = Field(default=WebSocketMessageType.SUBSCRIBE)
-    system_name: str = Field(description="System name to subscribe to")
-
-
-class UnsubscribeMessage(BaseModel):
-    """Unsubscribe from system updates"""
-
-    type: WebSocketMessageType = Field(default=WebSocketMessageType.UNSUBSCRIBE)
-    system_name: str = Field(description="System name to unsubscribe from")
+# WebSocket message models removed. Live updates now use AJAX long-polling.
 
 
 class AppSettings(BaseModel):

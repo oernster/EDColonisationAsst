@@ -20,6 +20,13 @@ vi.mock('./services/api', () => ({
   api: {
     healthCheck: mockHealthCheck,
     getAppSettings: mockGetAppSettings,
+    // New AJAX live-update loop (long-poll). In tests we just return a stable
+    // response so the background effect doesn't throw.
+    longPollChanges: vi.fn().mockResolvedValue({ seq: 0, changed: false }),
+    // Used by refreshFromBackend(); prevent errors if called.
+    getSystems: vi.fn().mockResolvedValue([]),
+    getSystemData: vi.fn().mockResolvedValue(null),
+    getCurrentSystem: vi.fn().mockResolvedValue({ current_system: null }),
   },
 }));
 

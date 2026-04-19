@@ -48,7 +48,7 @@ frontend/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
     │   └── carrierStore.ts       # Zustand store for Fleet carrier data
     ├── hooks/
-    │   └── useColonisationWebSocket.ts
+    │   └── (no websocket hooks; live updates use AJAX long-poll in App)
     ├── types/
     │   ├── colonisation.ts       # Shared frontend types for colonisation data
     │   ├── fleetCarriers.ts      # Types for Fleet carrier data
@@ -63,7 +63,7 @@ frontend/
 
 ### 1.3 Data flow (frontend)
 
-The frontend talks to the backend over both HTTP and WebSockets, using helpers in [`api.ts`](frontend/src/services/api.ts:1) and [`useColonisationWebSocket.ts`](frontend/src/hooks/useColonisationWebSocket.ts:1).
+The frontend talks to the backend over HTTP (REST + AJAX long-polling), using helpers in [`api.ts`](frontend/src/services/api.ts:1).
 
 - **Initial data via REST**:
   - `/api/systems` – for the system selector.
@@ -73,16 +73,16 @@ The frontend talks to the backend over both HTTP and WebSockets, using helpers i
   - `/api/settings` – app/journal/Inara settings.
   - `/api/carriers/*` – Fleet carrier identity and state.
 
-- **Live updates via WebSockets**:
-  - Connects to `ws://localhost:8000/ws/colonisation`.
-  - Subscribes to one or more systems.
-  - Receives update messages whenever ingestion updates the repository and the backend calls `notify_system_update`.
+- **Live updates via AJAX long-polling**:
+  - The UI holds a request open to `GET /api/changes/longpoll?since=<seq>`.
+  - When the backend ingests journal changes it bumps an in-process sequence and the long-poll returns immediately.
+  - The UI then refetches `/api/systems` and `/api/system?name=<current>`.
 
 State is centralised in two Zustand stores:
 
 - [`colonisationStore`](frontend/src/stores/colonisationStore.ts:1)
   - `currentSystem`, `systemData`, `allSystems`, `loading`, `error`, `currentSystemInfo`, `settingsVersion`.
-  - Actions to set the current system, update system data, update the system list, and react to WebSocket messages.
+  - Actions to set the current system, update system data, and update the system list.
 
 - [`carrierStore`](frontend/src/stores/carrierStore.ts:1)
   - `currentCarrierInfo`, `currentCarrierState`, `myCarriers`, loading/error flags.
@@ -127,7 +127,7 @@ State is centralised in two Zustand stores:
 - **App / main** – [`App.tsx`](frontend/src/App.tsx:1), [`main.tsx`](frontend/src/main.tsx:1)
 
   - Compose the overall layout and route tabs/screens.
-  - Initialise stores and WebSocket connection.
+  - Initialise stores and start the AJAX long-poll live update loop.
 
 ---
 

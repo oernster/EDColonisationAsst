@@ -12,12 +12,12 @@ This document describes how a GameGlass shard (or any embedded web view) should 
 The backend is a FastAPI service that exposes:
 
 - **REST endpoints** under the `/api` prefix
-- A **WebSocket endpoint** at `/ws/colonisation` for real-time updates
+- **AJAX long-poll endpoint** at `/api/changes/longpoll` for live updates
 
 By default the service listens on `http://localhost:<port>`, where the port is configured in the backend configuration (see the main application README / config). When developing a GameGlass shard on the same machine, the typical base URLs are:
 
 - `http://localhost:<port>/api/...` for HTTP requests
-- `ws://localhost:<port>/ws/colonisation` for WebSocket connections
+- `http://localhost:<port>/api/changes/longpoll` for long-poll live updates
 
 CORS is configured to allow browser-based clients, so calls from the shard’s embedded web view are permitted as long as they target the correct origin and port.
 
@@ -405,89 +405,35 @@ Accepts an updated settings object in JSON format. These endpoints are typically
 Returns overall statistics about colonisation data stored in the assistant. This can be used for high-level summary panels in a shard (for example totals of sites, systems, etc.). Exact contents may evolve with the backend and can be inspected via the generated OpenAPI docs (`/docs` route) or by calling the endpoint directly.
 
 
-## 3. Real-Time Updates via WebSocket
+## 3. Real-Time-ish Updates via AJAX long-poll
 
-For a more responsive shard you can subscribe to real-time system updates instead of (or in addition to) polling REST endpoints.
+For a more responsive shard you can long-poll for changes instead of (or in addition to) periodically polling REST endpoints.
 
-**URL:** `ws://localhost:<port>/ws/colonisation`
+**URL:** `http://localhost:<port>/api/changes/longpoll`
 
+### 3.1. Long-poll contract
 
-### 3.1. Subscribing to a System
+Call:
 
-To begin receiving updates for a particular system, send a JSON message:
+`GET /api/changes/longpoll?since=<seq>&timeout_s=<seconds>`
 
-```json
-{
-  "type": "subscribe",
-  "system_name": "LHS 1234"
-}
-```
-
-Upon subscription, the server immediately sends a snapshot:
+Response shape:
 
 ```json
 {
-  "type": "update",
-  "system_name": "LHS 1234",
-  "data": {
-    "construction_sites": [
-      {
-        "market_id": 123456,
-        "station_name": "Example Depot",
-        "commodities": [
-          {
-            "name_localised": "Water",
-            "required_amount": 1000,
-            "provided_amount": 250,
-            "remaining_amount": 750,
-            "progress_percentage": 25.0,
-            "payment": 250000,
-            "status": "in_progress"
-          }
-        ],
-        "total_commodities_needed": 750,
-        "commodities_progress_percentage": 25.0
-      }
-    ],
-    "total_sites": 1,
-    "completed_sites": 0,
-    "in_progress_sites": 1,
-    "completion_percentage": 0.0
-  },
-  "timestamp": "2025-01-01T12:00:00Z"
+  "seq": 42,
+  "changed": true
 }
 ```
 
-Whenever new journal data is processed for that system, further `update` messages are sent with the same shape, allowing the shard to refresh its lists and shopping data without polling.
+Client behavior:
 
-
-### 3.2. Unsubscribe and Keepalive
-
-To stop receiving updates for a system:
-
-```json
-{
-  "type": "unsubscribe",
-  "system_name": "LHS 1234"
-}
-```
-
-To keep the WebSocket connection alive, periodically send:
-
-```json
-{
-  "type": "ping"
-}
-```
-
-The server responds with:
-
-```json
-{
-  "type": "pong",
-  "timestamp": "2025-01-01T12:00:10Z"
-}
-```
+- Keep a local `seq` (start at `0`).
+- Loop forever:
+  - Call long-poll with your current `seq`.
+  - Update your local `seq` from the response.
+  - If `changed` is `true`, refetch the REST endpoints you display (e.g. `/api/system?name=...`, `/api/system/commodities?name=...`).
+  - If `changed` is `false` (timeout), simply long-poll again.
 
 
 ## 4. Recommended Integration Flow for a Shard
@@ -503,13 +449,12 @@ A typical GameGlass shard that wants to show **construction sites** and a **shop
    - Call `/api/system?name=<system_name>` to display per-site cards.
    - Call `/api/system/commodities?name=<system_name>` to build the aggregated **shopping list** for that system.
 
-3. **Optional: real-time updates**
-   - Open `ws://localhost:<port>/ws/colonisation`.
-   - Send a `subscribe` message for the selected system.
-   - Update the UI whenever an `update` message is received.
+3. **Optional: live updates**
+   - Long-poll `GET /api/changes/longpoll?since=<seq>`.
+   - When it returns with `changed: true`, refetch the relevant REST endpoints.
 
 4. **When the shard is closed or the system changes**
-   - Send an `unsubscribe` message for the old system, or close the WebSocket connection.
+   - No unsubscribe required; just stop your long-poll loop.
 
 This API-focused description is intended to be sufficient for shard authors to integrate with the ED Colonisation Assistant without needing to inspect the backend code.
 

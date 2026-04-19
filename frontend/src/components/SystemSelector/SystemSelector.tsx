@@ -33,9 +33,8 @@ export const SystemSelector = () => {
    const loadSystems = async () => {
      try {
        setLoadingSystems(true);
-       const systems = await api.getSystems();
-       console.log("SYSTEMS FROM API:", systems);
-       setAllSystems(systems);
+        const systems = await api.getSystems();
+        setAllSystems(systems);
        
        // Also get current system info
        const currentInfo = await api.getCurrentSystem();

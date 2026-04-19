@@ -12,7 +12,7 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 │  - System selector, site list, Fleet Carriers, settings UI         │
 │  - Talks to backend via:                                           │
 │      • REST  → http://localhost:8000/api/*                         │
-│      • WebSocket → ws://localhost:8000/ws/colonisation             │
+│      • Live updates (AJAX long-poll) → http://localhost:8000/api/changes/longpoll │
 └─────────────────────────────────────────────────────────────────────┘
                             ▲                  ▲
                             │                  │
@@ -31,7 +31,7 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 │      • Optionally enriches with Inara data                          │
 │  - APIs                                                             │
 │      • REST routes under /api/*                                     │
-│      • WebSocket endpoint /ws/colonisation                          │
+│      • Live updates via AJAX long-poll (/api/changes/longpoll)       │
 │      • Fleet carrier endpoints under /api/carriers/*                │
 └─────────────────────────────────────────────────────────────────────┘
                             ▲
@@ -48,8 +48,10 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 
 At a glance:
 
-- The **backend** watches and parses Elite: Dangerous journal files, persists colonisation state in SQLite, reconstructs Fleet carrier state in memory, and exposes REST/WebSocket APIs.
+- The **backend** watches and parses Elite: Dangerous journal files, persists colonisation state in SQLite, reconstructs Fleet carrier state in memory, and exposes REST APIs plus an AJAX long-poll live update endpoint.
 - The **frontend** is a React/TypeScript app (MUI, Zustand, Vite) that consumes those APIs to show system progress, shopping lists, carrier state, and settings.
+
+Note: EDCA previously used WebSockets for live updates; this has been replaced by AJAX long-polling via `/api/changes/longpoll`.
 - A **runtime layer** (Qt launcher, tray, packaged EXE) wraps the backend and serves the built frontend to end users, enforcing a single‑instance guarantee per OS user.
 
 ---
@@ -75,7 +77,7 @@ That document focuses on:
   - `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`.
   - Normalisation of commodity identifiers and display names.
 - Data aggregation and optional Inara integration.
-- Backend REST and WebSocket APIs.
+- Backend REST APIs and AJAX long-poll live updates.
 - Backend testing and quality tooling.
 
 ### 2.2 Frontend & runtime architecture
@@ -86,8 +88,8 @@ That document focuses on:
 
 - React/TypeScript frontend:
   - Component structure (SystemSelector, SiteList, FleetCarriersPanel, SettingsPage).
-  - Stores (`colonisationStore`, `carrierStore`) and hooks (`useColonisationWebSocket`).
-  - How the UI uses `/api/*` and `/ws/colonisation`.
+  - Stores (`colonisationStore`, `carrierStore`).
+  - How the UI uses `/api/*` and AJAX long-polling at `/api/changes/longpoll`.
 - Fleet Carriers UI:
   - Current docked carrier header and services.
   - Cargo and buy/sell order presentation.
@@ -115,8 +117,8 @@ These two files are the authoritative, up‑to‑date references for how EDCA wo
   - Packaging and installer notes.
 
 - **GameGlass integration**  
-  [`GameGlass-Integration.md`](GameGlass-Integration.md:1)  
-  - How to use EDCA’s APIs and WebSocket endpoint from GameGlass shards.
+  [`GameGlass-Integration.md`](GameGlass-Integration.md:1)
+  - How to use EDCA’s APIs and live update long-poll endpoint from GameGlass shards.
   - Which endpoints to call for system lists, site data, and aggregated commodities.
 
 - **Project setup**  

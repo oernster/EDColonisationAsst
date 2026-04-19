@@ -62,9 +62,14 @@ class JournalFileHandler(FileSystemEventHandler):
         # Legacy field kept for backward compatibility; we now track per-file
         # offsets for incremental processing instead.
         self._processed_files: Set[str] = set()
-        # Incremental processing state: remember how many bytes we have already
-        # processed per journal file so we only ingest appended lines.
-        self._file_offsets: dict[str, int] = {}
+        # Incremental processing state:
+        # - remember how many BYTES we have already read from each journal file
+        # - keep any trailing partial line bytes (when the writer hasn't yet
+        #   terminated the JSON line with a newline).
+        #
+        # This prevents losing events when we read mid-write.
+        self._file_offsets_bytes: dict[str, int] = {}
+        self._file_partial_bytes: dict[str, bytes] = {}
         # Prevent concurrent incremental reads of the same file.
         self._process_lock = asyncio.Lock()
         # Event loop used to schedule async processing from watchdog threads
@@ -77,6 +82,9 @@ class JournalFileHandler(FileSystemEventHandler):
         self.last_processed_at: str | None = None
         self.last_processed_file: str | None = None
         self.last_error: str | None = None
+        self.last_events_parsed: int | None = None
+        self.last_updated_systems: list[str] | None = None
+        self.last_depot_market_ids: list[int] | None = None
 
     # ------------------------------------------------------------------ watchdog hooks
 
@@ -159,7 +167,9 @@ class JournalFileHandler(FileSystemEventHandler):
             # - First time we see a file: parse entire file via parse_file.
             # - Subsequent calls: only parse newly appended lines via parse_line.
             async with self._process_lock:
-                offset = int(self._file_offsets.get(str(file_path), 0))
+                key = str(file_path)
+                offset = int(self._file_offsets_bytes.get(key, 0))
+                partial = self._file_partial_bytes.get(key, b"")
 
                 try:
                     current_size = file_path.stat().st_size
@@ -169,48 +179,75 @@ class JournalFileHandler(FileSystemEventHandler):
                 # Handle truncation/rotation edge case.
                 if current_size < offset:
                     offset = 0
+                    partial = b""
 
                 events = []
                 if offset <= 0:
                     events = self.parser.parse_file(file_path)
                     # After full parse, mark offset at EOF.
                     try:
-                        self._file_offsets[str(file_path)] = file_path.stat().st_size
+                        self._file_offsets_bytes[key] = file_path.stat().st_size
                     except OSError:
-                        self._file_offsets[str(file_path)] = current_size
+                        self._file_offsets_bytes[key] = current_size
+                    self._file_partial_bytes[key] = b""
                 else:
                     # Incremental tail parse from byte offset.
+                    # IMPORTANT: journals are appended line-by-line. If we read
+                    # while Elite is still writing the final JSON line, we will
+                    # see a partial line without a trailing newline. We MUST
+                    # retain that partial and retry it on the next pass.
                     try:
-                        with open(file_path, "r", encoding="utf-8") as f:
+                        with open(file_path, "rb") as f:
                             f.seek(offset)
-                            for line in f:
-                                line = line.strip()
-                                if not line:
-                                    continue
-                                try:
-                                    ev = self.parser.parse_line(line)
-                                    if ev is not None:
-                                        events.append(ev)
-                                except Exception:
-                                    # Keep processing; parser logs internally.
-                                    continue
+                            chunk = f.read()
+                            new_offset = offset + len(chunk)
+
+                        buf = partial + chunk
+                        parts = buf.split(b"\n")
+                        complete_parts = parts[:-1]
+                        new_partial = parts[-1]  # may be b"" when newline-terminated
+
+                        for part in complete_parts:
+                            if not part:
+                                continue
+                            # Decode a single line; tolerate any weird bytes.
                             try:
-                                self._file_offsets[str(file_path)] = f.tell()
+                                line = part.decode("utf-8", errors="replace").strip()
                             except Exception:
-                                self._file_offsets[str(file_path)] = current_size
+                                continue
+                            if not line:
+                                continue
+                            try:
+                                ev = self.parser.parse_line(line)
+                                if ev is not None:
+                                    events.append(ev)
+                            except Exception:
+                                # Keep processing; parser logs internally.
+                                continue
+
+                        self._file_offsets_bytes[key] = new_offset
+                        self._file_partial_bytes[key] = new_partial
                     except OSError:
                         # If we can't open/seek, fall back to full parse.
                         events = self.parser.parse_file(file_path)
                         try:
-                            self._file_offsets[str(file_path)] = file_path.stat().st_size
+                            self._file_offsets_bytes[key] = file_path.stat().st_size
                         except OSError:
-                            self._file_offsets[str(file_path)] = current_size
+                            self._file_offsets_bytes[key] = current_size
+                        self._file_partial_bytes[key] = b""
+
+            # Diagnostics
+            try:
+                self.last_events_parsed = len(events)
+            except Exception:
+                pass
 
             if not events:
                 return
 
             # Process each event
             updated_systems: Set[str] = set()
+            depot_market_ids: set[int] = set()
 
             for event in events:
                 # Update system tracker
@@ -230,8 +267,12 @@ class JournalFileHandler(FileSystemEventHandler):
 
                 # Process colonisation events
                 if isinstance(event, ColonisationConstructionDepotEvent):
-                    await self._process_construction_depot(event)
-                    updated_systems.add(event.system_name)
+                    depot_market_ids.add(event.market_id)
+                    resolved_system = await self._process_construction_depot(event)
+                    # Depot events often omit StarSystem; use the resolved system
+                    # name (from existing site / tracker fallbacks) for updates.
+                    if resolved_system:
+                        updated_systems.add(resolved_system)
                 elif isinstance(event, ColonisationContributionEvent):
                     await self._process_contribution(event)
                     site = await self.repository.get_site_by_market_id(event.market_id)
@@ -243,6 +284,13 @@ class JournalFileHandler(FileSystemEventHandler):
                 for system_name in updated_systems:
                     await self.update_callback(system_name)
 
+            # Diagnostics: record which systems/market IDs were updated.
+            try:
+                self.last_updated_systems = sorted(updated_systems)
+                self.last_depot_market_ids = sorted(depot_market_ids)
+            except Exception:
+                pass
+
         except Exception as exc:  # noqa: BLE001
             logger.error("Error processing file %s: %s", file_path, exc)
             try:
@@ -253,7 +301,7 @@ class JournalFileHandler(FileSystemEventHandler):
     async def _process_construction_depot(
         self,
         event: ColonisationConstructionDepotEvent,
-    ) -> None:
+    ) -> str:
         """Process ColonisationConstructionDepot event.
 
         Notes:
@@ -360,28 +408,22 @@ class JournalFileHandler(FileSystemEventHandler):
         else:
             merged_commodities = list(snapshot_commodities.values())
 
-        # Build the updated site model
-        site = ConstructionSite(
-            market_id=event.market_id,
-            station_name=station_name,
-            station_type=station_type,
-            system_name=system_name,
-            system_address=system_address,
-            construction_progress=event.construction_progress,
-            construction_complete=event.construction_complete,
-            construction_failed=event.construction_failed,
-            commodities=merged_commodities,
+        # Persist to repository.
+        await self.repository.add_construction_site(
+            ConstructionSite(
+                market_id=event.market_id,
+                station_name=station_name,
+                station_type=station_type,
+                system_name=system_name,
+                system_address=system_address,
+                construction_progress=event.construction_progress,
+                construction_complete=event.construction_complete,
+                construction_failed=event.construction_failed,
+                commodities=merged_commodities,
+            )
         )
 
-        # Persist (INSERT OR REPLACE on the same market_id)
-        await self.repository.add_construction_site(site)
-
-        logger.info(
-            "Updated construction site: %s in %s (%.1f%% complete)",
-            site.station_name,
-            site.system_name,
-            site.construction_progress,
-        )
+        return system_name
 
     async def _process_contribution(self, event: ColonisationContributionEvent) -> None:
         """Process ColonisationContribution event."""

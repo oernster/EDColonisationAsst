@@ -2,7 +2,7 @@
 
 import yaml
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from ..config import get_config, AppConfig, get_config_paths
 from ..models.api_models import AppSettings
 
@@ -24,7 +24,7 @@ async def get_app_settings():
 
 
 @router.post("", response_model=AppSettings)
-async def update_app_settings(settings: AppSettings):
+async def update_app_settings(settings: AppSettings, request: Request = None):  # type: ignore[assignment]
     """Update application settings.
 
     - Non-sensitive config (e.g. journal path) is stored in backend/config.yaml
@@ -76,12 +76,42 @@ async def update_app_settings(settings: AppSettings):
     # Update in-memory config so the running app sees the changes
     from ..config import _config
 
+    old_journal_dir: str | None = None
     if _config is not None:
+        old_journal_dir = _config.journal.directory
         _config.journal.directory = settings.journal_directory
         _config.inara.api_key = settings.inara_api_key or ""
         _config.inara.commander_name = settings.inara_commander_name
         _config.inara.prefer_local_for_commander_systems = (
             settings.prefer_local_for_commander_systems
         )
+
+    # Best-effort: restart the live file watcher if the journal directory changed.
+    #
+    # The watcher is started once during app lifespan startup in
+    # [`lifespan()`](backend/src/main.py:149). Without a restart, changing
+    # journal_directory in settings would not take effect until the user restarts
+    # the whole application.
+    try:
+        from .websocket import notify_global_refresh
+
+        changed = old_journal_dir is None or old_journal_dir != settings.journal_directory
+
+        # When called via FastAPI, `request` is provided. In unit tests this
+        # function is called directly, so request may be None.
+        file_watcher = None
+        if request is not None:
+            app_state = getattr(getattr(request, "app", None), "state", None)
+            file_watcher = getattr(app_state, "file_watcher", None) if app_state else None
+
+        if changed and file_watcher is not None:
+            await file_watcher.stop_watching()
+            await file_watcher.start_watching(Path(settings.journal_directory))
+
+        # Prompt connected clients to refetch their data.
+        await notify_global_refresh()
+    except Exception:
+        # Never fail settings save due to watcher restart issues.
+        pass
 
     return settings

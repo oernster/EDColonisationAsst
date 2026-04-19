@@ -50,15 +50,62 @@ async def health_check() -> HealthResponse:
     config = get_config()
     journal_dir = Path(config.journal.directory)
 
-    from .. import __version__
+    from .. import __version__, __build_id__
 
     return HealthResponse(
         status="healthy",
         version=__version__,
+        build_id=__build_id__ or "",
         python_version=platform.python_version(),
         journal_directory=str(journal_dir),
         journal_accessible=journal_dir.exists(),
     )
+
+
+@router.get("/watcher/status", response_model=dict)
+async def get_watcher_status() -> dict:
+    """Return a small diagnostic snapshot for the journal watcher.
+
+    This endpoint is intended for UI self-diagnostics in the packaged runtime.
+    """
+    config = get_config()
+    journal_dir = Path(config.journal.directory)
+
+    try:
+        # Import locally to avoid cycles in test imports.
+        from ..main import app as fastapi_app
+
+        watcher = getattr(fastapi_app.state, "file_watcher", None)
+    except Exception:
+        watcher = None
+
+    running = bool(getattr(watcher, "is_running", lambda: False)()) if watcher else False
+    watched = str(getattr(watcher, "watched_directory", lambda: None)() or "") if watcher else ""
+    poller_running = (
+        bool(getattr(watcher, "poller_running", lambda: False)()) if watcher else False
+    )
+
+    handler = getattr(watcher, "_handler", None) if watcher else None  # noqa: SLF001
+
+    handler_diag = None
+    if handler is not None:
+        handler_diag = {
+            "last_watchdog_event_at": getattr(handler, "last_watchdog_event_at", None),
+            "last_watchdog_event_type": getattr(handler, "last_watchdog_event_type", None),
+            "last_watchdog_event_path": getattr(handler, "last_watchdog_event_path", None),
+            "last_processed_at": getattr(handler, "last_processed_at", None),
+            "last_processed_file": getattr(handler, "last_processed_file", None),
+            "last_error": getattr(handler, "last_error", None),
+        }
+
+    return {
+        "configured_journal_directory": str(journal_dir),
+        "configured_directory_exists": journal_dir.exists(),
+        "watcher_running": running,
+        "watcher_directory": watched or None,
+        "poller_running": poller_running,
+        "handler": handler_diag,
+    }
 
 
 @router.get("/systems", response_model=SystemListResponse)
@@ -262,6 +309,33 @@ async def reload_journals() -> dict:
         if file_events:
             processed_files.append(journal_file.name)
             total_events += len(file_events)
+
+    # Push updates to any connected UIs.
+    #
+    # - Per-system UPDATE messages refresh subscribed system views.
+    # - A global REFRESH message prompts clients to refetch system list + current selection
+    #   (useful if the currently selected system changed, or if the list of systems changed).
+    try:
+        from ..api.websocket import notify_system_update, notify_global_refresh
+
+        # Broadcast per-system updates for all known systems.
+        try:
+            updated_systems = await _repository.get_all_systems()
+        except Exception:
+            updated_systems = []
+
+        for system_name in updated_systems:
+            try:
+                await notify_system_update(system_name)
+            except Exception:
+                # Best-effort; do not fail the API response.
+                pass
+
+        # Always broadcast a global refresh hint as a safety net.
+        await notify_global_refresh()
+    except Exception:
+        # Never fail the debug endpoint due to WebSocket notification issues.
+        pass
 
     return {
         "processed_files": processed_files,

@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -146,6 +147,68 @@ async def _prime_colonisation_database_if_empty(
     )
 
 
+async def _sync_latest_journals_best_effort(
+    parser: JournalParser,
+    system_tracker: SystemTracker,
+    repository: ColonisationRepository,
+    journal_dir: Path,
+    loop: asyncio.AbstractEventLoop,
+) -> None:
+    """Best-effort sync of the most recent journal files.
+
+    Motivation:
+    - The packaged runtime persists its SQLite DB under %LOCALAPPDATA%.
+      Reinstalling the app does not necessarily delete that DB.
+    - If the DB is stale (e.g. older depot snapshot values) and watchdog events
+      are unavailable, users can see old numbers until a manual reload.
+
+    Strategy:
+    - Process the most recently modified N journal files (oldest->newest) so
+      newer depot snapshots win.
+    - Use the same JournalFileHandler ingestion path so merge logic applies.
+    - Send a global refresh hint at the end so the UI refetches.
+
+    This is intentionally non-fatal.
+    """
+    try:
+        if not journal_dir.exists():
+            return
+
+        journal_files = sorted(
+            journal_dir.glob("Journal.*.log"),
+            key=lambda p: p.stat().st_mtime,
+        )
+        if not journal_files:
+            return
+
+        # Process only the tail of history to keep startup cost bounded.
+        tail_count = 3
+        tail = journal_files[-tail_count:]
+
+        from .services.file_watcher import JournalFileHandler  # local import
+
+        handler = JournalFileHandler(
+            parser=parser,
+            system_tracker=system_tracker,
+            repository=repository,
+            update_callback=notify_system_update,
+            loop=loop,
+        )
+
+        for jf in tail:
+            await handler._process_file(jf)
+
+        try:
+            from .api.websocket import notify_global_refresh
+
+            await notify_global_refresh()
+        except Exception:
+            # No-op if websocket layer isn't ready.
+            pass
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Best-effort latest journal sync failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -161,12 +224,27 @@ async def lifespan(app: FastAPI):
 
     config = get_config()
 
+    # Capture the *running* asyncio loop for the FastAPI lifespan.
+    #
+    # The journal file watcher uses watchdog (threads) and schedules async work
+    # back onto this loop. If we capture the wrong loop (or a non-running loop),
+    # live updates can silently stop.
+    loop = asyncio.get_running_loop()
+
     # Initialize core components
     repository = ColonisationRepository()
     aggregator = DataAggregator(repository)
     system_tracker = SystemTracker()
     parser = JournalParser()
-    file_watcher = FileWatcher(parser, system_tracker, repository)
+    # FileWatcher accepts an optional `loop` kwarg in production so watchdog
+    # threads can schedule work onto the running FastAPI event loop.
+    #
+    # In unit tests, FileWatcher may be monkeypatched with a dummy class that
+    # does not accept newer keyword args, so fall back gracefully.
+    try:
+        file_watcher = FileWatcher(parser, system_tracker, repository, loop=loop)
+    except TypeError:
+        file_watcher = FileWatcher(parser, system_tracker, repository)  # type: ignore[call-arg]
 
     # Expose components via application state for other parts of the app
     app.state.repository = repository
@@ -184,6 +262,26 @@ async def lifespan(app: FastAPI):
     # populate sites and commodities without requiring the user to call
     # /api/debug/reload-journals manually.
     await _prime_colonisation_database_if_empty(repository, parser, system_tracker)
+
+    # In the packaged runtime, also do a *bounded* best-effort sync of the most
+    # recent journal files even when the DB is not empty. This mitigates stale
+    # persistent DB state after reinstall/upgrade.
+    try:
+        if is_frozen():
+            journal_dir_for_sync = Path(config.journal.directory)
+            asyncio.create_task(
+                _sync_latest_journals_best_effort(
+                    parser,
+                    system_tracker,
+                    repository,
+                    journal_dir_for_sync,
+                    loop,
+                ),
+                name="edca-startup-journal-sync",
+            )
+    except Exception:
+        # Non-fatal.
+        pass
 
     # Set update callback for file watcher
     file_watcher.set_update_callback(notify_system_update)

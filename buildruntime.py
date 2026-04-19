@@ -46,6 +46,38 @@ APP_NAME = "Elite: Dangerous Colonisation Assistant"
 RUNTIME_EXE_NAME = "EDColonisationAsst"
 
 
+def _write_build_id(project_root: Path) -> str:
+    """Write a build identifier to BUILD_ID in the project root.
+
+    Format: UTC timestamp + short git SHA when available.
+    """
+    from datetime import datetime, UTC
+
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    sha = "nogit"
+    try:
+        # Using subprocess directly keeps this script dependency-free.
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            sha = result.stdout.strip()
+    except Exception:
+        pass
+
+    build_id = f"{stamp}-{sha}"
+    try:
+        (project_root / "BUILD_ID").write_text(build_id + "\n", encoding="utf-8")
+    except OSError:
+        # Not fatal; we still build, but health endpoint won't show a build id.
+        pass
+    return build_id
+
+
 def build_runtime() -> None:
     """Build the runtime executable using Nuitka."""
     project_root = Path(__file__).resolve().parent
@@ -67,6 +99,12 @@ def build_runtime() -> None:
     print(f"[buildruntime] Building runtime for {APP_NAME}")
     print(f"[buildruntime] Runtime entry script: {runtime_entry}")
     print(f"[buildruntime] Icon: {icon_path}")
+
+    # Create/refresh BUILD_ID so packaged builds can be verified at runtime.
+    # This avoids the "stale EXE" problem where an installer appears to rebuild
+    # but end users are still launching an older binary.
+    build_id = _write_build_id(project_root)
+    print(f"[buildruntime] BUILD_ID: {build_id}")
 
     # Determine jobs for Nuitka parallel compilation.
     cpu_count = os.cpu_count() or 1
@@ -104,6 +142,14 @@ def build_runtime() -> None:
         f"--output-filename={RUNTIME_EXE_NAME}.exe",
         f"--windows-icon-from-ico={icon_path}",
     ]
+
+    # Include build marker file and VERSION next to the runtime EXE.
+    build_id_file = project_root / "BUILD_ID"
+    if build_id_file.exists():
+        nuitka_args.append(f"--include-data-file={build_id_file}=BUILD_ID")
+    version_file = project_root / "VERSION"
+    if version_file.exists():
+        nuitka_args.append(f"--include-data-file={version_file}=VERSION")
 
     # Finally, the script to compile.
     nuitka_args.append(str(runtime_entry))

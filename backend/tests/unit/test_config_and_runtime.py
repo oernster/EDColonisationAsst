@@ -187,20 +187,21 @@ def test_get_config_linux_autodetect_overrides_windows_default(
     This behaviour is Linux-specific; on Windows the journal directory is
     resolved via utils.windows instead, so this test is skipped there.
     """
-    if os.name == "nt":
-        pytest.skip(
-            "Linux-specific journal auto-detect behaviour is not applicable on Windows."
-        )
-
     config_file = tmp_path / "config.yaml"
     commander_file = tmp_path / "commander.yaml"
 
-    # Use the baked-in Windows default so looks_like_windows_default evaluates True.
+    # Use a Windows-style default path that is guaranteed to be missing on the
+    # current machine.
+    #
+    # Important: write YAML using forward slashes + single quotes so the YAML
+    # is valid on all platforms. Double-quoted Windows paths with backslashes
+    # can be invalid YAML (e.g. "\U" unicode escapes), and config.get_config()
+    # intentionally falls back to defaults on YAML parse errors.
     win_default = (
-        r"C:\Users\%USERNAME%\Saved Games\Frontier Developments\Elite Dangerous"
+        "C:/Users/%USERNAME%/Saved Games/Frontier Developments/Elite Dangerous/__edca_test_missing__"
     )
     config_file.write_text(
-        f'journal:\n  directory: "{win_default}"\n',
+        f"journal:\n  directory: '{win_default}'\n",
         encoding="utf-8",
     )
     commander_file.write_text("", encoding="utf-8")

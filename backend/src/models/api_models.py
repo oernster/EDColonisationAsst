@@ -64,6 +64,7 @@ class HealthResponse(BaseModel):
 
     status: str = Field(default="healthy", description="Service status")
     version: str = Field(description="Application version")
+    build_id: str = Field(description="Build identifier (for diagnosing stale installs)")
     python_version: str = Field(description="Python runtime version")
     journal_directory: str = Field(description="Configured journal directory")
     journal_accessible: bool = Field(
@@ -77,6 +78,8 @@ class WebSocketMessageType(str, Enum):
     SUBSCRIBE = "subscribe"
     UNSUBSCRIBE = "unsubscribe"
     UPDATE = "update"
+    # Global refresh hint: clients should refetch system list + selected system.
+    REFRESH = "refresh"
     SYSTEM_CHANGED = "system_changed"
     ERROR = "error"
     PING = "ping"

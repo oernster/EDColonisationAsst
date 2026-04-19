@@ -266,3 +266,31 @@ async def notify_system_update(system_name: str) -> None:
 
     except Exception as e:
         logger.error(f"Error notifying system update: {e}")
+
+
+async def notify_global_refresh() -> None:
+    """Broadcast a global refresh hint to all connected clients.
+
+    Unlike per-system UPDATE messages, this message is not tied to a system
+    subscription; any connected UI can use it to refetch:
+      - /api/systems
+      - /api/system?name=<current>
+
+    This is primarily used after bulk operations like debug journal reloads or
+    configuration changes.
+    """
+    try:
+        message = WebSocketMessage(
+            type=WebSocketMessageType.REFRESH,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        payload = message.model_dump()
+
+        # Snapshot connections to avoid holding the manager lock while sending.
+        async with manager._lock:  # noqa: SLF001
+            websockets = list(manager.active_connections.keys())
+
+        for websocket in websockets:
+            await manager.send_personal_message(websocket, payload)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Error broadcasting global refresh: {exc}")

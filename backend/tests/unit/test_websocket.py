@@ -254,6 +254,28 @@ async def test_notify_system_update_no_aggregator_is_noop():
         ws_api._aggregator = orig_agg  # type: ignore[assignment]
 
 
+@pytest.mark.asyncio
+async def test_notify_global_refresh_broadcasts_to_all_connections():
+    """notify_global_refresh should send a REFRESH message to all connected websockets."""
+    # Use the real ConnectionManager but stub websockets.
+    manager = ws_api.ConnectionManager()
+    ws1 = StubWebSocket()
+    ws2 = StubWebSocket()
+
+    await manager.connect(ws1)
+    await manager.connect(ws2)
+
+    orig_manager = ws_api.manager
+    try:
+        ws_api.manager = manager  # type: ignore[assignment]
+        await ws_api.notify_global_refresh()
+    finally:
+        ws_api.manager = orig_manager  # type: ignore[assignment]
+
+    assert any(m.get("type") == WebSocketMessageType.REFRESH for m in ws1.sent_messages)
+    assert any(m.get("type") == WebSocketMessageType.REFRESH for m in ws2.sent_messages)
+
+
 class _BoomAggregator:
     async def aggregate_by_system(self, system_name: str) -> _DummySystemData:
         raise RuntimeError("boom")

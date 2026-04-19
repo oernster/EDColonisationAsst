@@ -83,6 +83,10 @@ def build_installer() -> None:
     # when backend sources are not directly visible.
     version_file = _ensure_version_file(project_root)
 
+    # Ensure BUILD_ID exists so the installed runtime can expose a precise build
+    # marker via /api/health (used to detect stale installs).
+    build_id_file = _ensure_build_id_file(project_root)
+
     print(f"[buildguiinstaller] Building installer for {APP_NAME}")
     print(f"[buildguiinstaller] GUI script: {gui_script}")
     print(f"[buildguiinstaller] Icon: {icon_path}")
@@ -100,6 +104,13 @@ def build_installer() -> None:
     else:
         print(
             "[buildguiinstaller] VERSION file not found; installer will fall back to 0.0.0."
+        )
+
+    if build_id_file.exists():
+        print(f"[buildguiinstaller] BUILD_ID will be bundled from: {build_id_file}")
+    else:
+        print(
+            "[buildguiinstaller] BUILD_ID file not found; health endpoint build_id will be empty."
         )
 
     # Determine jobs for Nuitka parallel compilation.
@@ -144,6 +155,10 @@ def build_installer() -> None:
     # Data: VERSION file for reliable version reporting in the installer.
     if version_file.exists():
         nuitka_args.append(f"--include-data-file={version_file}=VERSION")
+
+    # Data: BUILD_ID file for build provenance.
+    if build_id_file.exists():
+        nuitka_args.append(f"--include-data-file={build_id_file}=BUILD_ID")
 
     # Finally, the script to compile.
     nuitka_args.append(str(gui_script))
@@ -446,6 +461,25 @@ def _ensure_version_file(project_root: Path) -> Path:
             )
 
     return version_file
+
+
+def _ensure_build_id_file(project_root: Path) -> Path:
+    """Ensure a BUILD_ID file exists in the project root.
+
+    The runtime build step usually writes BUILD_ID, but the installer can be
+    built independently, so we keep this defensive.
+    """
+    build_id_file = project_root / "BUILD_ID"
+    if not build_id_file.exists():
+        try:
+            build_id_file.write_text("dev\n", encoding="utf-8")
+            print(
+                "[buildguiinstaller] BUILD_ID file not found; created default 'dev'. "
+                "Re-run buildruntime.py for a timestamped build id."
+            )
+        except OSError as exc:
+            print(f"[buildguiinstaller] WARNING: Failed to create BUILD_ID file: {exc}")
+    return build_id_file
 
 
 def main() -> int:

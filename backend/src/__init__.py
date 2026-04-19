@@ -45,3 +45,41 @@ def _load_version() -> str:
 
 
 __version__ = _load_version()
+
+
+def _load_build_id() -> str:
+    """Load a build identifier from the BUILD_ID file.
+
+    This is intended to make it *obvious* when a packaged/installed runtime is
+    running an older binary than the repository source tree.
+
+    Resolution order mirrors :func:`_load_version`:
+    1) Source tree: ../../BUILD_ID relative to backend/src/__init__.py
+    2) Frozen/installed: BUILD_ID next to the running executable
+    3) Fallback: "" (empty string)
+    """
+    # Source layout
+    try:
+        project_root = Path(__file__).resolve().parents[2]
+        build_file = project_root / "BUILD_ID"
+        if build_file.exists():
+            return build_file.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+
+    # Frozen/installed layout
+    try:
+        import sys
+
+        exe_path = Path(getattr(sys, "frozen", False) and sys.executable or sys.argv[0])
+        exe_root = exe_path.resolve().parent
+        build_file = exe_root / "BUILD_ID"
+        if build_file.exists():
+            return build_file.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+
+    return ""
+
+
+__build_id__ = _load_build_id()

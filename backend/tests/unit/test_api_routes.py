@@ -63,6 +63,7 @@ async def test_health_endpoint(api_app: FastAPI):
     # Basic shape checks; do not assert on actual journal path existence
     assert data["status"] == "healthy"
     assert "version" in data
+    assert "build_id" in data
     assert "journal_directory" in data
     assert "journal_accessible" in data
 

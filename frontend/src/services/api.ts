@@ -49,7 +49,7 @@ export const api = {
   },
  
   // Health check
-  async healthCheck(): Promise<{ status: string; version: string; python_version: string }> {
+  async healthCheck(): Promise<{ status: string; version: string; build_id: string; python_version: string }> {
     const response = await axios.get(`${API_BASE_URL}/health`);
     return response.data;
   },

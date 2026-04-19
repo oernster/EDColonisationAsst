@@ -15,6 +15,7 @@ helps keep file_watcher.py focused on watcher lifecycle concerns.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional, Set
 
@@ -58,9 +59,24 @@ class JournalFileHandler(FileSystemEventHandler):
         self.system_tracker = system_tracker
         self.repository = repository
         self.update_callback = update_callback
+        # Legacy field kept for backward compatibility; we now track per-file
+        # offsets for incremental processing instead.
         self._processed_files: Set[str] = set()
+        # Incremental processing state: remember how many bytes we have already
+        # processed per journal file so we only ingest appended lines.
+        self._file_offsets: dict[str, int] = {}
+        # Prevent concurrent incremental reads of the same file.
+        self._process_lock = asyncio.Lock()
         # Event loop used to schedule async processing from watchdog threads
         self._loop = loop or asyncio.get_event_loop()
+
+        # --- diagnostics (best-effort, for /api/watcher/status) ---
+        self.last_watchdog_event_at: str | None = None
+        self.last_watchdog_event_type: str | None = None
+        self.last_watchdog_event_path: str | None = None
+        self.last_processed_at: str | None = None
+        self.last_processed_file: str | None = None
+        self.last_error: str | None = None
 
     # ------------------------------------------------------------------ watchdog hooks
 
@@ -78,6 +94,15 @@ class JournalFileHandler(FileSystemEventHandler):
             return
 
         logger.debug("Journal file modified: %s", file_path.name)
+
+        # Diagnostics
+        try:
+            self.last_watchdog_event_at = datetime.now(timezone.utc).isoformat()
+            self.last_watchdog_event_type = "modified"
+            self.last_watchdog_event_path = str(file_path)
+        except Exception:
+            pass
+
         # Schedule processing on the main event loop from the watchdog thread
         asyncio.run_coroutine_threadsafe(
             self._process_file(file_path),
@@ -98,6 +123,15 @@ class JournalFileHandler(FileSystemEventHandler):
             return
 
         logger.info("New journal file created: %s", file_path.name)
+
+        # Diagnostics
+        try:
+            self.last_watchdog_event_at = datetime.now(timezone.utc).isoformat()
+            self.last_watchdog_event_type = "created"
+            self.last_watchdog_event_path = str(file_path)
+        except Exception:
+            pass
+
         # Schedule processing on the main event loop from the watchdog thread
         asyncio.run_coroutine_threadsafe(
             self._process_file(file_path),
@@ -113,8 +147,64 @@ class JournalFileHandler(FileSystemEventHandler):
             file_path: path to the journal file to parse.
         """
         try:
-            # Parse the file
-            events = self.parser.parse_file(file_path)
+            # Diagnostics
+            try:
+                self.last_processed_file = str(file_path)
+                self.last_processed_at = datetime.now(timezone.utc).isoformat()
+                self.last_error = None
+            except Exception:
+                pass
+
+            # Parse the file incrementally (append-only journal semantics).
+            # - First time we see a file: parse entire file via parse_file.
+            # - Subsequent calls: only parse newly appended lines via parse_line.
+            async with self._process_lock:
+                offset = int(self._file_offsets.get(str(file_path), 0))
+
+                try:
+                    current_size = file_path.stat().st_size
+                except OSError:
+                    current_size = 0
+
+                # Handle truncation/rotation edge case.
+                if current_size < offset:
+                    offset = 0
+
+                events = []
+                if offset <= 0:
+                    events = self.parser.parse_file(file_path)
+                    # After full parse, mark offset at EOF.
+                    try:
+                        self._file_offsets[str(file_path)] = file_path.stat().st_size
+                    except OSError:
+                        self._file_offsets[str(file_path)] = current_size
+                else:
+                    # Incremental tail parse from byte offset.
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            f.seek(offset)
+                            for line in f:
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                try:
+                                    ev = self.parser.parse_line(line)
+                                    if ev is not None:
+                                        events.append(ev)
+                                except Exception:
+                                    # Keep processing; parser logs internally.
+                                    continue
+                            try:
+                                self._file_offsets[str(file_path)] = f.tell()
+                            except Exception:
+                                self._file_offsets[str(file_path)] = current_size
+                    except OSError:
+                        # If we can't open/seek, fall back to full parse.
+                        events = self.parser.parse_file(file_path)
+                        try:
+                            self._file_offsets[str(file_path)] = file_path.stat().st_size
+                        except OSError:
+                            self._file_offsets[str(file_path)] = current_size
 
             if not events:
                 return
@@ -155,6 +245,10 @@ class JournalFileHandler(FileSystemEventHandler):
 
         except Exception as exc:  # noqa: BLE001
             logger.error("Error processing file %s: %s", file_path, exc)
+            try:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+            except Exception:
+                pass
 
     async def _process_construction_depot(
         self,

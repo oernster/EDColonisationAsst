@@ -14,10 +14,17 @@ export function useColonisationWebSocket(
   currentSystem: string | null,
   setSystemData: (data: SystemColonisationData | null) => void,
   setError: (message: string | null) => void,
+  onRefresh?: () => void,
 ): void {
   const wsRef = useRef<WebSocket | null>(null);
   const subscribedSystemRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const onRefreshRef = useRef<(() => void) | undefined>(onRefresh);
+
+  // Keep the latest callback without forcing WebSocket reconnection.
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
 
   // Establish and manage the WebSocket connection tied to the app lifecycle.
   useEffect(() => {
@@ -80,6 +87,14 @@ export function useColonisationWebSocket(
               };
 
               setSystemData(updated);
+            } else if (msgType === 'refresh') {
+              // Global refresh hint from the backend (e.g. after bulk journal reload).
+              // The caller decides what to refetch.
+              try {
+                onRefreshRef.current?.();
+              } catch {
+                // Ignore callback errors.
+              }
             } else if (msgType === 'error') {
               // Surface WebSocket-level errors as a non-fatal message in the UI.
               const message: string =

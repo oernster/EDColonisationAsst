@@ -71,6 +71,7 @@ function App() {
     settingsVersion,
     setSystemData,
     setError,
+    setAllSystems,
   } = useColonisationStore();
   const [currentTab, setCurrentTab] = useState(0);
   const [systemViewTab, setSystemViewTab] = useState(0);
@@ -136,16 +137,40 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const refreshFromBackend = async () => {
+    try {
+      // Refresh system list (may change after journal reloads).
+      const systems = await api.getSystems();
+      setAllSystems(systems);
+    } catch {
+      // Ignore; UI can continue with cached list.
+    }
+
+    // Refresh selected system snapshot.
+    if (currentSystem) {
+      try {
+        const data = await api.getSystemData(currentSystem);
+        setSystemData(data);
+      } catch {
+        // Ignore; system may not exist anymore or backend may be busy.
+      }
+    }
+  };
+
   // Establish a WebSocket connection for live colonisation updates. The REST
   // calls in SystemSelector provide the initial snapshot; this hook keeps the
   // currently selected system in sync when journal events arrive.
-  useColonisationWebSocket(currentSystem, setSystemData, setError);
+  useColonisationWebSocket(currentSystem, setSystemData, setError, () => {
+    void refreshFromBackend();
+  });
 
   useEffect(() => {
     const loadMeta = async () => {
       try {
         const health = await api.healthCheck();
-        setAppVersion(health.version);
+        setAppVersion(
+          health.build_id ? `${health.version} (${health.build_id})` : health.version,
+        );
         // New in 1.5.0+: surface the actual Python runtime version reported by the backend.
         // This lets us verify at a glance which embedded interpreter the packaged EXE is using.
         setPythonVersion(health.python_version ?? null);

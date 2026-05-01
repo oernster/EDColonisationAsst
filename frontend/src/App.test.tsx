@@ -31,6 +31,8 @@ vi.mock('./services/api', () => ({
 }));
 
 import App from './App';
+import { useColonisationStore } from './stores/colonisationStore';
+import { CommodityStatus, SystemColonisationData } from './types/colonisation';
 
 describe('App', () => {
   beforeEach(() => {
@@ -39,12 +41,74 @@ describe('App', () => {
 
     mockHealthCheck.mockClear();
     mockGetAppSettings.mockClear();
+
+    // Reset global zustand store state between tests.
+    useColonisationStore.setState({
+      currentSystem: null,
+      systemData: null,
+      allSystems: [],
+      loading: false,
+      error: null,
+      currentSystemInfo: null,
+      settingsVersion: 0,
+    });
   });
 
   it('renders the main heading', () => {
     render(<App />);
     const headingElement = screen.getByText(/Elite: Dangerous Colonisation Assistant/i);
     expect(headingElement).toBeTruthy();
+  });
+
+  it('includes Completed Stations as a System View sub-tab', () => {
+    const systemData: SystemColonisationData = {
+      system_name: 'Sol',
+      total_sites: 1,
+      completed_sites: 1,
+      in_progress_sites: 0,
+      completion_percentage: 100,
+      construction_sites: [
+        {
+          market_id: 1,
+          station_name: 'Galileo',
+          station_type: 'Construction Depot',
+          system_name: 'Sol',
+          system_address: 123,
+          construction_progress: 100,
+          construction_complete: true,
+          construction_failed: false,
+          commodities: [
+            {
+              name: 'foodcartridges',
+              name_localised: 'Food Cartridges',
+              required_amount: 10,
+              provided_amount: 10,
+              payment: 1000,
+              remaining_amount: 0,
+              progress_percentage: 100,
+              status: CommodityStatus.COMPLETED,
+            },
+          ],
+          last_updated: '2026-04-29T00:00:00.000Z',
+          is_complete: true,
+          total_commodities_needed: 0,
+          commodities_progress_percentage: 100,
+          last_source: 'journal',
+        },
+      ],
+    };
+
+    useColonisationStore.setState({
+      currentSystem: 'Sol',
+      systemData,
+      loading: false,
+      error: null,
+    });
+
+    render(<App />);
+
+    // System View is the default top-level tab. Verify the new sub-tab label exists.
+    expect(screen.getByRole('tab', { name: /Completed Stations/i })).toBeTruthy();
   });
 
   it('does not render the keep-awake chip on desktop', async () => {

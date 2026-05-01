@@ -495,13 +495,15 @@ function App() {
                     >
                       <Tab label="System Commodities" />
                       <Tab label="Stations" />
+                      <Tab label="Completed Stations" />
                       <Tab label="Fleet carriers" />
                     </Tabs>
                   </Box>
- 
+
                   {systemViewTab === 0 && <SiteList viewMode="system" />}
                   {systemViewTab === 1 && <SiteList viewMode="stations" />}
-                  {systemViewTab === 2 && <FleetCarriersPanel />}
+                  {systemViewTab === 2 && <SiteList viewMode="completed_stations" />}
+                  {systemViewTab === 3 && <FleetCarriersPanel />}
                 </>
               )}
 

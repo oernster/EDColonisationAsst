@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, LinearProgress, Chip, Grid, Collapse, IconButton, Tabs, Tab } from '@mui/material';
 import { CheckCircle, Construction, ExpandLess, ExpandMore } from '@mui/icons-material';
 import { useColonisationStore } from '../../stores/colonisationStore';
 import { ConstructionSite, CommodityStatus, CommodityAggregate } from '../../types/colonisation';
+
+type SiteListViewMode = 'system' | 'stations' | 'completed_stations';
 
 const aggregateCommodities = (
   sites: ConstructionSite[]
@@ -82,16 +84,70 @@ const aggregateCommodities = (
   return aggregates;
 };
 
-export const SiteList = ({ viewMode = 'system' }: { viewMode?: 'system' | 'stations' }) => {
+export const SiteList = ({ viewMode = 'system' }: { viewMode?: SiteListViewMode }) => {
   const { systemData } = useColonisationStore();
   const [systemExpanded, setSystemExpanded] = useState(true);
   const [stationTab, setStationTab] = useState(0);
+
+  // NOTE: user-requested rule: station is completed iff ALL of these are true.
+  // Backend currently sets is_complete := construction_complete; we still honor both fields.
+  const isStationCompleted = (site: ConstructionSite): boolean => {
+    const hasAllCommoditiesDelivered =
+      site.commodities.length === 0 ||
+      site.commodities.every(
+        (c) => c.remaining_amount === 0 || c.status === CommodityStatus.COMPLETED
+      );
+
+    return Boolean(site.construction_complete) && Boolean(site.is_complete) && hasAllCommoditiesDelivered;
+  };
+
+  const filteredConstructionSites = useMemo(() => {
+    if (!systemData) return [] as ConstructionSite[];
+
+    if (viewMode === 'stations') {
+      return systemData.construction_sites.filter((s) => !isStationCompleted(s));
+    }
+
+    // New mode: show only completed stations.
+    if (viewMode === 'completed_stations') {
+      return systemData.construction_sites.filter((s) => isStationCompleted(s));
+    }
+
+    return systemData.construction_sites;
+  }, [systemData, viewMode]);
+
+  // If the filtered list shrinks, keep stationTab in range.
+  useEffect(() => {
+    if (stationTab >= filteredConstructionSites.length) {
+      setStationTab(0);
+    }
+  }, [filteredConstructionSites.length, stationTab]);
 
   if (!systemData || systemData.construction_sites.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography color="text.secondary">
           No construction sites found in this system
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (viewMode === 'stations' && filteredConstructionSites.length === 0) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Typography color="text.secondary">
+          No in-progress stations found in this system
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (viewMode === 'completed_stations' && filteredConstructionSites.length === 0) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Typography color="text.secondary">
+          No completed stations found in this system
         </Typography>
       </Box>
     );
@@ -298,7 +354,7 @@ export const SiteList = ({ viewMode = 'system' }: { viewMode?: 'system' | 'stati
       )}
 
       {/* Construction Sites (tab-controlled) */}
-      {viewMode === 'stations' && (
+      {(viewMode === 'stations' || viewMode === 'completed_stations') && (
         <>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
             <Tabs
@@ -308,7 +364,7 @@ export const SiteList = ({ viewMode = 'system' }: { viewMode?: 'system' | 'stati
               variant="scrollable"
               scrollButtons="auto"
             >
-              {systemData.construction_sites.map((site, index) => (
+              {filteredConstructionSites.map((site, index) => (
                 <Tab
                   key={site.market_id}
                   label={site.station_name}
@@ -319,16 +375,16 @@ export const SiteList = ({ viewMode = 'system' }: { viewMode?: 'system' | 'stati
             </Tabs>
           </Box>
 
-          {systemData.construction_sites.length > 0 && (
+          {filteredConstructionSites.length > 0 && (
             <SiteCard
               key={
-                systemData.construction_sites[
-                  stationTab < systemData.construction_sites.length ? stationTab : 0
+                filteredConstructionSites[
+                  stationTab < filteredConstructionSites.length ? stationTab : 0
                 ].market_id
               }
               site={
-                systemData.construction_sites[
-                  stationTab < systemData.construction_sites.length ? stationTab : 0
+                filteredConstructionSites[
+                  stationTab < filteredConstructionSites.length ? stationTab : 0
                 ]
               }
             />
@@ -341,6 +397,9 @@ export const SiteList = ({ viewMode = 'system' }: { viewMode?: 'system' | 'stati
 
 const SiteCard = ({ site }: { site: ConstructionSite }) => {
   const isComplete = site.construction_complete;
+  const displayedConstructionProgress = isComplete
+    ? 100
+    : Math.max(0, Math.min(100, site.construction_progress));
   const statusColor = isComplete ? 'success.main' : 'info.main';
   const statusIcon = isComplete ? <CheckCircle /> : <Construction />;
   const [expanded, setExpanded] = useState(true);
@@ -385,12 +444,12 @@ const SiteCard = ({ site }: { site: ConstructionSite }) => {
               Construction Progress
             </Typography>
             <Typography variant="body2" fontWeight="bold">
-              {site.construction_progress.toFixed(1)}%
+              {displayedConstructionProgress.toFixed(1)}%
             </Typography>
           </Box>
           <LinearProgress
             variant="determinate"
-            value={site.construction_progress}
+            value={displayedConstructionProgress}
             sx={{
               height: 8,
               borderRadius: 1,

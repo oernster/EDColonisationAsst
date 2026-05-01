@@ -199,21 +199,41 @@ def _ensure_frontend_dist_built(project_root: Path) -> None:
         return
 
     dist_dir = frontend_dir / "dist"
-    try:
-        if dist_dir.exists() and any(dist_dir.iterdir()):
-            print(f"[buildguiinstaller] Using existing frontend build at: {dist_dir}")
-            return
-    except OSError as exc:
-        raise RuntimeError(
-            f"[buildguiinstaller] Unable to inspect frontend/dist: {exc}"
-        ) from exc
 
-    print(
-        "[buildguiinstaller] frontend/dist not found or empty; running `npm run build`..."
-    )
+    # Always rebuild the frontend for installer builds *when npm is available*.
+    #
+    # Motivation:
+    # - Prevent shipping stale UI assets after code changes.
+    # - Make build outputs deterministic in CI/dev environments where Node/npm
+    #   is available.
+    #
+    # However: some builders may not have Node/npm on PATH (e.g. a pure-Python
+    # environment). In that case we fall back to using an existing frontend/dist
+    # if present, and fail only if dist is missing.
+    npm_exe = shutil.which("npm")
+    if not npm_exe:
+        try:
+            if dist_dir.exists() and any(dist_dir.iterdir()):
+                print(
+                    "[buildguiinstaller] WARNING: npm not found on PATH; "
+                    "skipping forced frontend build and using existing frontend/dist at: "
+                    f"{dist_dir}"
+                )
+                return
+        except OSError as exc:
+            raise RuntimeError(
+                f"[buildguiinstaller] Unable to inspect frontend/dist: {exc}"
+            ) from exc
+
+        raise RuntimeError(
+            "[buildguiinstaller] Failed to start npm to build the frontend because npm was not found on PATH. "
+            "Install Node.js/npm, or ensure frontend/dist is present (run the build on a machine with npm first)."
+        )
+
+    print("[buildguiinstaller] Running `npm run build` for the frontend (forced)...")
     try:
         result = subprocess.run(
-            ["npm", "--prefix", str(frontend_dir), "run", "build"],
+            [npm_exe, "--prefix", str(frontend_dir), "run", "build"],
             check=False,
         )
     except OSError as exc:

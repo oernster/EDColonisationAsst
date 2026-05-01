@@ -182,6 +182,9 @@ function App() {
 
           if (res.changed) {
             await refreshFromBackend();
+            // Let feature panels that are not part of refreshFromBackend
+            // (e.g. Fleet carriers) react immediately.
+            window.dispatchEvent(new Event('edcaBackendChanged'));
           } else {
             // Safety net: long-polling should normally block for many seconds.
             // If the backend returns immediately with changed=false (misconfig,

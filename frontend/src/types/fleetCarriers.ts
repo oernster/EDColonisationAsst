@@ -51,6 +51,18 @@ export interface CarrierOrder {
 export interface CarrierState {
   identity: CarrierIdentity;
   cargo: CarrierCargoItem[];
+
+  /**
+   * Raw CarrierStats.SpaceUsage breakdown (when available).
+   */
+  space_usage?: {
+    total_capacity?: number | null;
+    crew?: number | null;
+    module_packs?: number | null;
+    cargo?: number | null;
+    cargo_space_reserved?: number | null;
+    free_space?: number | null;
+  } | null;
   /**
    * Total cargo tonnage in the carrier hold, taken from CarrierStats.SpaceUsage.Cargo
    * when available. This may exceed the sum of per‑commodity market stock shown in
@@ -70,6 +82,21 @@ export interface CarrierState {
   free_space_tonnage?: number | null;
   buy_orders: CarrierOrder[];
   sell_orders: CarrierOrder[];
+  /**
+   * Indicates which journal window was used to derive buy/sell orders.
+   * - since_docked: observed CarrierTradeOrder events after the latest Docked event
+   * - recent_history: fallback window when no trade orders were observed since docking
+   * - market_export: derived from Market.json snapshot (carrier market export)
+   * - none: no trade order data available
+   * - stale: trade order data exists but is older than the current docked context
+   */
+  trade_orders_scope?:
+    | 'since_docked'
+    | 'recent_history'
+    | 'market_export'
+    | 'stale'
+    | 'none'
+    | null;
   snapshot_time: string;
 }
 

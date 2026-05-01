@@ -115,6 +115,14 @@ class CarrierStatsEvent(JournalEvent):
     callsign: Optional[str] = Field(
         default=None, description="Carrier callsign (e.g. ABC-123)"
     )
+    market_id: Optional[int] = Field(
+        default=None,
+        description=(
+            "Market ID for the carrier when available in the journal payload. "
+            "Some environments may differ between CarrierID and MarketID; this "
+            "field helps reconcile trade order association."
+        ),
+    )
 
 
 class CarrierTradeOrderEvent(JournalEvent):

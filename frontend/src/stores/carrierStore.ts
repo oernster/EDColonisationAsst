@@ -30,6 +30,8 @@ interface CarrierStoreState {
   loadCurrentCarrier: () => Promise<void>;
   // Background refresh that does not toggle loading state or clear the UI.
   refreshCurrentCarrier: () => Promise<void>;
+  // Refresh that *does* show loading state (manual user action).
+  forceRefreshCurrentCarrier: () => Promise<void>;
   loadMyCarriers: () => Promise<void>;
   setCarrierViewTab: (tab: 'cargo' | 'market') => void;
   clearCarrierError: () => void;
@@ -46,9 +48,9 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
   myCarriers: null,
   myCarriersLoading: false,
   myCarriersError: null,
-
+  
   // UI state
-  carrierViewTab: 'cargo',
+  carrierViewTab: 'market',
 
   // Actions
 
@@ -136,6 +138,12 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
       // Background refresh errors are intentionally ignored; the last known
       // state remains visible and foreground loads surface errors instead.
     }
+  },
+
+  async forceRefreshCurrentCarrier() {
+    // Reuse the foreground load path so the user can explicitly refresh and
+    // see loading/error state if the backend is temporarily unavailable.
+    await useCarrierStore.getState().loadCurrentCarrier();
   },
 
   async loadMyCarriers() {

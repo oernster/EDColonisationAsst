@@ -143,6 +143,35 @@ class CarrierOrder(BaseModel):
     )
 
 
+class CarrierSpaceUsage(BaseModel):
+    """Raw CarrierStats.SpaceUsage breakdown, when present in the journal."""
+
+    total_capacity: Optional[int] = Field(
+        default=None,
+        description="Nominal total carrier cargo capacity in tonnes (usually 25,000).",
+    )
+    crew: Optional[int] = Field(
+        default=None,
+        description="Tonnes consumed by crew/services.",
+    )
+    module_packs: Optional[int] = Field(
+        default=None,
+        description="Tonnes consumed by installed module packs.",
+    )
+    cargo: Optional[int] = Field(
+        default=None,
+        description="Tonnes currently occupied by cargo.",
+    )
+    cargo_space_reserved: Optional[int] = Field(
+        default=None,
+        description="Tonnes reserved (typically outstanding buy orders).",
+    )
+    free_space: Optional[int] = Field(
+        default=None,
+        description="Tonnes of free space remaining.",
+    )
+
+
 class CarrierState(BaseModel):
     """Current reconstructed state of a single carrier."""
 
@@ -178,11 +207,29 @@ class CarrierState(BaseModel):
             "cargo capacity after accounting for installed services / loadouts."
         ),
     )
+
+    space_usage: Optional[CarrierSpaceUsage] = Field(
+        default=None,
+        description=(
+            "CarrierStats.SpaceUsage breakdown when available (TotalCapacity, Crew, ModulePacks, "
+            "Cargo, CargoSpaceReserved, FreeSpace)."
+        ),
+    )
     buy_orders: List[CarrierOrder] = Field(
         default_factory=list, description="Active buy orders on the carrier."
     )
     sell_orders: List[CarrierOrder] = Field(
         default_factory=list, description="Active sell orders on the carrier."
+    )
+
+    trade_orders_scope: Optional[str] = Field(
+        default=None,
+        description=(
+            "Indicates which journal window was used to derive buy/sell orders. "
+            "Values: 'since_docked' (preferred), 'recent_history' (fallback when no "
+            "orders were observed since the latest Docked event), 'stale' (trade orders exist "
+            "but are too old to trust), 'market_export' (Market.json snapshot), or 'none'."
+        ),
     )
     snapshot_time: datetime = Field(
         description="Timestamp of the latest journal event used to build this state."

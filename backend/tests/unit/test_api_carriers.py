@@ -29,6 +29,31 @@ def _write_journal_file(journal_dir: Path, events: list[dict]) -> Path:
     return file_path
 
 
+def _write_market_export(
+    journal_dir: Path,
+    *,
+    market_id: int,
+    station_name: str = "X7J-BQG",
+    star_system: str = "Test System",
+    timestamp: str = "2025-12-15T11:25:25Z",
+    items: list[dict] | None = None,
+) -> Path:
+    """Helper to write a Market.json export in the journal directory."""
+    journal_dir.mkdir(parents=True, exist_ok=True)
+    path = journal_dir / "Market.json"
+    payload = {
+        "timestamp": timestamp,
+        "event": "Market",
+        "StationName": station_name,
+        "StationType": "FleetCarrier",
+        "StarSystem": star_system,
+        "MarketID": market_id,
+        "Items": items or [],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
 @pytest.mark.asyncio
 async def test_carriers_current_and_state_with_fleet_carrier(
     tmp_path: Path, monkeypatch: Callable
@@ -115,6 +140,10 @@ async def test_carriers_current_and_state_with_fleet_carrier(
             "Commodity": "titanium",
             "Commodity_Localised": "Titanium",
             "SaleOrder": 23,
+            # Provide Stock/Outstanding so the API can derive a per-commodity
+            # market-stock row for the cargo snapshot.
+            "Stock": 23,
+            "Outstanding": 23,
             "Price": 4446,
         },
         {
@@ -205,6 +234,74 @@ async def test_carriers_current_and_state_with_fleet_carrier(
 
 
 @pytest.mark.asyncio
+async def test_carrier_sell_order_without_stock_or_outstanding_does_not_create_cargo_row(
+    tmp_path: Path, monkeypatch: Callable
+):
+    """Regression: do not treat SaleOrder (configured size) as cargo stock.
+
+    Some journals emit CarrierTradeOrder lines with only SaleOrder + Price and
+    omit Stock/Outstanding. Those lines should still create a SELL order, but
+    must NOT create a cargo commodity row, otherwise the UI shows phantom cargo.
+    """
+    journal_dir = tmp_path / "journals"
+
+    events = [
+        {
+            "timestamp": "2025-12-15T10:54:47Z",
+            "event": "Docked",
+            "StationName": "X7J-BQG",
+            "StationType": "FleetCarrier",
+            "StarSystem": "Test System",
+            "SystemAddress": 2278253693331,
+            "MarketID": 3700569600,
+            "StationFaction": {"Name": "FleetCarrier"},
+            "StationGovernment": "$government_Carrier;",
+            "StationEconomy": "$economy_Carrier;",
+            "StationEconomies": [{"Name": "$economy_Carrier;", "Proportion": 1.0}],
+        },
+        {
+            "timestamp": "2025-12-15T11:17:37Z",
+            "event": "CarrierTradeOrder",
+            "CarrierID": 3700569600,
+            "CarrierType": "FleetCarrier",
+            "BlackMarket": False,
+            "Commodity": "titanium",
+            "Commodity_Localised": "Titanium",
+            "SaleOrder": 23,
+            "Price": 4446,
+            # Intentionally omit Stock and Outstanding
+        },
+    ]
+
+    journal_file = _write_journal_file(journal_dir, events)
+
+    monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
+    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [journal_file])
+
+    app = FastAPI()
+    app.include_router(carriers_router)
+
+    async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        resp_state = await client.get("/api/carriers/current/state")
+        assert resp_state.status_code == 200
+        state_data = resp_state.json()
+        carrier_state = state_data["carrier"]
+        assert carrier_state is not None
+
+        # Order should exist
+        sell_orders = carrier_state["sell_orders"]
+        assert any(
+            order["commodity_name"] == "titanium" and order["order_type"] == "sell"
+            for order in sell_orders
+        )
+
+        # Cargo should NOT include titanium because stock is unknown
+        cargo = carrier_state["cargo"]
+        assert isinstance(cargo, list)
+        assert not any(item["commodity_name"] == "titanium" for item in cargo)
+
+
+@pytest.mark.asyncio
 async def test_carriers_scan_recent_files_for_most_recent_trade_orders(
     tmp_path: Path, monkeypatch: Callable
 ):
@@ -288,6 +385,169 @@ async def test_carriers_scan_recent_files_for_most_recent_trade_orders(
         assert current_data["carrier"]["name"] == "MIDNIGHT ELOQUENCE"
 
 
+@pytest.mark.asyncio
+async def test_carriers_current_state_ignores_trade_orders_before_latest_docked_context(
+    tmp_path: Path, monkeypatch: Callable
+):
+    """Regression: old trade orders from previous sessions should not linger.
+
+    The API scans multiple recent journal files. If old CarrierTradeOrder events
+    are included without a newer cancel, they must not be treated as active for
+    the current docking context.
+    """
+    journal_dir = tmp_path / "journals"
+
+    # Old session (older timestamp) contains a SELL order.
+    old_events = [
+        {
+            "timestamp": "2025-12-14T10:54:47Z",
+            "event": "Docked",
+            "StationName": "X7J-BQG",
+            "StationType": "FleetCarrier",
+            "StarSystem": "Test System",
+            "SystemAddress": 2278253693331,
+            "MarketID": 3700569600,
+            "StationFaction": {"Name": "FleetCarrier"},
+            "StationGovernment": "$government_Carrier;",
+            "StationEconomy": "$economy_Carrier;",
+            "StationEconomies": [{"Name": "$economy_Carrier;", "Proportion": 1.0}],
+        },
+        {
+            "timestamp": "2025-12-14T11:17:37Z",
+            "event": "CarrierTradeOrder",
+            "CarrierID": 3700569600,
+            "CarrierType": "FleetCarrier",
+            "BlackMarket": False,
+            "Commodity": "aluminium",
+            "Commodity_Localised": "Aluminium",
+            "SaleOrder": 99,
+            "Stock": 99,
+            "Outstanding": 99,
+            "Price": 127,
+        },
+    ]
+
+    # New session: commander docks again, but no trade orders at all.
+    new_events = [
+        {
+            "timestamp": "2025-12-15T10:54:47Z",
+            "event": "Docked",
+            "StationName": "X7J-BQG",
+            "StationType": "FleetCarrier",
+            "StarSystem": "Test System",
+            "SystemAddress": 2278253693331,
+            "MarketID": 3700569600,
+            "StationFaction": {"Name": "FleetCarrier"},
+            "StationGovernment": "$government_Carrier;",
+            "StationEconomy": "$economy_Carrier;",
+            "StationEconomies": [{"Name": "$economy_Carrier;", "Proportion": 1.0}],
+        }
+    ]
+
+    old_file = _write_journal_file(journal_dir, old_events)
+    new_file = journal_dir / "Journal.2025-12-15T104644.01.log"
+    new_file.write_text("\n".join(json.dumps(e) for e in new_events), encoding="utf-8")
+
+    monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
+    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [old_file, new_file])
+
+    app = FastAPI()
+    app.include_router(carriers_router)
+
+    async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        resp_state = await client.get("/api/carriers/current/state")
+        assert resp_state.status_code == 200
+        carrier_state = resp_state.json()["carrier"]
+        assert carrier_state is not None
+
+        # Old aluminium sell order should NOT be used as current state.
+        # We expect the API to return no orders/cargo for this session.
+        assert carrier_state["sell_orders"] == []
+        assert carrier_state["cargo"] == []
+        assert carrier_state.get("trade_orders_scope") in {"stale", "none"}
+
+
+@pytest.mark.asyncio
+async def test_carriers_state_falls_back_to_market_json_when_no_trade_orders_since_docked(
+    tmp_path: Path, monkeypatch: Callable
+):
+    """Use Market.json as authoritative market snapshot when journal trade orders are absent."""
+    journal_dir = tmp_path / "journals"
+
+    events = [
+        {
+            "timestamp": "2025-12-15T11:24:47Z",
+            "event": "Docked",
+            "StationName": "X7J-BQG",
+            "StationType": "FleetCarrier",
+            "StarSystem": "Test System",
+            "SystemAddress": 2278253693331,
+            "MarketID": 3700569600,
+            "StationFaction": {"Name": "FleetCarrier"},
+            "StationGovernment": "$government_Carrier;",
+            "StationEconomy": "$economy_Carrier;",
+            "StationEconomies": [{"Name": "$economy_Carrier;", "Proportion": 1.0}],
+        },
+        # No CarrierTradeOrder events at all.
+    ]
+
+    journal_file = _write_journal_file(journal_dir, events)
+    _write_market_export(
+        journal_dir,
+        market_id=3700569600,
+        timestamp="2025-12-15T11:25:25Z",
+        items=[
+            {
+                "id": 111,
+                "Name": "$steel_name;",
+                "Name_Localised": "Steel",
+                "BuyPrice": 0,
+                "SellPrice": 209,
+                "Demand": 7705,
+                "Stock": 0,
+                "Category": "$MARKET_category_metals;",
+                "Category_Localised": "Metals",
+            },
+            {
+                "id": 112,
+                "Name": "$titanium_name;",
+                "Name_Localised": "Titanium",
+                "BuyPrice": 0,
+                "SellPrice": 223,
+                "Demand": 4606,
+                "Stock": 0,
+                "Category": "$MARKET_category_metals;",
+                "Category_Localised": "Metals",
+            },
+        ],
+    )
+
+    monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
+    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [journal_file])
+
+    app = FastAPI()
+    app.include_router(carriers_router)
+
+    async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        resp_state = await client.get("/api/carriers/current/state")
+        assert resp_state.status_code == 200
+        payload = resp_state.json()
+        carrier_state = payload["carrier"]
+        assert carrier_state is not None
+
+        buy_orders = carrier_state["buy_orders"]
+        assert any(
+            o["commodity_name"] == "steel" and o["remaining_amount"] == 7705 for o in buy_orders
+        )
+        assert any(
+            o["commodity_name"] == "titanium" and o["remaining_amount"] == 4606 for o in buy_orders
+        )
+
+        assert carrier_state["sell_orders"] == []
+        assert carrier_state["cargo"] == []
+        assert carrier_state["trade_orders_scope"] == "market_export"
+
+
 
 @pytest.mark.asyncio
 async def test_carriers_current_state_clears_sold_out_cargo(
@@ -343,6 +603,8 @@ async def test_carriers_current_state_clears_sold_out_cargo(
             "Commodity": "fruitandvegetables",
             "Commodity_Localised": "Fruit and Vegetables",
             "SaleOrder": 9,
+            "Stock": 9,
+            "Outstanding": 9,
             "Price": 1000,
         },
         # Initial SELL order for titanium with 23t for sale.
@@ -355,6 +617,8 @@ async def test_carriers_current_state_clears_sold_out_cargo(
             "Commodity": "titanium",
             "Commodity_Localised": "Titanium",
             "SaleOrder": 23,
+            "Stock": 23,
+            "Outstanding": 23,
             "Price": 4446,
         },
         # Later update after the commander has bought all titanium. The journal

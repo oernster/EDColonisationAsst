@@ -95,10 +95,28 @@ class JournalFileHandler(FileSystemEventHandler):
 
         file_path = Path(event.src_path)
 
-        # Only process journal files
-        if not file_path.name.startswith("Journal.") or not file_path.name.endswith(
+        # Process either:
+        # - Journal.*.log (ingestion)
+        # - Companion exports (trigger UI refresh via change bus)
+        is_journal = file_path.name.startswith("Journal.") and file_path.name.endswith(
             ".log"
-        ):
+        )
+        is_companion_export = file_path.name in {"Market.json", "Cargo.json", "Status.json"}
+
+        if not is_journal and not is_companion_export:
+            return
+
+        if is_companion_export:
+            logger.debug("Companion export modified: %s", file_path.name)
+
+            # Companion exports are not journals and are not parsed/ingested here,
+            # but they should still trigger a UI refresh (carrier market relies on
+            # Market.json).
+            if self.update_callback is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self.update_callback("__exports__"),
+                    self._loop,
+                )
             return
 
         logger.debug("Journal file modified: %s", file_path.name)

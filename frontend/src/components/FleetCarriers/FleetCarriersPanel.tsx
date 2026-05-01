@@ -112,15 +112,6 @@ export const FleetCarriersPanel = () => {
     setCarrierViewTab,
   } = useCarrierStore();
 
-  const freeSpace = currentCarrierState?.free_space_tonnage ?? null;
-  const outstandingBuyTonnage =
-    currentCarrierState?.buy_orders?.reduce(
-      (sum, order) => sum + Math.max(order.remaining_amount, 0),
-      0,
-    ) ?? 0;
-  const freeAfterBuys =
-    freeSpace != null ? Math.max(freeSpace - outstandingBuyTonnage, 0) : null;
-
   useEffect(() => {
     // Load both the current docked carrier (if any) and the "my carriers" list
     // when the Fleet carriers tab first mounts.
@@ -128,8 +119,21 @@ export const FleetCarriersPanel = () => {
     void loadMyCarriers();
   }, [loadCurrentCarrier, loadMyCarriers]);
 
+  // Respond immediately to backend ingestion changes (AJAX long-poll in App.tsx
+  // updates system data, but carriers are separate endpoints).
+  useEffect(() => {
+    const onBackendChanged = () => {
+      void refreshCurrentCarrier();
+      void loadMyCarriers();
+    };
+    window.addEventListener('edcaBackendChanged', onBackendChanged);
+    return () => window.removeEventListener('edcaBackendChanged', onBackendChanged);
+  }, [refreshCurrentCarrier, loadMyCarriers]);
+
   const handleCarrierViewTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setCarrierViewTab(newValue === 0 ? 'cargo' : 'market');
+    // Tab index 0 is the left-most tab.
+    // We want Market on the left and Cargo on the right.
+    setCarrierViewTab(newValue === 0 ? 'market' : 'cargo');
   };
 
   const dockedIdentity: CarrierIdentity | null =
@@ -221,6 +225,9 @@ export const FleetCarriersPanel = () => {
             )}
           </Box>
 
+          {/* Manual refresh removed: state should update automatically via
+              journal/Market.json updates + backend change-bus long-poll. */}
+
           {dockedIdentity && (
             <>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -246,12 +253,6 @@ export const FleetCarriersPanel = () => {
                   />
                 )}
               </Stack>
-
-              {freeAfterBuys !== null && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                  Free after all buy orders: {freeAfterBuys.toLocaleString()} t
-                </Typography>
-              )}
 
               {visibleDockedServicesSorted.length > 0 && (
                 <Stack
@@ -284,19 +285,27 @@ export const FleetCarriersPanel = () => {
           <>
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
               <Tabs
-                value={carrierViewTab === 'cargo' ? 0 : 1}
+                value={carrierViewTab === 'market' ? 0 : 1}
                 onChange={handleCarrierViewTabChange}
                 aria-label="carrier detail tabs"
                 textColor="primary"
                 indicatorColor="primary"
               >
-                <Tab label="Cargo" {...a11yProps(0)} />
-                <Tab label="Market" {...a11yProps(1)} />
+                <Tab label="Market" {...a11yProps(0)} />
+                <Tab label="Cargo" {...a11yProps(1)} />
               </Tabs>
             </Box>
 
             {carrierViewTab === 'cargo' && (
-              <CarrierCargoSection cargo={currentCarrierState.cargo} />
+              <CarrierCargoSection
+                cargo={currentCarrierState.cargo}
+                totalCargoTonnage={currentCarrierState.total_cargo_tonnage ?? null}
+                totalCapacityTonnage={currentCarrierState.total_capacity_tonnage ?? null}
+                freeSpaceTonnage={currentCarrierState.free_space_tonnage ?? null}
+                spaceUsage={currentCarrierState.space_usage ?? null}
+                snapshotTime={currentCarrierState.snapshot_time}
+                buyOrders={currentCarrierState.buy_orders}
+              />
             )}
             {carrierViewTab === 'market' && (
               <CarrierMarketSection
@@ -459,22 +468,138 @@ const CarrierIdentityList = ({
 
 interface CarrierCargoSectionProps {
   cargo: CarrierCargoItem[];
+  totalCargoTonnage: number | null;
+  totalCapacityTonnage: number | null;
+  freeSpaceTonnage: number | null;
+  spaceUsage: {
+    total_capacity?: number | null;
+    crew?: number | null;
+    module_packs?: number | null;
+    cargo?: number | null;
+    cargo_space_reserved?: number | null;
+    free_space?: number | null;
+  } | null;
+  snapshotTime: string;
+  buyOrders: CarrierOrder[];
 }
 
-const CarrierCargoSection = ({ cargo }: CarrierCargoSectionProps) => {
+const CarrierCargoSection = ({
+  cargo,
+  totalCargoTonnage,
+  totalCapacityTonnage,
+  freeSpaceTonnage,
+  spaceUsage,
+  snapshotTime,
+  buyOrders,
+}: CarrierCargoSectionProps) => {
+  const buyOrderCommodities = new Set(
+    (buyOrders || []).map((o) => o.commodity_name),
+  );
+
+  const outstandingBuyTonnage =
+    (buyOrders || []).reduce(
+      // Remaining amounts should be non-negative, but be defensive: if the
+      // backend/journals ever yield a negative, treat it as 0.
+      (sum, order) => sum + (order.remaining_amount < 0 ? 0 : order.remaining_amount),
+      0,
+    ) ?? 0;
+
+  // Compute free space after all buy orders using the carrier's SpaceUsage breakdown
+  // when available (this is the authoritative view, including module/service usage).
+  //
+  // TotalCapacity - (Crew + ModulePacks) - Cargo - CargoSpaceReserved
+  //
+  // This should not go negative in valid journal data; if it does, it indicates
+  // an inconsistent snapshot.
+  const freeAfterBuyOrdersTonnage = (() => {
+    // If we have SpaceUsage, compute directly from its breakdown.
+    // TotalCapacity - Crew - ModulePacks - Cargo - CargoSpaceReserved
+    if (spaceUsage?.total_capacity != null) {
+      const crew = spaceUsage.crew ?? 0;
+      const modulePacks = spaceUsage.module_packs ?? 0;
+      const cargoUsed = spaceUsage.cargo ?? 0;
+
+      // IMPORTANT:
+      // CarrierStats.SpaceUsage.CargoSpaceReserved does not always update
+      // immediately when the commander tweaks buy orders (some sessions only
+      // emit CarrierTradeOrder deltas, and CarrierStats can lag).
+      //
+      // For a responsive UI, treat *current* buy orders as the reservation
+      // source.
+      const reserved = outstandingBuyTonnage;
+
+      return spaceUsage.total_capacity - crew - modulePacks - cargoUsed - reserved;
+    }
+
+    // Fallback when SpaceUsage breakdown is unavailable:
+    // Use the backend-provided FreeSpace (already accounts for modules/services).
+    // This value typically includes buy-order reservation, so it's the best we can do.
+    return freeSpaceTonnage;
+  })();
+
   if (!cargo || cargo.length === 0) {
     return (
-      <Typography variant="body2" color="text.secondary">
-        No carrier cargo data is currently available from the journals. Once carrier trade/cargo
-        events are observed, they will be shown here.
-      </Typography>
+      <Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Carrier hold summary.
+        </Typography>
+
+        {(totalCargoTonnage != null || totalCapacityTonnage != null || freeSpaceTonnage != null) && (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+            {totalCargoTonnage != null && (
+              <Chip
+                label={`Total cargo in hold: ${totalCargoTonnage.toLocaleString()} t`}
+                variant="outlined"
+                size="small"
+              />
+            )}
+            {freeAfterBuyOrdersTonnage != null && (
+              <Chip
+                label={`Free after all buy orders: ${freeAfterBuyOrdersTonnage.toLocaleString()} t`}
+                variant="outlined"
+                size="small"
+              />
+            )}
+            {totalCapacityTonnage != null && (
+              <Chip
+                label={`Capacity: ${totalCapacityTonnage.toLocaleString()} t`}
+                variant="outlined"
+                size="small"
+              />
+            )}
+            {outstandingBuyTonnage > 0 && (
+              <Chip
+                label={`Outstanding buy orders: ${outstandingBuyTonnage.toLocaleString()} t`}
+                variant="outlined"
+                size="small"
+                color="warning"
+              />
+            )}
+          </Stack>
+        )}
+
+        <Typography variant="body2" color="text.secondary">
+          No per-commodity carrier inventory snapshot is available locally.
+          The list below only shows per-commodity rows when the carrier market has active SELL stock
+          (Market.json Stock &gt; 0 / journal Stock/Outstanding).
+          If you have cargo in the hold but no active sell orders, this list will be empty.
+        </Typography>
+
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          Snapshot: {new Date(snapshotTime).toLocaleString()}
+        </Typography>
+      </Box>
     );
   }
 
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Current cargo snapshot.
+        Market-stock snapshot (SELL orders).
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Snapshot: {new Date(snapshotTime).toLocaleString()}
+        {totalCargoTonnage != null ? ` • Total cargo: ${totalCargoTonnage.toLocaleString()} t` : ''}
       </Typography>
       <Divider sx={{ mb: 1 }} />
       <Stack spacing={1.5}>
@@ -492,6 +617,11 @@ const CarrierCargoSection = ({ cargo }: CarrierCargoSectionProps) => {
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="body2" noWrap>
                 {item.commodity_name_localised}
+                {buyOrderCommodities.has(item.commodity_name) && (
+                  <Typography component="span" variant="caption" color="warning.main" sx={{ ml: 1 }}>
+                    (Buy order)
+                  </Typography>
+                )}
               </Typography>
             </Box>
             <Box sx={{ textAlign: 'right' }}>

@@ -423,6 +423,7 @@ class JournalParser(IJournalParser):
             carrier_id=data["CarrierID"],
             name=data.get("Name", "Unknown Carrier"),
             callsign=data.get("Callsign"),
+            market_id=data.get("MarketID"),
             raw_data=data,
         )
 
@@ -450,16 +451,17 @@ class JournalParser(IJournalParser):
           for buy orders and remaining quantities.
         - When Stock/Outstanding are omitted we keep sentinel values so that
           downstream logic can distinguish "unknown" from an explicit zero.
+
+        IMPORTANT
+        ---------
+        Do NOT default Outstanding to the configured SaleOrder/PurchaseOrder.
+        Those fields represent the *configured order size*, not current stock
+        or remaining amount. Treating them as outstanding/stock causes the UI
+        to show phantom cargo commodities that are not actually present.
         """
         # Sentinel -1 means "not provided in this journal line".
         stock = data.get("Stock", -1)
-        outstanding = data.get("Outstanding")
-        if outstanding is None:
-            # Fall back to the configured order size when Outstanding is not
-            # present at all. For SELL orders this is SaleOrder; for BUY
-            # orders it is PurchaseOrder. If neither is present we keep the
-            # sentinel so that higher layers can fall back sensibly.
-            outstanding = data.get("SaleOrder", data.get("PurchaseOrder", -1))
+        outstanding = data.get("Outstanding", -1)
 
         return CarrierTradeOrderEvent(
             timestamp=timestamp,

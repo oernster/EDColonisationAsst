@@ -7,6 +7,7 @@ latest Elite: Dangerous journal file; no additional persistence is used.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException
@@ -31,7 +32,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/carriers", tags=["carriers"])
 
 
-def _load_recent_journal_events() -> Tuple[List[JournalEvent], Optional[str]]:
+def _load_recent_journal_events() -> Tuple[List[JournalEvent], Optional[Path], Optional[str]]:
     """Parse recent journal files and return all relevant events.
 
     Fleet carrier related events are not guaranteed to appear in the *latest*
@@ -48,14 +49,14 @@ def _load_recent_journal_events() -> Tuple[List[JournalEvent], Optional[str]]:
         all_files = get_journal_files(journal_dir)
     except FileNotFoundError:
         logger.warning("Journal directory not found while querying carrier state.")
-        return [], None
+        return [], None, None
     except Exception as exc:  # noqa: BLE001
         logger.exception("Unexpected error resolving journal directory: %s", exc)
-        return [], None
+        return [], None, None
 
     if not all_files:
         logger.info("No Journal.*.log files found when querying carrier state.")
-        return [], None
+        return [], journal_dir, None
 
     # Only parse a bounded set of files for performance.
     # If the commander has not played in a long time, scanning the last ~25
@@ -70,7 +71,7 @@ def _load_recent_journal_events() -> Tuple[List[JournalEvent], Optional[str]]:
         events.extend(parser.parse_file(file_path))
 
     newest_file = files_to_parse[-1]
-    return events, str(newest_file)
+    return events, journal_dir, str(newest_file)
 
 
 @router.get("/current", response_model=CurrentCarrierResponse)
@@ -81,7 +82,7 @@ async def get_current_carrier() -> CurrentCarrierResponse:
     most recent Docked event whose StationType is FleetCarrier and
     enriching it with CarrierStats/CarrierLocation where available.
     """
-    events, _ = _load_recent_journal_events()
+    events, _journal_dir, _ = _load_recent_journal_events()
     return build_current_carrier_response(events)
 
 
@@ -98,11 +99,11 @@ async def get_current_carrier_state() -> CarrierStateResponse:
     As more carrier-specific events become available (e.g. explicit cargo
     storage snapshots), this view can be refined.
     """
-    events, _ = _load_recent_journal_events()
+    events, journal_dir, _ = _load_recent_journal_events()
     if not events:
         raise HTTPException(status_code=404, detail="No journal data available")
 
-    response = build_current_carrier_state_response(events)
+    response = build_current_carrier_state_response(events, journal_dir=journal_dir)
     if response is None:
         raise HTTPException(
             status_code=404,
@@ -120,5 +121,5 @@ async def get_my_carriers() -> MyCarriersResponse:
     to discover arbitrary third-party carriers beyond what the journal
     exposes for this commander.
     """
-    events, _ = _load_recent_journal_events()
+    events, _journal_dir, _ = _load_recent_journal_events()
     return build_my_carriers_response(events)

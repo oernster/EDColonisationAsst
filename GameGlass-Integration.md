@@ -528,6 +528,7 @@ Returns a reconstructed snapshot of the Fleet carrier the commander is currently
 - Cargo snapshot
 - Buy and sell orders
 - Basic cargo and capacity metrics
+- Carrier capacity breakdown (when available)
 
 **Response Shape (simplified)**
 
@@ -576,8 +577,16 @@ Based on [`CarrierStateResponse`](backend/src/models/api_models.py:144) and [`Ca
     ],
     "sell_orders": [],
     "total_cargo_tonnage": 2302,
+    "total_capacity_tonnage": 25000,
     "free_space_tonnage": 19328,
-    "free_space_after_buys_tonnage": 19319
+    "space_usage": {
+      "total_capacity": 25000,
+      "crew": 3370,
+      "module_packs": 0,
+      "cargo": 2302,
+      "cargo_space_reserved": 9,
+      "free_space": 19328
+    }
   }
 }
 ```
@@ -590,7 +599,10 @@ Key fields for a shard:
   - `commodity_name_localised` – display name.
   - `price` – CR/t.
   - `remaining_amount` / `original_amount` – order fill progress.
-- `free_space_after_buys_tonnage`: an approximate “free space after buy orders are filled” metric.
+- `space_usage`: (when present) the authoritative carrier capacity breakdown from `CarrierStats.SpaceUsage`.
+  - Shards that want a single “free after buy orders” number can compute:
+    - `space_usage.free_space` (already accounts for reserved buy space), or
+    - `space_usage.total_capacity - space_usage.crew - space_usage.module_packs - space_usage.cargo - space_usage.cargo_space_reserved`
 
 If the commander is not docked at any Fleet carrier, the backend returns a 404 error `"Commander is not currently docked at a fleet carrier"`; shards should handle this by hiding or disabling carrier panels.
 
@@ -601,7 +613,7 @@ If the commander is not docked at any Fleet carrier, the backend returns a 404 e
 
 **Purpose**
 
-Returns the commander's own carriers and (where detectable) squadron carriers, inferred from `CarrierStats` and `CarrierLocation` events in the latest journal file.
+Returns the commander's own carriers and (where detectable) squadron carriers, inferred from `CarrierStats` and `CarrierLocation` events across a window of recent journal files.
 
 **Response Shape (simplified)**
 
@@ -672,4 +684,4 @@ For a GameGlass shard that wants to display **Fleet carrier state** alongside co
 3. **When the commander undocks or moves**
    - Handle the 404 from `/api/carriers/current/state` as “not docked at a Fleet carrier” and hide carrier‑specific panels in the shard.
 
-Carrier data is **derived purely from the latest journal file**; if the game has not yet written new `CarrierTradeOrder` / `CarrierStats` events, the snapshot will reflect the last known state.
+Carrier data is derived from local journals. EDCA parses a window of recent `Journal.*.log` files, and may also use `Market.json` as a snapshot source when carrier trade-order journal lines are missing or partial.

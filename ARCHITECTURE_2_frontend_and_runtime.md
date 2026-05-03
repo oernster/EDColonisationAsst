@@ -114,8 +114,16 @@ State is centralised in two Zustand stores:
     - Load `myCarriers` (inferred from journal `CarrierStats` + `CarrierLocation`).
   - Presents:
     - Current docked carrier identity and services.
-    - Derived cargo snapshot and buy/sell orders from `CarrierTradeOrder` events.
+    - Derived cargo snapshot and buy/sell orders from `CarrierTradeOrder` events (with `Market.json` snapshot merge handled by the backend).
+    - A single “Free after all buy orders” metric derived from carrier capacity usage:
+      - Uses `CarrierStats.SpaceUsage` breakdown (TotalCapacity, Crew/ModulePacks, Cargo), and
+      - Uses the live summed BUY order outstanding tonnage for reservation (so UI reacts immediately to buy-order tweaks).
     - A list of known owned/squadron carriers.
+
+  Fleet carrier detail sub-tabs:
+
+  - The carrier detail view uses two sub-tabs: **Market** (left) and **Cargo** (right).
+  - Default selected sub-tab is **Market** (stored in `carrierStore`).
 
 - **SettingsPage** – [`SettingsPage.tsx`](frontend/src/components/Settings/SettingsPage.tsx:1)
 

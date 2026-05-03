@@ -42,17 +42,25 @@ EDCA will begin reading your journal files immediately.
 
 ## Fleet carrier data and journal updates
 
-EDCA's Fleet Carrier view (cargo and market orders) is built **entirely** from the official Elite Dangerous journal files. The game only writes carrier trade information to the journals when you **edit or refresh trade orders on your carrier** (for example, by changing or cancelling a buy/sell order in the Carrier Management screen).
+EDCA's Fleet Carrier view (cargo and market orders) is built from your local Elite Dangerous journal data.
+
+Internally, EDCA:
+
+- Parses a **window of recent** `Journal.*.log` files (not just the single newest file), because carrier-related events are not guaranteed to be present in the latest journal.
+- Reconstructs carrier identity/state primarily from `Docked`, `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` events.
+- Uses `Market.json` as a **snapshot source** for carrier market configuration when the journal only contains partial `CarrierTradeOrder` updates (or none at all).
 
 This has two important consequences:
 
-* If you change your carrier's market in-game but the game does **not** emit new journal events (such as `CarrierTradeOrder` entries), EDCA cannot see that change and the UI will continue to show the last state that was recorded in the journals.
+* If you change your carrier's market in-game but the game does **not** emit new journal events (such as `CarrierTradeOrder` entries) **and** `Market.json` is not updated, EDCA cannot see that change and the UI will continue to show the last state it can derive locally.
 * To ensure EDCA shows valid, up-to-date carrier commodity data, you may occasionally need to:
 
   * Open the Carrier Management screen and adjust or re-apply your commodity orders (even if only by toggling/cancelling and re-creating them), so that the game writes fresh carrier trade events to the journal.
   * Wait a moment for the journal watcher to ingest the new lines and for the UI to refresh.
 
 EDCA cannot force Elite Dangerous to write new journal data; it can only reflect what is actually present in your local `Journal.*.log` files.
+
+> **Tip:** The Fleet Carrier UI uses the carrier capacity breakdown from `CarrierStats.SpaceUsage` when available (TotalCapacity, Crew/ModulePacks usage, Cargo usage, and reserved space for buy orders).
 
 > **Note:** Because this is not a code‑signed commercial product, Windows SmartScreen
 > (and some antivirus tools) may warn that the installer or runtime is from an

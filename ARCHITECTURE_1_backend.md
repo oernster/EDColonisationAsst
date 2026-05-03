@@ -207,6 +207,11 @@ Journal event models are in [`backend/src/models/journal_events.py`](backend/src
   - `CarrierStatsEvent`
   - `CarrierTradeOrderEvent`
 
+Fleet carrier domain models are in [`backend/src/models/carriers.py`](backend/src/models/carriers.py:1). Recent additions:
+
+- `CarrierState.space_usage` (type: `CarrierSpaceUsage`) exposes the raw `CarrierStats.SpaceUsage` breakdown when available:
+  - `total_capacity`, `crew`, `module_packs`, `cargo`, `cargo_space_reserved`, `free_space`
+
 ---
 
 ## 5. Repository and persistence
@@ -376,6 +381,19 @@ The backend’s colonisation APIs are defined in:
 - [`backend/src/api/journal.py`](backend/src/api/journal.py:1)
 - [`backend/src/api/settings.py`](backend/src/api/settings.py:1)
 - [`backend/src/api/changes.py`](backend/src/api/changes.py:1)
+
+Fleet carrier endpoints are defined in [`backend/src/api/carriers.py`](backend/src/api/carriers.py:1) and are powered by [`backend/src/services/carrier_service.py`](backend/src/services/carrier_service.py:1).
+
+Key carrier endpoints:
+
+- `GET /api/carriers/current` – current docking context (docked carrier identity when docked at a Fleet carrier).
+- `GET /api/carriers/current/state` – reconstructed snapshot including:
+  - Identity + services
+  - Buy and sell orders from `CarrierTradeOrder` events
+  - Capacity metrics from `CarrierStats.SpaceUsage`
+  - `space_usage` breakdown (when present)
+  - Market.json merge to avoid “missing order” artefacts when the journal only emits deltas
+- `GET /api/carriers/mine` – known own/squadron carriers derived from recent `CarrierStats`/`CarrierLocation`.
 
 Key colonisation endpoints:
 

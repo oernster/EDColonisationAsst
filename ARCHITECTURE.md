@@ -75,6 +75,7 @@ That document focuses on:
   - DB schema, versioning and automatic reset for incompatible schema changes.
 - Fleet carrier state reconstruction from carrier journal events:
   - `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`.
+  - `Market.json` snapshot merge to avoid missing orders when only deltas are emitted.
   - Normalisation of commodity identifiers and display names.
 - Data aggregation and optional Inara integration.
 - Backend REST APIs and AJAX long-poll live updates.

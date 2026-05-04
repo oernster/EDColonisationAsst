@@ -95,6 +95,11 @@ Notes:
 
 - The `commodities` array on each site contains **per-commodity progress**.
 - The fields `total_commodities_needed` and `commodities_progress_percentage` summarize the commodity situation for each site.
+- The field `construction_progress` reflects the journal-reported `ConstructionProgress` value and may not advance in lockstep with commodity delivery. For a **live** site progress indicator, compute:
+
+  `sum(provided_amount) / sum(required_amount) * 100`
+
+  across the site’s `commodities` (this matches the EDCA UI behaviour).
 - You can use this endpoint to:
   - Render global lists of depots
   - Build a **global shopping list** by aggregating `commodities` across **all** sites in the shard itself

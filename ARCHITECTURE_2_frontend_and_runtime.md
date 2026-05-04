@@ -104,7 +104,12 @@ State is centralised in two Zustand stores:
   - Shows a **system summary**, **system shopping list** and **per‑station cards**.
   - Reads `systemData` from `colonisationStore`:
     - Uses an internal `aggregateCommodities` helper to re‑aggregate commodities for the **System Shopping List**.
-    - Displays per‑commodity and per‑site progress with MUI progress bars and chips.
+    - Displays per‑commodity progress and **per‑site overall delivery progress** with MUI progress bars and chips.
+    - Per‑site progress bar semantics:
+      - Labelled **Commodities Delivered** in the UI.
+      - Computed as `sum(provided_amount) / sum(required_amount) * 100` across all commodities for the site.
+      - If the site has no commodity requirements yet, the UI shows an indeterminate progress bar with the text “Awaiting requirements”.
+      - Note: this intentionally does **not** use the journal field `ConstructionProgress`, which can remain static while commodity deliveries are happening.
 
 - **FleetCarriersPanel** – [`FleetCarriersPanel.tsx`](frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx:1)
 

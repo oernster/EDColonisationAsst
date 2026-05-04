@@ -180,6 +180,10 @@ Core colonisation models live in [`backend/src/models/colonisation.py`](backend/
   - `commodities: list[Commodity]`
   - `last_updated`, `last_source`
 
+  Notes:
+  - `construction_progress` reflects the journal field `ConstructionProgress` when present.
+  - The **frontend UI does not rely on `construction_progress` for the per-site progress bar**; instead it computes a live per-site delivery percentage from commodity totals (sum provided / sum required) to avoid a “stuck” indicator when deliveries are happening.
+
 - **`SystemColonisationData`**
   - `system_name`
   - `construction_sites: list[ConstructionSite]`

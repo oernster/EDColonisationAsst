@@ -397,9 +397,36 @@ export const SiteList = ({ viewMode = 'system' }: { viewMode?: SiteListViewMode 
 
 const SiteCard = ({ site }: { site: ConstructionSite }) => {
   const isComplete = site.construction_complete;
+
+  // Live per-site progress is derived from *commodity delivery totals*.
+  // This is more responsive than the journal's ConstructionProgress field,
+  // which can remain static for long periods.
+  const { totalRequired, totalProvided, deliveryProgressPercentage, hasRequirements } = useMemo(() => {
+    const commodities = site.commodities ?? [];
+    const totalRequired = commodities.reduce((sum, c) => sum + (c.required_amount ?? 0), 0);
+    const totalProvided = commodities.reduce((sum, c) => sum + (c.provided_amount ?? 0), 0);
+
+    // If we have no commodity requirements at all, we cannot compute a meaningful
+    // delivery percentage yet.
+    const hasRequirements = commodities.length > 0 && totalRequired > 0;
+
+    const deliveryProgressPercentage = hasRequirements
+      ? (totalProvided / totalRequired) * 100
+      : null;
+
+    return {
+      totalRequired,
+      totalProvided,
+      deliveryProgressPercentage,
+      hasRequirements,
+    };
+  }, [site.commodities]);
+
   const displayedConstructionProgress = isComplete
     ? 100
-    : Math.max(0, Math.min(100, site.construction_progress));
+    : deliveryProgressPercentage === null
+      ? null
+      : Math.max(0, Math.min(100, deliveryProgressPercentage));
   const statusColor = isComplete ? 'success.main' : 'info.main';
   const statusIcon = isComplete ? <CheckCircle /> : <Construction />;
   const [expanded, setExpanded] = useState(true);
@@ -441,15 +468,33 @@ const SiteCard = ({ site }: { site: ConstructionSite }) => {
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Construction Progress
+              Commodities Delivered
             </Typography>
-            <Typography variant="body2" fontWeight="bold">
-              {displayedConstructionProgress.toFixed(1)}%
-            </Typography>
+            {displayedConstructionProgress === null ? (
+              <Typography variant="body2" color="text.secondary">
+                Awaiting requirements
+              </Typography>
+            ) : (
+              <Typography
+                variant="body2"
+                fontWeight="bold"
+                data-testid={`site-progress-label-${site.market_id}`}
+              >
+                {displayedConstructionProgress.toFixed(1)}%
+              </Typography>
+            )}
           </Box>
+
+          {hasRequirements && !isComplete && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              {totalProvided.toLocaleString()} / {totalRequired.toLocaleString()} delivered
+            </Typography>
+          )}
+
           <LinearProgress
-            variant="determinate"
-            value={displayedConstructionProgress}
+            data-testid={`site-progress-${site.market_id}`}
+            variant={displayedConstructionProgress === null ? 'indeterminate' : 'determinate'}
+            value={displayedConstructionProgress === null ? 0 : displayedConstructionProgress}
             sx={{
               height: 8,
               borderRadius: 1,

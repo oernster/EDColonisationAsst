@@ -33,6 +33,7 @@ vi.mock('./services/api', () => ({
 import App from './App';
 import { useColonisationStore } from './stores/colonisationStore';
 import { CommodityStatus, SystemColonisationData } from './types/colonisation';
+import { SiteList } from './components/SiteList/SiteList';
 
 describe('App', () => {
   beforeEach(() => {
@@ -109,6 +110,68 @@ describe('App', () => {
 
     // System View is the default top-level tab. Verify the new sub-tab label exists.
     expect(screen.getByRole('tab', { name: /Completed Stations/i })).toBeTruthy();
+  });
+
+  it('computes per-site live progress from total commodity delivery (sum provided / sum required)', () => {
+    const systemData: SystemColonisationData = {
+      system_name: 'Sol',
+      total_sites: 1,
+      completed_sites: 0,
+      in_progress_sites: 1,
+      completion_percentage: 0,
+      construction_sites: [
+        {
+          market_id: 42,
+          station_name: 'Orbital Construction Site: Example',
+          station_type: 'Construction Depot',
+          system_name: 'Sol',
+          system_address: 123,
+          // Deliberately set to an incorrect value to ensure we are NOT using it.
+          construction_progress: 0,
+          construction_complete: false,
+          construction_failed: false,
+          commodities: [
+            {
+              name: 'water',
+              name_localised: 'Water',
+              required_amount: 4,
+              provided_amount: 2,
+              payment: 1000,
+              remaining_amount: 2,
+              progress_percentage: 50,
+              status: CommodityStatus.IN_PROGRESS,
+            },
+            {
+              name: 'liquidoxygen',
+              name_localised: 'Liquid Oxygen',
+              required_amount: 4,
+              provided_amount: 2,
+              payment: 1000,
+              remaining_amount: 2,
+              progress_percentage: 50,
+              status: CommodityStatus.IN_PROGRESS,
+            },
+          ],
+          last_updated: '2026-04-29T00:00:00.000Z',
+          is_complete: false,
+          total_commodities_needed: 4,
+          commodities_progress_percentage: 50,
+          last_source: 'journal',
+        },
+      ],
+    };
+
+    useColonisationStore.setState({
+      currentSystem: 'Sol',
+      systemData,
+      loading: false,
+      error: null,
+    });
+
+    render(<SiteList viewMode="stations" />);
+
+    // 2/4 + 2/4 => 4/8 => 50%
+    expect(screen.getByTestId('site-progress-label-42').textContent).toContain('50.0%');
   });
 
   it('does not render the keep-awake chip on desktop', async () => {

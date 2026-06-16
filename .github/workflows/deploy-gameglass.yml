@@ -1,5 +1,5 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy GameGlass App to GitHub Pages
+name: Deploy site to GitHub Pages
 
 on:
   # Runs on pushes targeting the default branch
@@ -33,8 +33,11 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the specific sub-directory
-          path: 'frontend/src/gameglass'
+          # Publish the marketing site so the public Pages root is docs/, not
+          # the GameGlass shard. The shard fetches a local (127.0.0.1) address,
+          # which made the browser prompt for local-network access on every
+          # visit to the site root.
+          path: 'docs'
 
   # Deployment job
   deploy:

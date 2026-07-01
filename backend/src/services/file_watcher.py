@@ -23,7 +23,9 @@ class IFileWatcher(ABC):
     """Interface for file watching."""
 
     @abstractmethod
-    async def start_watching(self, directory: Path) -> None:
+    async def start_watching(
+        self, directory: Path, process_existing: bool = True
+    ) -> None:
         """Start watching directory for changes."""
         raise NotImplementedError
 
@@ -95,7 +97,9 @@ class FileWatcher(IFileWatcher):
         alive = None
         try:
             alive = (
-                bool(getattr(self._observer, "is_alive")()) if self._observer is not None else False
+                bool(getattr(self._observer, "is_alive")())
+                if self._observer is not None
+                else False
             )
         except Exception:
             alive = None
@@ -135,7 +139,9 @@ class FileWatcher(IFileWatcher):
             "task_done": done,
             "task_exception": exc,
             "last_checked_at": self._poll_last_checked_at,
-            "last_seen_file": str(self._poll_last_path) if self._poll_last_path else None,
+            "last_seen_file": str(self._poll_last_path)
+            if self._poll_last_path
+            else None,
             "last_seen_mtime": self._poll_last_mtime,
             "last_error": self._poll_last_error,
             "interval_s": self._poll_interval_s,
@@ -156,12 +162,20 @@ class FileWatcher(IFileWatcher):
         if self._handler is not None:
             self._handler.update_callback = callback
 
-    async def start_watching(self, directory: Path) -> None:
+    async def start_watching(
+        self, directory: Path, process_existing: bool = True
+    ) -> None:
         """
         Start watching a directory for changes.
 
         Args:
             directory: Path to journal directory.
+            process_existing: When True (the default), synchronously scan and
+                ingest all existing journal files before returning. The
+                packaged runtime passes False so this potentially minutes-long
+                full-history scan does not block server readiness; the initial
+                catch-up is instead performed by a background task in the
+                application lifespan.
         """
         if self._observer is not None:
             # If the previous observer thread died, treat this as a restart.
@@ -217,18 +231,22 @@ class FileWatcher(IFileWatcher):
             if alive:
                 logger.info("Started watching journal directory: %s", directory)
             else:
-                self._watchdog_last_error = (
-                    "Observer thread is not alive after start(); watchdog events unavailable"
-                )
+                self._watchdog_last_error = "Observer thread is not alive after start(); watchdog events unavailable"
                 logger.error(self._watchdog_last_error)
         except Exception as exc:  # noqa: BLE001
             self._watchdog_last_error = f"{type(exc).__name__}: {exc}"
-            logger.exception("Failed to start watchdog observer: %s", self._watchdog_last_error)
+            logger.exception(
+                "Failed to start watchdog observer: %s", self._watchdog_last_error
+            )
             self._observer = None
 
         # Process existing files, but never prevent polling from starting.
+        # When process_existing is False the caller (the packaged lifespan)
+        # performs the initial catch-up in the background so that starting the
+        # watcher stays fast and does not block server readiness.
         try:
-            await self._process_existing_files(directory)
+            if process_existing:
+                await self._process_existing_files(directory)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Error while processing existing journals: %s", exc)
         finally:
@@ -328,7 +346,9 @@ class FileWatcher(IFileWatcher):
             except Exception:  # noqa: BLE001
                 logger.exception("Polling fallback encountered an error")
                 try:
-                    self._poll_last_error = "Polling fallback encountered an error; see logs"
+                    self._poll_last_error = (
+                        "Polling fallback encountered an error; see logs"
+                    )
                 except Exception:
                     pass
 

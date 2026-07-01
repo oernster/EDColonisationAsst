@@ -148,4 +148,3 @@ def load_market_export(journal_dir: Path) -> Optional[MarketExportSnapshot]:
         market_id=market_id,
         items=tuple(items),
     )
-

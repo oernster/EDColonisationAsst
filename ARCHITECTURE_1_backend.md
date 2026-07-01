@@ -99,21 +99,21 @@ On startup, the lifespan context manager `lifespan(app)`:
 
    - [`set_dependencies`](backend/src/api/routes.py:35) for REST routes.
 
-4. Performs a **one‑time initial import** of existing journals when the DB is empty, using `_prime_colonisation_database_if_empty`:
+4. Decides whether this is a first run by reading [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:256) once (`total_sites == 0`), then **schedules the initial journal ingestion as a background task** (`_startup_ingestion` via `asyncio.create_task`) rather than awaiting it inline.
 
-   - Calls [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:256).
-   - If `total_sites == 0`, it:
-     - Locates the journal directory from `config.journal.directory`.
-     - Walks all `Journal.*.log` files.
-     - Uses [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:109) with a real `JournalParser` and `SystemTracker` to ingest events.
-   - On subsequent runs (non‑empty DB), this step is skipped.
+   This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
+
+   - **First run (empty DB):** `_prime_colonisation_database_if_empty` walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:109) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
+   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync (`_sync_latest_journals_best_effort`, newest few files). The full history is already persisted, and live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
 
 5. Configures the `FileWatcher`:
 
    - Calls `file_watcher.set_update_callback(...)` so that changes bump the in-process change sequence used by AJAX long-polling (`/api/changes/longpoll`).
-   - Starts watching the journal directory with `file_watcher.start_watching(journal_dir)`, handling errors non‑fatally so the API can still start even if watching fails.
+   - Starts watching with `file_watcher.start_watching(journal_dir, process_existing=False)`. The `process_existing=False` flag skips the watcher's own blocking full‑history scan (that initial catch‑up is owned by the background task above); watchdog plus the polling fallback still deliver live updates. Errors are handled non‑fatally so the API starts even if watching fails.
 
 On shutdown, the lifespan handler stops the `FileWatcher` and its watchdog observer via `file_watcher.stop_watching()`.
+
+Because the heavy ingestion is off the readiness path, `test_lifespan_readiness.py` guards that entering the lifespan returns promptly while the import completes in the background.
 
 ### 3.2 Automatic DB reset for new installs
 
@@ -336,8 +336,12 @@ Concurrency:
 ### 6.3 First‑run vs incremental ingestion
 
 - **First run / empty DB:**
-  - `_prime_colonisation_database_if_empty(...)` runs once on startup (see section 3.1).
-  - It uses `JournalFileHandler._process_file` to ingest all historical `Journal.*.log` files.
+  - `_prime_colonisation_database_if_empty(...)` runs once, in a background task scheduled during startup (see section 3.1), so it never blocks server readiness.
+  - It uses `JournalFileHandler._process_file` to ingest all historical `Journal.*.log` files, bumping the change bus so the UI populates progressively.
+
+- **Repeat launch / non‑empty DB:**
+  - Only a bounded tail sync (`_sync_latest_journals_best_effort`) runs in the background; the persisted DB already holds prior history.
+  - The watcher is started with `process_existing=False`, so no full re‑scan happens on the readiness path.
 
 - **Normal operation:**
   - `FileWatcher` watches the journal directory and calls the same `_process_file` for changed/created files.
@@ -438,5 +442,10 @@ The first‑run preload logic and DB versioning are exercised indirectly via:
 - Repository tests (schema creation and data round‑trip).
 - API reload tests (`test_reload_journals_processes_journal_files`).
 - File watcher integration tests for depot + contribution flows, including the new `ColonisationContribution` array schema.
+
+The suite runs with branch coverage and a hard 100% gate on the testable
+backend surface (`pytest -v --cov`); see [`TESTING.md`](TESTING.md) for the
+gate scope, the omit rationale for the Qt runtime shell and the
+no-mock-libraries testing conventions.
 
 This document should give you a concise, backend‑only view of how EDCA ingests journals, stores colonisation state, and surfaces it via APIs, including the new **automatic DB reset + first‑run journal import** behaviour for new installs.

@@ -389,6 +389,7 @@ class DummyAction:
 class DummyMenu:
     def __init__(self) -> None:
         self.actions: List[DummyAction | str] = []
+        self.submenus: List[tuple[str, "DummyMenu"]] = []
 
     def addAction(self, text: str) -> DummyAction:  # noqa: N802
         act = DummyAction(text)
@@ -397,6 +398,11 @@ class DummyMenu:
 
     def addSeparator(self) -> None:
         self.actions.append("---")
+
+    def addMenu(self, title: str) -> "DummyMenu":  # noqa: N802
+        submenu = DummyMenu()
+        self.submenus.append((title, submenu))
+        return submenu
 
 
 class DummyTrayIcon:
@@ -455,6 +461,20 @@ def test_tray_controller_configures_tray_and_start_services_stubbed(
     assert controller._tray.visible is True  # type: ignore[attr-defined]
     assert controller._tray.tooltip == tray_mod.APP_NAME  # type: ignore[attr-defined]
     assert calls["start_services_called"] is True
+
+    # The context menu should carry a Help submenu with About and
+    # Check for Updates entries ahead of the Exit action.
+    menu = controller._tray.menu  # type: ignore[attr-defined]
+    assert menu is not None
+    submenu_titles = [title for title, _submenu in menu.submenus]
+    assert submenu_titles == ["Help"]
+    _title, help_submenu = menu.submenus[0]
+    help_action_texts = [
+        act.text for act in help_submenu.actions if isinstance(act, DummyAction)
+    ]
+    assert help_action_texts == ["About", "Check for Updates"]
+    exit_texts = [act.text for act in menu.actions if isinstance(act, DummyAction)]
+    assert "Exit" in exit_texts
 
 
 def test_spawn_process_handles_failure_and_logs(

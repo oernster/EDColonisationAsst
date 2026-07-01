@@ -263,13 +263,21 @@ Key classes:
 
   - Uses a custom `_QuietUvicornConfig` that disables uvicorn’s own logging configuration (to avoid conflicts in certain frozen environments).
   - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the EXE.
-  - `wait_until_ready(timeout=...)` polls `/api/health` and `/app/` to ensure the backend and static frontend are reachable.
+  - `probe_ready()` runs a single non‑blocking readiness probe of `/api/health` and `/app/`; `wait_until_ready(timeout=...)` is the blocking wrapper around it for callers that need a synchronous wait.
+
+- `StartupSplashWindow` and `StartupMonitor` ([`splash.py`](backend/src/runtime/splash.py:1)) – first‑run feedback in frozen mode:
+
+  - The splash shows the app icon, “by Oliver Ernster”, the version (from the top‑level `VERSION` file via `src.__version__`) and a live status line.
+  - `StartupMonitor` polls `BackendServerController.probe_ready()` on a Qt timer, so the UI thread never blocks; status progresses from “Starting the local backend...” to “Preparing the web interface...” to “Ready”.
+  - The browser is opened only when both endpoints actually respond; on timeout the splash reports the problem and closes while the tray stays available.
+  - Silent starts (`--no-browser`, used for login autostart) show no splash and open no browser.
 
 - `TrayUIController` – simple Qt system tray UI in frozen mode:
 
   - Sets EDCA icon and tooltip.
   - Offers:
     - “Open Web UI” (launches default browser at `RuntimeEnvironment.frontend_url`, usually `http://127.0.0.1:8000/app/`).
+    - “Help” submenu ([`help_menu.py`](backend/src/runtime/help_menu.py:1), shared with the dev tray): “About” (icon, author, copyright, open source credits) and “Check for Updates” (opens the GitHub releases page).
     - “Exit” (with confirmation).
   - Clicking/double‑clicking the tray icon also opens the web UI.
 
@@ -278,10 +286,11 @@ Key classes:
   - `run()`:
     - In DEV mode: delegates to the legacy launcher window (`_run_dev()`).
     - In FROZEN mode: runs `_run_frozen()`:
+      - Shows the startup splash immediately (unless `--no-browser`).
       - Starts the in‑process backend server via `BackendServerController`.
-      - Waits for readiness.
-      - Creates and shows `TrayUIController`.
-      - Automatically opens the web UI in the user’s default browser.
+      - Creates and shows `TrayUIController` straight away so Exit is always available.
+      - Polls readiness via `StartupMonitor` without blocking the Qt event loop.
+      - Opens the web UI in the user’s default browser only once ready.
       - Runs the Qt event loop until exit, then stops the backend.
 
 `runtime_entry.py` bootstraps logging and the single‑instance lock, then instantiates `RuntimeApplication` and calls `run()`.

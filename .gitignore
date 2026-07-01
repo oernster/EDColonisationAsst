@@ -212,16 +212,16 @@ dist/
 build/
 # Frontend production bundle (built by Vite)
 frontend/dist/
-# Installer / runtime build artefacts
-build_payload/
-guiinstaller.build/
-guiinstaller.dist/
-guiinstaller.onefile-build/
-runtime_entry.build/
-runtime_entry.dist/
-runtime_entry.onefile-build/
+# Installer / runtime build artefacts (buildexe.py / buildinstaller.py)
+# Nuitka intermediates and the staged payload live under build/ (ignored
+# above); the final EXEs land in the dist-* directories.
+dist-runtime/
+dist-installer/
 EDColonizationAsstInstaller.exe
 EDColonizationAsst.exe
+
+# Local scratch notes (release-note material, never shipped)
+NOTES.md
 .env.local
 .env.*.local
 npm-debug.log*

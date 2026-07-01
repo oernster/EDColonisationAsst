@@ -64,12 +64,15 @@ class HealthResponse(BaseModel):
 
     status: str = Field(default="healthy", description="Service status")
     version: str = Field(description="Application version")
-    build_id: str = Field(description="Build identifier (for diagnosing stale installs)")
+    build_id: str = Field(
+        description="Build identifier (for diagnosing stale installs)"
+    )
     python_version: str = Field(description="Python runtime version")
     journal_directory: str = Field(description="Configured journal directory")
     journal_accessible: bool = Field(
         description="Whether journal directory is accessible"
     )
+
 
 # WebSocket message models removed. Live updates now use AJAX long-polling.
 

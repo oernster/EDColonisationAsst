@@ -101,7 +101,11 @@ class JournalFileHandler(FileSystemEventHandler):
         is_journal = file_path.name.startswith("Journal.") and file_path.name.endswith(
             ".log"
         )
-        is_companion_export = file_path.name in {"Market.json", "Cargo.json", "Status.json"}
+        is_companion_export = file_path.name in {
+            "Market.json",
+            "Cargo.json",
+            "Status.json",
+        }
 
         if not is_journal and not is_companion_export:
             return

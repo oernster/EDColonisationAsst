@@ -112,10 +112,17 @@ These two files are the authoritative, up‑to‑date references for how EDCA wo
 ## 3. Other useful documentation
 
 - **Development workflows and tooling**  
-  [`DEVELOPMENT_README.md`](DEVELOPMENT_README.md:1)  
+  [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md)  
   - How to run backend and frontend in development.
-  - Test/lint/type‑checking commands.
-  - Packaging and installer notes.
+  - The Windows build pipeline: `python buildexe.py` (runtime EXE) then
+    `python buildinstaller.py` (GUI installer), with the installer UI
+    sources under `installer/`.
+  - Lint/type-checking commands.
+
+- **Testing**  
+  [`TESTING.md`](TESTING.md)  
+  - How to run the suites (`pytest -v --cov`) and what the 100% coverage
+    gate covers.
 
 - **GameGlass integration**  
   [`GameGlass-Integration.md`](GameGlass-Integration.md:1)

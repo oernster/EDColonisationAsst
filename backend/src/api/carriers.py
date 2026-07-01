@@ -32,7 +32,9 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/carriers", tags=["carriers"])
 
 
-def _load_recent_journal_events() -> Tuple[List[JournalEvent], Optional[Path], Optional[str]]:
+def _load_recent_journal_events() -> (
+    Tuple[List[JournalEvent], Optional[Path], Optional[str]]
+):
     """Parse recent journal files and return all relevant events.
 
     Fleet carrier related events are not guaranteed to appear in the *latest*

@@ -22,4 +22,3 @@ async def longpoll(
 ) -> dict:
     snapshot = await change_bus.wait_for_change(since=since, timeout_s=timeout_s)
     return {"seq": snapshot.seq, "changed": snapshot.changed}
-

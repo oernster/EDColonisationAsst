@@ -94,14 +94,18 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
     # journal_directory in settings would not take effect until the user restarts
     # the whole application.
     try:
-        changed = old_journal_dir is None or old_journal_dir != settings.journal_directory
+        changed = (
+            old_journal_dir is None or old_journal_dir != settings.journal_directory
+        )
 
         # When called via FastAPI, `request` is provided. In unit tests this
         # function is called directly, so request may be None.
         file_watcher = None
         if request is not None:
             app_state = getattr(getattr(request, "app", None), "state", None)
-            file_watcher = getattr(app_state, "file_watcher", None) if app_state else None
+            file_watcher = (
+                getattr(app_state, "file_watcher", None) if app_state else None
+            )
 
         if changed and file_watcher is not None:
             await file_watcher.stop_watching()

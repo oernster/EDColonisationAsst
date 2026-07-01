@@ -21,12 +21,44 @@ import webbrowser
 from typing import Optional
 
 import uvicorn
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from .common import _debug_log, fastapi_app, logger
 from .environment import RuntimeEnvironment
 from .common import RuntimeMode
+
+# Canonical application version, resolved from the top-level VERSION file.
+try:
+    from .. import __version__  # type: ignore[import-not-found]
+except Exception:  # noqa: BLE001
+    from backend.src import __version__  # type: ignore[import-error]
+
+# Shared Help menu (About + Check for Updates) used by the tray UI.
+try:
+    from .help_menu import add_help_menu, resolve_about_icon  # type: ignore[import-not-found]
+except Exception:  # noqa: BLE001
+    from backend.src.runtime.help_menu import (  # type: ignore[import-error]
+        add_help_menu,
+        resolve_about_icon,
+    )
+
+# Startup splash and non-blocking readiness monitor for the frozen runtime.
+try:
+    from .splash import (  # type: ignore[import-not-found]
+        SPLASH_FAILURE_CLOSE_DELAY_MS,
+        STATUS_TIMED_OUT,
+        StartupMonitor,
+        StartupSplashWindow,
+    )
+except Exception:  # noqa: BLE001
+    from backend.src.runtime.splash import (  # type: ignore[import-error]
+        SPLASH_FAILURE_CLOSE_DELAY_MS,
+        STATUS_TIMED_OUT,
+        StartupMonitor,
+        StartupSplashWindow,
+    )
 
 
 class BackendServerController:
@@ -79,12 +111,13 @@ class BackendServerController:
         logger.info("In-process uvicorn server stopped.")
         _debug_log("[BackendServerController] in-process uvicorn server stopped")
 
-    def wait_until_ready(self, timeout: float = 60.0) -> bool:
+    def probe_ready(self) -> tuple[bool, bool]:
         """
-        Wait until the backend responds on /api/health and /app/ or timeout.
+        Run one readiness probe of the health and web UI endpoints.
 
-        Returns True if both endpoints appear to be available, False if the
-        timeout elapses.
+        Returns a (backend_ok, frontend_ok) tuple. Each probe uses a short
+        connection timeout so a single call never stalls the caller for
+        long; the startup monitor invokes this repeatedly from a Qt timer.
         """
         import urllib.error
         import urllib.request
@@ -101,20 +134,25 @@ class BackendServerController:
             except urllib.error.URLError:
                 return False
 
-        logger.info(
-            "Waiting for backend at %s and frontend at %s...",
-            health_url,
-            frontend_url,
-        )
+        return _probe(health_url), _probe(frontend_url)
+
+    def wait_until_ready(self, timeout: float = 60.0) -> bool:
+        """
+        Wait until the backend responds on /api/health and /app/ or timeout.
+
+        Returns True if both endpoints appear to be available, False if the
+        timeout elapses. The frozen runtime now prefers the non-blocking
+        StartupMonitor; this blocking variant remains for callers that need
+        a simple synchronous wait.
+        """
         _debug_log(
             "[BackendServerController] wait_until_ready() "
-            f"health_url={health_url} frontend_url={frontend_url} timeout={timeout}",
+            f"port={self._env.backend_port} timeout={timeout}",
         )
 
         deadline = time.time() + timeout
         while time.time() < deadline:
-            backend_ok = _probe(health_url)
-            frontend_ok = _probe(frontend_url)
+            backend_ok, frontend_ok = self.probe_ready()
             if backend_ok and frontend_ok:
                 logger.info("Backend and frontend are ready.")
                 _debug_log(
@@ -273,6 +311,10 @@ class TrayUIController:
         open_action.triggered.connect(self._on_open_web_ui)  # type: ignore[arg-type]
 
         menu.addSeparator()
+        about_icon = resolve_about_icon(self._env.project_root)
+        add_help_menu(menu, icon_path=about_icon)
+
+        menu.addSeparator()
         exit_action = menu.addAction("Exit")
         exit_action.triggered.connect(self._on_exit)  # type: ignore[arg-type]
 
@@ -341,6 +383,10 @@ class RuntimeApplication:
         self._env = RuntimeEnvironment.detect()
         self._backend = BackendServerController(self._env)
         self._open_browser = open_browser
+        # Strong references to Qt-side startup helpers created in
+        # _run_frozen(); kept on self so they outlive the local scope.
+        self._monitor: Optional[StartupMonitor] = None
+        self._splash: Optional[StartupSplashWindow] = None
         _debug_log(
             "[RuntimeApplication] detected environment: "
             f"mode={self._env.mode}, project_root={self._env.project_root}",
@@ -386,9 +432,14 @@ class RuntimeApplication:
         """
         Frozen (packaged EXE) behaviour.
 
-        - Starts the backend in-process.
-        - Waits for readiness (health + /app).
-        - Shows a tray icon with Open Web UI / Exit.
+        - Shows a startup splash immediately (unless started with
+          --no-browser for silent background/login starts).
+        - Starts the backend in-process and shows the tray icon straight
+          away so Exit is always available.
+        - Polls readiness (health + /app) on a Qt timer without blocking
+          the UI thread, reporting progress on the splash.
+        - Opens the browser only once both endpoints actually respond, so
+          the user never lands on an empty page.
         """
         _debug_log("[RuntimeApplication] _run_frozen() starting")
         app = QApplication([])
@@ -402,29 +453,65 @@ class RuntimeApplication:
         if icon_path.exists():
             app.setWindowIcon(QIcon(str(icon_path)))
 
+        # Show the splash before any heavier startup work so the user gets
+        # immediate feedback. Background starts (--no-browser) stay silent.
+        splash: Optional[StartupSplashWindow] = None
+        if self._open_browser:
+            splash = StartupSplashWindow(
+                version=__version__,
+                icon_path=resolve_about_icon(self._env.project_root)
+                or self._env.icon_path,
+            )
+            splash.show()
+            app.processEvents()
+            _debug_log("[RuntimeApplication] startup splash shown")
+
         # Start backend in-process.
         _debug_log("[RuntimeApplication] starting in-process backend")
         self._backend.start()
-        ready = self._backend.wait_until_ready(timeout=60.0)
-        _debug_log(
-            "[RuntimeApplication] backend readiness wait completed; " f"ready={ready}",
-        )
 
-        # Create and show tray UI.
+        # Create and show tray UI immediately; Exit must not wait for
+        # readiness.
         tray = TrayUIController(app, self._env, self._backend)
         tray.show()
         _debug_log("[RuntimeApplication] TrayUIController created and shown")
 
-        # Optionally auto-open the web UI on first run.
-        if self._open_browser:
-            webbrowser.open(self._env.frontend_url)
-            _debug_log(
-                "[RuntimeApplication] Opening web UI at " f"{self._env.frontend_url}",
-            )
-        else:
-            _debug_log(
-                "[RuntimeApplication] open_browser disabled; not launching web UI automatically",
-            )
+        def _set_status(message: str) -> None:
+            if splash is not None:
+                splash.set_status(message)
+
+        def _on_ready() -> None:
+            _debug_log("[RuntimeApplication] backend/frontend reported ready")
+            if self._open_browser:
+                webbrowser.open(self._env.frontend_url)
+                _debug_log(
+                    "[RuntimeApplication] Opening web UI at "
+                    f"{self._env.frontend_url}",
+                )
+            else:
+                _debug_log(
+                    "[RuntimeApplication] open_browser disabled; "
+                    "not launching web UI automatically",
+                )
+            if splash is not None:
+                splash.close()
+
+        def _on_timeout() -> None:
+            _debug_log("[RuntimeApplication] readiness monitoring timed out")
+            _set_status(STATUS_TIMED_OUT)
+            if splash is not None:
+                QTimer.singleShot(SPLASH_FAILURE_CLOSE_DELAY_MS, splash.close)
+
+        monitor = StartupMonitor(
+            probe=self._backend.probe_ready,
+            on_status=_set_status,
+            on_ready=_on_ready,
+            on_timeout=_on_timeout,
+        )
+        monitor.start()
+        # Keep strong references so Qt-side objects are not garbage-collected.
+        self._monitor = monitor
+        self._splash = splash
 
         result = app.exec()
         _debug_log(

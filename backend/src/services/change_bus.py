@@ -59,4 +59,3 @@ class ChangeBus:
 
 # Global singleton used by API routes.
 change_bus = ChangeBus()
-

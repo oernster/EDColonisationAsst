@@ -28,6 +28,17 @@ from typing import Optional
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+# Shared Help menu (About + Check for Updates). Defensive import so this
+# module works both as part of the backend.src package and when executed
+# with backend/ on sys.path.
+try:
+    from .help_menu import add_help_menu, resolve_about_icon  # type: ignore[import-not-found]
+except Exception:  # noqa: BLE001
+    from backend.src.runtime.help_menu import (  # type: ignore[import-error]
+        add_help_menu,
+        resolve_about_icon,
+    )
+
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 
@@ -111,6 +122,8 @@ class TrayController:
         self._tray.setToolTip(APP_NAME)
 
         menu = QMenu()
+        add_help_menu(menu, icon_path=resolve_about_icon(self._root))
+        menu.addSeparator()
         exit_action = menu.addAction("Exit")
         exit_action.triggered.connect(self._on_exit_triggered)
 

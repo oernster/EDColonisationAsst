@@ -254,32 +254,60 @@ async def lifespan(app: FastAPI):
     # Set dependencies for API routes
     set_dependencies(repository, aggregator, system_tracker)
 
-    # Perform a one-time initial import of existing journals when the
-    # colonisation database is empty. This ensures that on a fresh
-    # installation (or after the DB has been deleted) we immediately
-    # populate sites and commodities without requiring the user to call
-    # /api/debug/reload-journals manually.
-    await _prime_colonisation_database_if_empty(repository, parser, system_tracker)
+    journal_dir = Path(config.journal.directory)
 
-    # In the packaged runtime, also do a *bounded* best-effort sync of the most
-    # recent journal files even when the DB is not empty. This mitigates stale
-    # persistent DB state after reinstall/upgrade.
+    # Determine up front whether this is a first run (empty database) so the
+    # heavy initial journal import can be scheduled in the BACKGROUND rather
+    # than blocking server readiness.
+    #
+    # This await runs during ASGI lifespan startup, before uvicorn begins
+    # serving requests. Any blocking work here (parsing the full journal
+    # history, which can span years and take minutes) would leave the
+    # packaged runtime unable to answer /api/health, freezing the startup
+    # splash for the entire duration. The single stats query below is cheap.
     try:
-        if is_frozen():
-            journal_dir_for_sync = Path(config.journal.directory)
-            asyncio.create_task(
-                _sync_latest_journals_best_effort(
-                    parser,
-                    system_tracker,
-                    repository,
-                    journal_dir_for_sync,
-                    loop,
-                ),
-                name="edca-startup-journal-sync",
-            )
-    except Exception:
-        # Non-fatal.
-        pass
+        initial_stats = await repository.get_stats()
+        db_is_empty = initial_stats.get("total_sites", 0) == 0
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to read initial repository stats: %s", exc)
+        db_is_empty = True
+
+    async def _startup_ingestion() -> None:
+        """Perform the initial journal catch-up off the readiness path.
+
+        - First run (empty DB): backfill the full journal history once so a
+          fresh install shows existing sites. This is the only case that
+          scans everything, and it now runs in the background while the UI
+          is already available; the change-bus bump at the end drives the
+          long-poll UI to refetch and populate progressively.
+        - Repeat run (persisted DB under %LOCALAPPDATA%): only a bounded
+          tail sync of the most recent journals. The full history is already
+          persisted, and live changes are handled by watchdog and polling,
+          so re-scanning everything on every launch is unnecessary.
+        """
+        try:
+            if db_is_empty:
+                await _prime_colonisation_database_if_empty(
+                    repository, parser, system_tracker
+                )
+            else:
+                await _sync_latest_journals_best_effort(
+                    parser, system_tracker, repository, journal_dir, loop
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Background startup journal ingestion failed")
+        finally:
+            # Signal long-poll clients that data may have changed so the UI
+            # refetches once the background ingestion has made progress.
+            try:
+                await change_bus.bump()
+            except Exception:
+                pass
+
+    try:
+        asyncio.create_task(_startup_ingestion(), name="edca-startup-ingestion")
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to schedule background startup ingestion")
 
     # Set update callback for file watcher.
     #
@@ -293,10 +321,19 @@ async def lifespan(app: FastAPI):
 
     file_watcher.set_update_callback(_update_callback)
 
-    # Start watching journal directory for incremental updates
-    journal_dir = Path(config.journal.directory)
+    # Start watching journal directory for incremental updates.
+    #
+    # process_existing=False: the initial full-history catch-up is owned by
+    # the background _startup_ingestion task above, so starting the watcher
+    # stays fast and never blocks readiness. Watchdog plus the polling
+    # fallback still deliver live updates from here on.
     try:
-        await file_watcher.start_watching(journal_dir)
+        try:
+            await file_watcher.start_watching(journal_dir, process_existing=False)
+        except TypeError:
+            # A monkeypatched FileWatcher in tests may not accept the newer
+            # keyword argument; fall back to the original signature.
+            await file_watcher.start_watching(journal_dir)
         logger.info("File watcher started successfully")
     except FileNotFoundError as e:
         # Expected "directory missing" case – log clearly but do not block startup.

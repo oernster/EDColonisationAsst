@@ -9,12 +9,13 @@ Features:
 - About dialog showing the LGPL-3 license text (read from INSTALLER_LICENSE in project root).
 - Simple log area and status bar for feedback.
 
-This script is intended to be run as a GUI application. It expects that the
+This script is intended to be run as a GUI application. It lives at
+installer/app.py, is compiled by buildinstaller.py and expects that the
 installer payload (the EDColonisationAsst project files) is located in a
 known directory relative to the script, for example:
 
 - When running from source:
-    <project_root>/build_payload/  (you can adjust PAYLOAD_DIR below)
+    <project_root>/build/payload/  (staged by buildinstaller.py)
 - When built as a compiled installer:
     a 'payload' directory placed alongside the compiled executable
     or this module file (see get_payload_root()).
@@ -59,14 +60,19 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
 )
 
-from guiinstallercss import DARK_QSS, LIGHT_QSS
+from css import DARK_QSS, LIGHT_QSS
 
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 APP_ID = "EDColonisationAssistant"
-PROJECT_ROOT = Path(__file__).resolve().parent
+# Directory containing this module. In the compiled onefile installer this is
+# the unpack directory where bundled data (payload/, VERSION, LICENSE) lives.
+MODULE_DIR = Path(__file__).resolve().parent
+# Repository root when running from source (this module lives in installer/).
+# Used only as a last-resort fallback; bundled lookups anchor on MODULE_DIR.
+PROJECT_ROOT = MODULE_DIR.parent
 # Default relative payload directory when running from source.
-DEFAULT_PAYLOAD_DIR = PROJECT_ROOT / "build_payload"
+DEFAULT_PAYLOAD_DIR = PROJECT_ROOT / "build" / "payload"
 WINDOWS_UNINSTALL_KEY = (
     r"Software\Microsoft\Windows\CurrentVersion\Uninstall\EDColonisationAsst"
 )
@@ -86,7 +92,7 @@ def get_backend_version() -> str:
     3. __version__ from backend/src/__init__.py in common layouts.
     4. Fallback to "0.0.0" if all else fails.
     """
-    # --- 1) VERSION file (preferred, written by buildguiinstaller.py) ----
+    # --- 1) VERSION file (preferred, bundled by buildinstaller.py) ----
     version_candidates: list[Path] = []
 
     try:
@@ -280,7 +286,7 @@ def read_license_text() -> str:
     except Exception:
         pass
 
-    # Fallback: project root next to guiinstaller.py
+    # Fallback: repository root (source mode)
     candidate_paths.append(PROJECT_ROOT / "LICENSE")
 
     for license_path in candidate_paths:
@@ -302,7 +308,7 @@ def read_license_text() -> str:
 
 
 # --------------------------------------------------------------------------- QSS
-# Dark and light theme QSS are defined in guiinstallercss.DARK_QSS / LIGHT_QSS.
+# Dark and light theme QSS are defined in css.DARK_QSS / css.LIGHT_QSS.
 
 
 class ThemeManager:
@@ -928,7 +934,7 @@ class InstallerWindow(QMainWindow):
           curated payload tree).
         - Restore renamed Python sources shipped as ``*.py_`` in the payload
           back to real ``*.py`` files in the install directory. This pairs
-          with the renaming performed in buildguiinstaller._ensure_payload_dir().
+          with the renaming performed in buildinstaller._ensure_payload_dir().
         """
         # These directory names are never needed at runtime and should not be
         # installed even if the payload root accidentally points at a repo
@@ -1085,7 +1091,7 @@ class InstallerWindow(QMainWindow):
         self._set_windows_autostart_enabled(enabled)
 
     def _set_windows_autostart_enabled(self, enabled: bool) -> None:
-        """Enable/disable per-user auto-start via HKCU\...\Run on Windows."""
+        r"""Enable/disable per-user auto-start via HKCU\...\Run on Windows."""
         if not sys.platform.startswith("win"):
             return
 
@@ -1238,7 +1244,7 @@ class InstallerWindow(QMainWindow):
         # onefile packaging can treat executables differently inside data
         # directories. We therefore embed EDColonisationAsst.exe explicitly as a
         # data file under a dedicated "runtime/" directory in the bundle (see
-        # buildguiinstaller.build_installer) and recover from there if needed.
+        # buildinstaller.build_installer) and recover from there if needed.
         if not runtime_exe.exists():
             # 1) Prefer the dedicated runtime/ directory next to the extracted
             #    installer module. In onefile builds, __file__ points at the

@@ -3,11 +3,11 @@
 QSS style definitions for the ED Colonisation Assistant GUI installer.
 
 This module isolates the dark and light theme QSS strings so that the main
-`guiinstaller.py` script can remain more focused on application logic.
+`installer/app.py` script can remain more focused on application logic.
 
-Usage (from guiinstaller.py):
+Usage (from installer/app.py):
 
-    from guiinstallercss import DARK_QSS, LIGHT_QSS
+    from css import DARK_QSS, LIGHT_QSS
 """
 
 DARK_QSS = """

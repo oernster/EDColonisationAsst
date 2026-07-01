@@ -471,12 +471,18 @@ def build_orders_for_carrier(
             continue
 
         # Original amount is the configured order size.
-        original_amount = event.sale_order if order_type == CarrierOrderType.SELL else event.purchase_order
+        original_amount = (
+            event.sale_order
+            if order_type == CarrierOrderType.SELL
+            else event.purchase_order
+        )
 
         # Remaining amount (Outstanding) is optional in journal output.
         # When not provided we keep it as the configured size for display
         # purposes, but we do NOT use it to infer cargo stock.
-        remaining_amount = event.outstanding if event.outstanding >= 0 else original_amount
+        remaining_amount = (
+            event.outstanding if event.outstanding >= 0 else original_amount
+        )
 
         # Derive a best-effort view of *current market stock* for SELL orders.
         # Priority:
@@ -620,7 +626,9 @@ def build_current_carrier_state_response(
     stats = find_latest_carrier_stats_for_market_id(events, docked_carrier.market_id)
     if stats is None:
         # Fallback: match CarrierStats by callsign (Docked.StationName).
-        stats = find_latest_carrier_stats_for_callsign(events, docked_carrier.station_name)
+        stats = find_latest_carrier_stats_for_callsign(
+            events, docked_carrier.station_name
+        )
 
     location = find_latest_carrier_location_for_id(events, docked_carrier.market_id)
     if location is None and stats is not None:
@@ -639,13 +647,13 @@ def build_current_carrier_state_response(
     events_since_docked = [
         e
         for e in events
-        if getattr(e, "timestamp", None) is not None and e.timestamp >= docked_carrier.timestamp
+        if getattr(e, "timestamp", None) is not None
+        and e.timestamp >= docked_carrier.timestamp
     ]
     trade_events_since_docked: list[CarrierTradeOrderEvent] = [
         e
         for e in events_since_docked
-        if isinstance(e, CarrierTradeOrderEvent)
-        and e.carrier_id == carrier_trade_id
+        if isinstance(e, CarrierTradeOrderEvent) and e.carrier_id == carrier_trade_id
     ]
 
     trade_orders_scope: str = "none"
@@ -713,7 +721,10 @@ def build_current_carrier_state_response(
     #
     # Market.json is a snapshot and is typically updated when the carrier market
     # changes, so we merge it in to fill any missing commodities.
-    if trade_orders_scope in ("none", "stale", "since_docked"):
+    #
+    # trade_orders_scope is assigned only the three values tested here, so this
+    # guard is exhaustive; the false arc is excluded from branch coverage.
+    if trade_orders_scope in ("none", "stale", "since_docked"):  # pragma: no branch
         try:
             # Prefer the directory passed by the API layer so unit tests can
             # control Market.json inputs deterministically.

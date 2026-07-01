@@ -85,7 +85,7 @@ Each script:
 - Starts the backend on `http://127.0.0.1:8000`.
 - Opens your browser at `http://127.0.0.1:8000/app/`.
 
-For full Linux prerequisites and advanced usage (including environment variables and alternative workflows), see [`DEVELOPMENT_README.md`](DEVELOPMENT_README.md:666).
+For full Linux prerequisites and advanced usage (including environment variables and alternative workflows), see [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md).
 
 The installed runtime starts a local web server and opens your browser to:
 
@@ -179,8 +179,14 @@ The current state is shown in the header via the “Keep awake” indicator in [
 
 ## Development / source checkout
 
-If you have cloned the repository and want to build or run EDCA from source (backend/frontend dev, tests, installer builds), see:
+If you have cloned the repository and want to build or run EDCA from source, the documentation set is:
 
-- [`DEVELOPMENT_README.md`](DEVELOPMENT_README.md:1)
+- [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md) - how to build the Windows release (`python buildexe.py` then `python buildinstaller.py`), run the backend and frontend from source and set up the dev environment
+- [`TESTING.md`](TESTING.md) - how to run the test suites (`pytest -v --cov` with a 100% coverage gate on the backend surface)
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) - high-level system and component design
+- [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md) - backend architecture in detail
+- [`ARCHITECTURE_2_frontend_and_runtime.md`](ARCHITECTURE_2_frontend_and_runtime.md) - frontend and packaged-runtime architecture
+- [`PROJECT_SETUP.md`](PROJECT_SETUP.md) - first-time environment setup notes
+- [`GameGlass-Integration.md`](GameGlass-Integration.md) - GameGlass shard integration
 
 Elite Dangerous is a trademark of Frontier Developments plc. This tool is not affiliated with Frontier. 

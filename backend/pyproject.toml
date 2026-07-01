@@ -1,9 +1,14 @@
 [project]
 name = "ed-colonisation-assistant-backend"
-version = "2.3.1"
+# The canonical version lives in the top-level VERSION file; nothing else
+# hardcodes a version (see backend/src/__init__.py for the runtime read).
+dynamic = ["version"]
 description = "Backend for Elite: Dangerous Colonisation Assistant"
 requires-python = ">=3.11"
 dependencies = []
+
+[tool.setuptools.dynamic]
+version = { file = ["../VERSION"] }
 
 [tool.black]
 line-length = 88
@@ -37,6 +42,19 @@ addopts = "-q"
 [tool.coverage.run]
 branch = true
 source = ["src"]
+# The coverage gate is scoped to the testable backend surface. The Qt
+# runtime shell (tray, splash, launcher, single-instance lock, in-process
+# uvicorn orchestration) and the thin entrypoints are excluded: they are
+# either fragile PySide6 UI surfaces or process-level composition roots.
+# Their pure logic (readiness monitor, menu wiring, process groups) is
+# extracted into testable form and covered via the unit tests.
+omit = [
+    "src/main.py",
+    "src/launcher.py",
+    "src/tray_app.py",
+    "src/runtime_entry.py",
+    "src/runtime/*",
+]
 
 [tool.coverage.report]
 show_missing = true

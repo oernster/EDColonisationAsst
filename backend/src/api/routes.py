@@ -80,15 +80,25 @@ async def get_watcher_status() -> dict:
     except Exception:
         watcher = None
 
-    running = bool(getattr(watcher, "is_running", lambda: False)()) if watcher else False
-    watched = str(getattr(watcher, "watched_directory", lambda: None)() or "") if watcher else ""
+    running = (
+        bool(getattr(watcher, "is_running", lambda: False)()) if watcher else False
+    )
+    watched = (
+        str(getattr(watcher, "watched_directory", lambda: None)() or "")
+        if watcher
+        else ""
+    )
     watchdog_status = (
-        getattr(watcher, "watchdog_status", lambda: {"configured": False, "alive": False})()
+        getattr(
+            watcher, "watchdog_status", lambda: {"configured": False, "alive": False}
+        )()
         if watcher
         else {"configured": False, "alive": False}
     )
     poller_status = (
-        getattr(watcher, "poller_status", lambda: {"running": False})() if watcher else {"running": False}
+        getattr(watcher, "poller_status", lambda: {"running": False})()
+        if watcher
+        else {"running": False}
     )
 
     handler = getattr(watcher, "_handler", None) if watcher else None  # noqa: SLF001
@@ -97,8 +107,12 @@ async def get_watcher_status() -> dict:
     if handler is not None:
         handler_diag = {
             "last_watchdog_event_at": getattr(handler, "last_watchdog_event_at", None),
-            "last_watchdog_event_type": getattr(handler, "last_watchdog_event_type", None),
-            "last_watchdog_event_path": getattr(handler, "last_watchdog_event_path", None),
+            "last_watchdog_event_type": getattr(
+                handler, "last_watchdog_event_type", None
+            ),
+            "last_watchdog_event_path": getattr(
+                handler, "last_watchdog_event_path", None
+            ),
             "last_processed_at": getattr(handler, "last_processed_at", None),
             "last_processed_file": getattr(handler, "last_processed_file", None),
             "last_error": getattr(handler, "last_error", None),

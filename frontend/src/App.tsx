@@ -550,6 +550,16 @@ function App() {
                 </Typography>
               )}
 
+              <Typography variant="body1" sx={{ mb: 3 }}>
+                <Link
+                  href="https://github.com/oernster/EDColonisationAsst/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Check for Updates
+                </Link>
+              </Typography>
+
               <Typography variant="h6" gutterBottom>
                 Third‑party components
               </Typography>

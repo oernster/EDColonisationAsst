@@ -1,4 +1,4 @@
-# <img width="242" height="242" alt="edcolonisationasst-icon" src="https://github.com/user-attachments/assets/f840c1d9-f120-448d-ae1c-43dbc6cf0d8a" /> Elite Dangerous Colonisation Assistant (EDCA)
+# <img width="64" height="64" alt="edcolonisationasst-icon" src="https://github.com/user-attachments/assets/f840c1d9-f120-448d-ae1c-43dbc6cf0d8a" /> Elite Dangerous Colonisation Assistant (EDCA)
 
 ## Designed for players actively working on colonisation sites and fleet carrier logistics.
 

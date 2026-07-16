@@ -158,6 +158,76 @@
   .faq .card h3 { font-family: var(--sans); font-size: 16px; margin: 0 0 8px; color: var(--accent-soft); }
   .faq .card p { color: var(--text); }
 
+  .eyebrow {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--edge);
+    padding-bottom: 10px;
+    margin-bottom: 28px;
+  }
+  h2.section-title {
+    font-family: var(--sans);
+    color: var(--text);
+    font-size: 30px;
+    letter-spacing: normal;
+    text-transform: none;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin: 0 0 10px;
+  }
+  .section-sub {
+    color: var(--muted);
+    max-width: 640px;
+    margin: 0 0 18px;
+    font-size: 16px;
+  }
+  .dl-version {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 14px;
+    color: var(--accent-soft);
+    border: 1px solid var(--edge);
+    border-radius: 999px;
+    padding: 4px 14px;
+  }
+  .downloads {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 28px;
+    max-width: 380px;
+  }
+  .dl-card {
+    background: var(--surface);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    padding: 24px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .dl-card .ico { font-size: 30px; }
+  .dl-card h3 { margin: 4px 0 0; font-size: 18px; color: var(--text); }
+  .dl-card .req { display: block; color: var(--muted); font-size: 13px; margin: 0; }
+  .dl-card .btn { margin: 14px auto 4px; }
+  .dl-card .meta {
+    color: var(--muted);
+    font-size: 12.5px;
+    min-height: 1.2em;
+    margin: 0;
+  }
+  .dl-card .how { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .dl-links {
+    text-align: left;
+    color: var(--muted);
+    font-size: 14px;
+    margin: 18px 0 0;
+  }
+
   footer {
     border-top: 1px solid var(--edge);
     margin-top: 32px;
@@ -272,7 +342,7 @@
         journal. No spreadsheets, no accounts, nothing leaves your PC.
       </p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest">Download</a>
+        <a class="btn primary" href="#download">Download</a>
         <a class="btn ghost" href="#how">How it works</a>
         <a class="btn ghost" href="https://github.com/oernster/EDColonisationAsst">View on GitHub</a>
       </div>
@@ -391,6 +461,33 @@
       </div>
     </section>
 
+    <section id="download">
+      <div class="eyebrow">Get EDCA</div>
+      <h2 class="section-title">Download EDCA</h2>
+      <p class="section-sub">Download the newest release with one click. Free and open
+        source under LGPL-3.0, built for Windows; it runs entirely on your machine and
+        nothing leaves your PC.</p>
+      <span class="dl-version" id="dl-version">Latest release</span>
+      <div class="downloads">
+        <div class="dl-card">
+          <div class="ico">🪟</div>
+          <h3>Windows</h3>
+          <p class="req">Windows 10 or 11, 64-bit</p>
+          <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest/download/EDColonisationAsstInstaller.exe">
+            Download for Windows</a>
+          <p class="meta" data-asset="EDColonisationAsstInstaller.exe">Installer (.exe)</p>
+          <p class="how">Run the installer: there is nothing to configure and EDCA opens in your browser when it starts.</p>
+        </div>
+      </div>
+      <p class="dl-links">
+        <a id="dl-whats-new" href="https://github.com/oernster/EDColonisationAsst/releases/latest">What's new in this release</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/oernster/EDColonisationAsst/releases">All releases</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/oernster/EDColonisationAsst">Source on GitHub</a>
+      </p>
+    </section>
+
     <footer>
       <p class="mono">EDCA &middot; Elite Dangerous Colonisation Assistant</p>
       <p>
@@ -401,5 +498,39 @@
     </footer>
 
   </div>
+<script>
+    // The download button never goes stale: it points at GitHub's releases/latest/download
+    // redirect, which always serves the newest release's asset (the asset name is version-free
+    // by design). This script only decorates the page with live details: the version chip, the
+    // release date and the installer's size, fetched from the GitHub API. If the call fails
+    // (offline, rate-limited), the static text above stands on its own.
+    (function () {
+        var api = 'https://api.github.com/repos/oernster/EDColonisationAsst/releases/latest';
+        fetch(api).then(function (r) {
+            if (!r.ok) { throw new Error('release lookup failed'); }
+            return r.json();
+        }).then(function (rel) {
+            var version = (rel.tag_name || '').replace(/^v/, '');
+            if (version) {
+                var when = '';
+                if (rel.published_at) {
+                    when = ' · ' + new Date(rel.published_at).toLocaleDateString(undefined,
+                        {day: 'numeric', month: 'long', year: 'numeric'});
+                }
+                document.getElementById('dl-version').textContent = 'Version ' + version + when;
+            }
+            if (rel.html_url) {
+                document.getElementById('dl-whats-new').href = rel.html_url;
+            }
+            (rel.assets || []).forEach(function (asset) {
+                var meta = document.querySelector('[data-asset="' + asset.name + '"]');
+                if (meta && asset.size) {
+                    var mb = (asset.size / (1024 * 1024)).toFixed(1);
+                    meta.textContent = meta.textContent + ' · ' + mb + ' MB';
+                }
+            });
+        }).catch(function () { /* The static page already says everything essential. */ });
+    })();
+</script>
 </body>
 </html>

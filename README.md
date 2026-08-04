@@ -184,6 +184,7 @@ If you have cloned the repository and want to build or run EDCA from source, the
 - [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md) - how to build the Windows release (`python buildexe.py` then `python buildinstaller.py`), run the backend and frontend from source and set up the dev environment
 - [`TESTING.md`](TESTING.md) - how to run the test suites (`pytest -v --cov` with a 100% coverage gate on the backend surface)
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - high-level system and component design
+- [`TECH_DEBT.md`](TECH_DEBT.md) - what is still open, what is deliberately left and what only looks like debt
 - [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md) - backend architecture in detail
 - [`ARCHITECTURE_2_frontend_and_runtime.md`](ARCHITECTURE_2_frontend_and_runtime.md) - frontend and packaged-runtime architecture
 - [`PROJECT_SETUP.md`](PROJECT_SETUP.md) - first-time environment setup notes

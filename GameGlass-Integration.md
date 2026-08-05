@@ -338,7 +338,7 @@ If you want a **global shopping list** across **all systems**, there is no dedic
 
 ### 2.5. Supporting Endpoints
 
-These endpoints are useful for diagnostics and auxiliary UI, but are not strictly required for a basic construction-site-and-shopping-list shard.
+These endpoints are useful for diagnostics and auxiliary UI but are not strictly required for a basic construction-site-and-shopping-list shard.
 
 
 #### 2.5.1. Health Check
@@ -355,11 +355,17 @@ Returns the health status of the assistant.
 ```json
 {
   "status": "healthy",
-  "version": "2.3.1",
+  "version": "<the running EDCA version>",
+  "build_id": "<the build marker; empty in a source checkout>",
+  "python_version": "<the interpreter version>",
   "journal_directory": "C:\\\\Users\\\\Example\\\\Saved Games\\\\Frontier Developments\\\\Elite Dangerous",
   "journal_accessible": true
 }
 ```
+
+`version` is whatever the running build reports; it is read from the
+repository's `VERSION` file, so do not hardcode or pin against a particular
+value in a shard.
 
 Typical usage:
 
@@ -384,7 +390,7 @@ Provides a minimal view of the latest journal-derived system.
 }
 ```
 
-This can act as a fallback for inferring the current system directly from journal logs, but `/api/systems/current` is the richer endpoint if available.
+This can act as a fallback for inferring the current system directly from journal logs; `/api/systems/current` is the richer endpoint if available.
 
 
 #### 2.5.3. Settings
@@ -397,7 +403,7 @@ Returns the current application settings, including the journal directory and In
 **Method:** POST  
 **Path:** `/api/settings`
 
-Accepts an updated settings object in JSON format. These endpoints are typically managed by the main web UI rather than a GameGlass shard, but they are listed here for completeness.
+Accepts an updated settings object in JSON format. These endpoints are typically managed by the main web UI rather than a GameGlass shard but they are listed here for completeness.
 
 
 #### 2.5.4. Overall Statistics (Optional)
@@ -478,7 +484,7 @@ Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierS
 
 **Purpose**
 
-Returns whether the commander is currently docked at a Fleet carrier, and if so, basic identity information for that carrier.
+Returns whether the commander is currently docked at a Fleet carrier and (if so) basic identity information for that carrier.
 
 **Response Shape (simplified)**
 
@@ -517,7 +523,7 @@ Notes:
 
 Typical usage in a shard:
 
-- Show a header indicating whether the commander is on a carrier and, if so, its name and callsign.
+- Show a header indicating whether the commander is on a carrier and (if so) its name and callsign.
 - Use the `carrier_id` / `market_id` to correlate with `/api/carriers/mine`.
 
 ### 5.2. Current carrier state snapshot
@@ -606,7 +612,7 @@ Key fields for a shard:
   - `remaining_amount` / `original_amount` – order fill progress.
 - `space_usage`: (when present) the authoritative carrier capacity breakdown from `CarrierStats.SpaceUsage`.
   - Shards that want a single “free after buy orders” number can compute:
-    - `space_usage.free_space` (already accounts for reserved buy space), or
+    - `space_usage.free_space` (already accounts for reserved buy space) or
     - `space_usage.total_capacity - space_usage.crew - space_usage.module_packs - space_usage.cargo - space_usage.cargo_space_reserved`
 
 If the commander is not docked at any Fleet carrier, the backend returns a 404 error `"Commander is not currently docked at a fleet carrier"`; shards should handle this by hiding or disabling carrier panels.
@@ -689,4 +695,4 @@ For a GameGlass shard that wants to display **Fleet carrier state** alongside co
 3. **When the commander undocks or moves**
    - Handle the 404 from `/api/carriers/current/state` as “not docked at a Fleet carrier” and hide carrier‑specific panels in the shard.
 
-Carrier data is derived from local journals. EDCA parses a window of recent `Journal.*.log` files, and may also use `Market.json` as a snapshot source when carrier trade-order journal lines are missing or partial.
+Carrier data is derived from local journals. EDCA parses a window of recent `Journal.*.log` files and may also use `Market.json` as a snapshot source when carrier trade-order journal lines are missing or partial.

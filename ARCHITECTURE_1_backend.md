@@ -1,6 +1,6 @@
 # Elite: Dangerous Colonisation Assistant – Backend Architecture
 
-This document focuses on the **Python backend** of the Elite: Dangerous Colonisation Assistant: how it ingests Elite journals, stores colonisation data, and exposes APIs. It is a backend‑only slice of the full architecture described in [`ARCHITECTURE.md`](ARCHITECTURE.md:1).
+This document focuses on the **Python backend** of the Elite: Dangerous Colonisation Assistant: how it ingests Elite journals, stores colonisation data and exposes APIs. It is a backend‑only slice of the full architecture described in [`ARCHITECTURE.md`](ARCHITECTURE.md:1).
 
 ---
 
@@ -104,7 +104,7 @@ On startup, the lifespan context manager `lifespan(app)`:
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
    - **First run (empty DB):** `_prime_colonisation_database_if_empty` walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:109) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
-   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync (`_sync_latest_journals_best_effort`, newest few files). The full history is already persisted, and live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
+   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync (`_sync_latest_journals_best_effort`, newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
 
 5. Configures the `FileWatcher`:
 
@@ -120,7 +120,7 @@ Because the heavy ingestion is off the readiness path, `test_lifespan_readiness.
 The colonisation SQLite DB is located via [`_get_db_file()`](backend/src/repositories/colonisation_repository.py:18), which chooses:
 
 - **Dev mode** (non‑frozen): `backend/colonisation.db`
-- **Frozen/packaged runtime**: `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows, or `~/.edcolonisationasst/colonisation.db` on POSIX.
+- **Frozen/packaged runtime**: `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows or `~/.edcolonisationasst/colonisation.db` on POSIX.
 
 To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130) now:
 
@@ -370,7 +370,7 @@ Concurrency:
 
 - `get_system_summary(system_name) -> dict[str, Any]`:
 
-  - Convenience helper returning counts, completion percentage, and the most‑needed commodity.
+  - Convenience helper returning counts, completion percentage and the most‑needed commodity.
 
 These methods power:
 
@@ -444,8 +444,11 @@ The first‑run preload logic and DB versioning are exercised indirectly via:
 - File watcher integration tests for depot + contribution flows, including the new `ColonisationContribution` array schema.
 
 The suite runs with branch coverage and a hard 100% gate on the testable
-backend surface (`pytest -v --cov`); see [`TESTING.md`](TESTING.md) for the
-gate scope, the omit rationale for the Qt runtime shell and the
-no-mock-libraries testing conventions.
+backend surface. `python -m pytest -q` from the repository root is the
+invocation to use: it runs this suite together with the setup program's under
+one gate. `pytest` from `backend/` enforces the same gate on the
+backend alone. See [`TESTING.md`](TESTING.md) for the gate scope, the omit
+rationale for the Qt runtime shell and the no-mock-libraries testing
+conventions.
 
-This document should give you a concise, backend‑only view of how EDCA ingests journals, stores colonisation state, and surfaces it via APIs, including the new **automatic DB reset + first‑run journal import** behaviour for new installs.
+This document should give you a concise, backend‑only view of how EDCA ingests journals, stores colonisation state and surfaces it via APIs, including the new **automatic DB reset + first‑run journal import** behaviour for new installs.

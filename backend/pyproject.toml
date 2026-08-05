@@ -59,6 +59,14 @@ branch = true
 # from backend/ or from the root. Without that, a root-level run silently
 # measured eleven extra files and reported 84% against the same suite.
 omit = [
+    # The setup program's Qt client. installer/ops, installer/state and
+    # installer/shared are inside the gate: they do the most privileged work in
+    # the product (registry writes, shortcut creation, per-user deployment,
+    # uninstall) and are Qt-free, so they are unit tested rather than left
+    # unmeasured. The window, its dialogs and the composition root are excluded
+    # on the same grounds as the backend's runtime shell.
+    "**/installer/ui/*",
+    "**/installer/app.py",
     "**/src/main.py",
     "**/src/launcher.py",
     "**/src/tray_app.py",

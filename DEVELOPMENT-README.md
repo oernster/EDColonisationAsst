@@ -10,6 +10,7 @@ Related documents:
 - [ARCHITECTURE_1_backend.md](ARCHITECTURE_1_backend.md) - backend architecture detail
 - [ARCHITECTURE_2_frontend_and_runtime.md](ARCHITECTURE_2_frontend_and_runtime.md) - frontend and packaged-runtime architecture
 - [TESTING.md](TESTING.md) - how to run the tests and the coverage gate
+- [TECH_DEBT.md](TECH_DEBT.md) - what is still open, what is deliberately left and what only looks like debt
 - [PROJECT_SETUP.md](PROJECT_SETUP.md) - first-time environment setup notes
 - [GameGlass-Integration.md](GameGlass-Integration.md) - GameGlass shard integration
 
@@ -63,9 +64,16 @@ debug build with an attached console.
    (shipped as `*.py_` so Nuitka does not strip them; the installer renames
    them back on deploy), the built frontend, icons, `LICENSE`, `VERSION`
    and the runtime EXE.
-4. Compiles the PySide6 installer UI at [installer/app.py](installer/app.py)
-   with Nuitka (onefile) with the payload embedded, stamping the same PE
-   metadata from `VERSION`.
+4. Compiles the PySide6 installer package with Nuitka (onefile) from the
+   root entry point [installer_main.py](installer_main.py), with
+   `--include-package=installer` and the payload embedded at
+   `installer/payload`, stamping the same PE metadata from `VERSION`.
+
+   The entry point is at the repository root rather than inside the package
+   because a script is compiled with its own directory on the module search
+   path: compiling `installer/app.py` directly would leave the `installer.*`
+   imports unresolvable. Compiling from the root also gives the payload one
+   anchor that holds in both source and compiled runs.
 
 Output: `dist-installer/EDColonisationAsstInstaller.exe`
 
@@ -74,14 +82,21 @@ Output: `dist-installer/EDColonisationAsstInstaller.exe`
 ```text
 buildexe.py           # runtime EXE build (Nuitka onefile)
 buildinstaller.py     # payload staging + installer EXE build
+installer_main.py     # installer entry point (Nuitka compiles this)
 installer/
-├── app.py            # PySide6 GUI installer (Install / Repair / Uninstall)
-└── css.py            # installer QSS themes (dark / light)
+├── app.py            # composition root
+├── cli.py            # --uninstall / --quiet / --help
+├── constants.py      # every name written to disk or to the registry
+├── ops/              # side effects, no Qt (payload, copy, shortcuts, processes)
+├── state/            # HKCU record, version comparison, the state model
+├── shared/           # resource anchoring and crash logging, no Qt
+└── ui/               # the themed window, its dialogs, its themes and the worker thread
+tests/installer/      # the setup program's suite (run from the root)
 build/                # Nuitka intermediates + staged payload (gitignored)
 dist-runtime/         # EDColonisationAsst.exe (gitignored)
 dist-installer/       # EDColonisationAsstInstaller.exe (gitignored)
 VERSION               # single source of truth for the app version
-BUILD_ID              # build marker written by buildexe.py
+BUILD_ID              # build marker written by buildexe.py (gitignored)
 ```
 
 The `VERSION` file is the single source of truth for the application
@@ -98,14 +113,17 @@ hardcodes a version.
   workload (MSVC v143) and a recent Windows 10/11 SDK; see the compiler
   notes below.
 - **Node.js 18+** with npm (frontend build only; never needed by end users).
-- Backend dev dependencies installed:
+- Dev dependencies installed in a root virtual environment, which is what
+  the build scripts, the whole-suite test run and the linters use:
 
   ```powershell
-  cd backend
   python -m venv venv        # or: uv venv venv
   venv\Scripts\activate
-  pip install -r requirements-dev.txt
+  pip install -r backend\requirements-dev.txt
   ```
+
+  That one environment serves everything, including the backend suite run
+  from `backend/`; see [PROJECT_SETUP.md](PROJECT_SETUP.md).
 
 ### Windows compiler requirements for Nuitka
 
@@ -136,13 +154,26 @@ On a Windows test machine:
    **Install** (default target: `%LOCALAPPDATA%\EDColonisationAssistant`;
    no elevation required).
 2. Confirm the install directory contains `EDColonisationAsst.exe`,
-   `backend/` and `frontend/dist/`.
+   `backend/`, `frontend/dist/` and `_uninstall/`.
 3. Launch via the Start Menu / Desktop shortcut:
    - The startup splash appears (icon, author, version, live status).
    - A tray icon appears (Open Web UI / Help / Exit).
    - The browser opens `http://127.0.0.1:8000/app/` once the backend is
      actually ready.
 4. No system Python or Node.js should be required.
+5. Leave **Launch when finished** ticked on a fresh install and confirm the
+   app comes up on its own once the installer reports success.
+6. Re-run the installer with the app open: it should offer to close the
+   running instance before it replaces any files, saying that the running
+   session ends; the button should read Upgrade, Reinstall or Downgrade
+   rather than Install. Declining the offer should abort rather than
+   proceed.
+7. Repair an installation that has **start when I sign in** enabled and
+   confirm the tick survives, both in the window and in the Run key.
+8. Uninstall from **Apps & features**, not from the downloaded installer:
+   the registered uninstaller runs from inside the install directory, so
+   this is the path that exercises the deferred deletion. The directory
+   should be gone within a few seconds of the window closing.
 
 ---
 
@@ -152,11 +183,12 @@ Run these from the `backend/` directory unless noted.
 
 ### Setup
 
+Use the root environment created above; there is nothing extra to install
+under `backend/`.
+
 ```bash
-cd backend
-python -m venv venv          # or: uv venv venv
 venv\Scripts\activate        # Windows; source venv/bin/activate on Unix
-pip install -r requirements-dev.txt
+cd backend
 ```
 
 ### Running the dev server
@@ -182,14 +214,18 @@ keys.
 
 ### Testing
 
-See [TESTING.md](TESTING.md). Short version, from `backend/`:
+See [TESTING.md](TESTING.md). Short version, from the **repository root**:
 
 ```bash
-pytest -v --cov
+python -m pytest -q
 ```
 
-The suite enforces 100% coverage of the gated backend surface; the build
-fails below it.
+That runs the backend suite and the setup program's suite together under
+one gate. Running `pytest` from `backend/` still works and
+enforces the same gate on the backend alone. Either way the run fails below
+100% on the gated surface; the exit code is what to read: a
+coverage-gated run prints the coverage table last, so there is no "N
+passed" line at the bottom.
 
 ### Code quality
 
@@ -202,6 +238,20 @@ mypy src/
 pylint src/
 ```
 
+From the repository root, for the setup program and its suite, which are
+clean under all three:
+
+```bash
+black --check installer installer_main.py tests
+ruff check --isolated installer installer_main.py tests
+flake8 --max-line-length=88 installer installer_main.py tests
+```
+
+The explicit line length is needed because the repository has no flake8
+configuration file, so flake8 defaults to 79 while black is configured for
+88. The rest of the repository is not yet clean under either linter; see
+[TECH_DEBT.md](TECH_DEBT.md).
+
 ### Git hooks
 
 A shared pre-commit hook lives at [.githooks/pre-commit](.githooks/pre-commit).
@@ -213,7 +263,13 @@ chmod +x .githooks/pre-commit
 ```
 
 It formats staged Python files with black and runs the backend test suite
-(including the coverage gate) before every commit.
+(including its coverage gate) before every commit.
+
+Know its limits: it runs neither the setup program's suite nor either
+linter; the interpreter it prefers (`backend/.venv`) does not exist in
+this repository, so it falls back to whatever is on `PATH`. Run
+`python -m pytest -q` from the root yourself before committing rather than
+relying on the hook. Both gaps are recorded in [TECH_DEBT.md](TECH_DEBT.md).
 
 ---
 

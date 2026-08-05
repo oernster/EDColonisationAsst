@@ -8,27 +8,57 @@ Related documents: [README.md](README.md),
 
 ---
 
-## Backend (pytest)
+## Python (pytest)
 
-Run from the `backend/` directory with the dev environment installed
-(`pip install -r requirements-dev.txt`):
+Run from the **repository root** with the dev environment installed
+(`pip install -r backend/requirements-dev.txt` into the root `venv/`):
 
 ```bash
-pytest -v --cov
+python -m pytest -q
 ```
 
-This runs the full unit suite with branch coverage and enforces the
-coverage gate: the run **fails if coverage of the gated surface is below
-100%**. The gate is configured in [backend/pytest.ini](backend/pytest.ini)
-(`--cov-fail-under=100`) with the coverage scope defined in
-[backend/pyproject.toml](backend/pyproject.toml) under `[tool.coverage.run]`.
+That is the invocation to use: it runs the backend suite and the installer
+suite together under one gate. The root configuration
+([pytest.ini](pytest.ini)) puts the repository root on the module search path
+so the installer suite can import `installer.*`; it also points coverage at both
+`backend/src` and `installer`.
 
-Useful variants:
+Running from `backend/` still works and enforces the same gate on the backend
+alone:
 
 ```bash
-pytest -v --cov --cov-report=html   # HTML report in backend/htmlcov/
-pytest tests/unit/test_models.py -v # a single file
-pytest -q --no-cov                  # quick run without the gate
+cd backend
+pytest
+```
+
+Do not add `--cov` to either command. Both configurations already pass a
+scoped `--cov`; a second bare `--cov` on the command line widens the
+measurement to everything imported, including the test modules themselves.
+The gate then fails at around 99% with every source file at 100%, which reads
+as a coverage regression and is not one.
+
+The two configurations must stay in step. They did not always: the root one
+carried no coverage gate and no `asyncio_mode`, so a root-level run silently
+skipped every asynchronous test and reported a smaller pass count than the
+same suite run from `backend/`, with no gate at all. The weaker of the two was
+the one the likelier invocation picked up. If you change one file, change the
+other.
+
+Either invocation runs the full unit suite with branch coverage and enforces
+the coverage gate: the run **fails if coverage of the gated surface is below
+100%**. The gate is configured in [backend/pytest.ini](backend/pytest.ini) and
+[pytest.ini](pytest.ini) (`--cov-fail-under=100`), with the coverage scope
+defined in [backend/pyproject.toml](backend/pyproject.toml) under
+`[tool.coverage.run]`. An HTML report is written on every run: `backend/htmlcov/`
+from `backend/`, `htmlcov/` from the root.
+
+Useful variants, all of which need `--no-cov` because a partial selection
+cannot meet a 100% gate:
+
+```bash
+pytest tests/unit/test_models.py -q --no-cov   # a single file (from backend/)
+pytest -k "test_parse" -q --no-cov             # tests matching a pattern
+python -m pytest tests/installer -q --no-cov   # the installer suite alone (from the root)
 ```
 
 Trust the exit code, not the console text: coverage-gated runs print the
@@ -50,6 +80,16 @@ repositories, API routes, configuration and utilities. Excluded via the
   via the packaged-build smoke test instead of fragile UI tests.
 - `src/main.py` - the FastAPI composition root (app assembly, static
   mounts, startup wiring).
+- `installer/ui/*` and `installer/app.py` - the setup program's Qt client
+  and its composition root, excluded on the same grounds as the runtime
+  shell above.
+
+`installer/ops`, `installer/state`, `installer/shared`, `installer/cli.py`
+and `installer/constants.py` are **inside** the gate. The setup program does
+the most privileged work in the product (registry writes, shortcut creation,
+per-user deployment, uninstall) and a defect in it lands on a machine before
+the application ever starts, so its Qt-free half is measured rather than left
+unmeasured.
 
 Everything inside the gate must stay at 100% statement AND branch
 coverage. If you add code there, add tests with it; the build fails
@@ -69,6 +109,33 @@ otherwise.
   anything worth asserting is factored out of the widgets into plain
   Python first.
 
+### The installer suite
+
+[tests/installer/](tests/installer) covers the setup program. No test may
+touch a real EDCA installation; three fixtures in
+[tests/installer/conftest.py](tests/installer/conftest.py) are what guarantee
+that:
+
+- `scratch_keys` yields a unique `RegistryKeys` under a test-only HKCU root
+  and deletes the whole subtree afterwards, so no test reads or writes the
+  real Uninstall or Run registration;
+- `staged_payload` redirects the payload anchors at a temporary directory and
+  the tests stage a tiny tree there, so the real staged payload is never read
+  and never copied;
+- `isolated_profile` redirects `USERPROFILE`, `LOCALAPPDATA` and `APPDATA`
+  into a temporary tree, so shortcuts and install directories land there.
+
+Every external command goes through the hand-written `FakeRunner` in
+[tests/installer/fakes.py](tests/installer/fakes.py), so no test spawns a
+process, ends a real one or writes a real shortcut. The one place a genuinely
+unreachable branch remains is marked `# pragma: no cover` with a one-line
+reason.
+
+`tests/` is deliberately **not** a Python package: `backend/tests` already
+claims the top-level name `tests`, so a second package of that name would
+shadow it. The suite imports its helpers as plain top-level modules
+(`from fakes import ...`).
+
 ## Frontend (vitest)
 
 Run from the `frontend/` directory:
@@ -80,9 +147,35 @@ npm run type-check       # tsc
 npm run lint             # eslint
 ```
 
+## Linters
+
+The setup program, its entry point and its suite are clean under three tools,
+run from the repository root:
+
+```bash
+black --check installer installer_main.py tests
+ruff check --isolated installer installer_main.py tests
+flake8 --max-line-length=88 installer installer_main.py tests
+```
+
+The explicit line length is not optional: the repository has no flake8
+configuration file, so flake8 defaults to 79 characters while black is
+configured for 88 in `backend/pyproject.toml`; a bare run reports E501
+against lines black itself produced. The rest of the repository is not yet
+clean under either linter, so neither is wired into the hook; see
+[TECH_DEBT.md](TECH_DEBT.md).
+
 ## Pre-commit hook
 
 With the shared hook enabled (`git config core.hooksPath .githooks`), every
 commit formats staged Python files with black and runs the backend suite
-including the coverage gate, so a commit cannot land below 100% on the
-gated surface.
+including its coverage gate.
+
+That is less than the full gate. The hook runs `backend/tests` only, so the
+installer suite is not exercised and a change that drops `installer/ops`,
+`installer/state` or `installer/shared` below 100% still commits. It also
+prefers an interpreter at `backend/.venv`, which does not exist here (the two
+environments are `venv/` and `backend/venv/`), so it falls back to whatever is
+on `PATH`. Run `python -m pytest -q` from the root before committing and treat
+the hook as a backstop rather than the gate. Both gaps are recorded in
+[TECH_DEBT.md](TECH_DEBT.md).

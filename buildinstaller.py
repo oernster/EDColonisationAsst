@@ -11,8 +11,16 @@ This script:
 - Stages a curated payload under build/payload/ (backend sources, the
   built frontend, icons, LICENSE, VERSION and the runtime EXE from
   dist-runtime/).
-- Compiles the PySide6 installer UI (installer/app.py) into a single
-  onefile EXE with the payload embedded.
+- Compiles the PySide6 installer package into a single onefile EXE with
+  the payload embedded.
+
+The Nuitka entry point is installer_main.py at the repository root rather than
+a script inside installer/. A script is compiled with its own directory on the
+module search path, so compiling installer/app.py directly would leave the
+``installer.*`` imports unresolvable. Compiling from the root also gives the
+payload one anchor that holds in both source and compiled runs: the installer
+resolves it relative to the installer package directory, and the data is
+included at that same relative location below.
 
 Outputs:
 - dist-installer/EDColonisationAsstInstaller.exe
@@ -28,7 +36,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -38,7 +45,8 @@ APP_AUTHOR = "Oliver Ernster"
 RUNTIME_EXE_NAME = "EDColonisationAsst"
 INSTALLER_NAME = "EDColonisationAsstInstaller"
 
-INSTALLER_ENTRY = PROJECT_ROOT / "installer" / "app.py"
+INSTALLER_ENTRY = PROJECT_ROOT / "installer_main.py"
+INSTALLER_PACKAGE = "installer"
 ICON_FILE = PROJECT_ROOT / "EDColonisationAsst.ico"
 VERSION_FILE = PROJECT_ROOT / "VERSION"
 BUILD_ID_FILE = PROJECT_ROOT / "BUILD_ID"
@@ -107,7 +115,7 @@ def read_version() -> str:
 
 def pe_version(version: str) -> str:
     """Convert a version string into a 4-part numeric PE version."""
-    parts: List[str] = []
+    parts: list[str] = []
     for segment in version.split("."):
         digits = "".join(ch for ch in segment if ch.isdigit())
         parts.append(digits or "0")
@@ -286,7 +294,7 @@ def build_installer() -> None:
     """Build the GUI installer executable using Nuitka."""
     if not INSTALLER_ENTRY.exists():
         raise FileNotFoundError(
-            f"Could not find the installer UI at: {INSTALLER_ENTRY}"
+            f"Could not find the installer entry point at: {INSTALLER_ENTRY}"
         )
     if not ICON_FILE.exists():
         raise FileNotFoundError(f"Could not find application icon at: {ICON_FILE}")
@@ -308,7 +316,7 @@ def build_installer() -> None:
 
     cpu_count = os.cpu_count() or 1
 
-    nuitka_args: List[str] = [
+    nuitka_args: list[str] = [
         sys.executable,
         "-m",
         "nuitka",
@@ -326,11 +334,20 @@ def build_installer() -> None:
         f"--product-version={pe_ver}",
         f"--file-description={APP_DESCRIPTION} installer",
         f"--copyright=Copyright {APP_AUTHOR}",
-        f"--include-data-dir={PAYLOAD_DIR}=payload",
+        # Compile the whole installer package, not only what the entry
+        # script reaches statically.
+        f"--include-package={INSTALLER_PACKAGE}",
+        # Embed the staged payload under the package directory. The installer
+        # resolves its payload relative to the installer package in both source
+        # and compiled runs, so both find it in the same place.
+        f"--include-data-dir={PAYLOAD_DIR}={INSTALLER_PACKAGE}/payload",
         # The runtime EXE is also embedded as a dedicated data file so it is
         # always present even if Nuitka strips executables from the payload
-        # data directory.
-        f"--include-data-file={RUNTIME_EXE}=runtime/{RUNTIME_EXE_NAME}.exe",
+        # data directory. It is anchored on the package for the same reason.
+        (
+            f"--include-data-file={RUNTIME_EXE}="
+            f"{INSTALLER_PACKAGE}/runtime/{RUNTIME_EXE_NAME}.exe"
+        ),
     ]
 
     if LICENSE_FILE.exists():
@@ -346,7 +363,7 @@ def build_installer() -> None:
     for part in nuitka_args:
         print("  ", part)
 
-    result = subprocess.run(nuitka_args, cwd=PROJECT_ROOT)
+    result = subprocess.run(nuitka_args, cwd=PROJECT_ROOT, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"Nuitka build failed with exit code {result.returncode}")
 

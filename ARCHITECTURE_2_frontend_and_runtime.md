@@ -82,7 +82,7 @@ State is centralised in two Zustand stores:
 
 - [`colonisationStore`](frontend/src/stores/colonisationStore.ts:1)
   - `currentSystem`, `systemData`, `allSystems`, `loading`, `error`, `currentSystemInfo`, `settingsVersion`.
-  - Actions to set the current system, update system data, and update the system list.
+  - Actions to set the current system, update system data and update the system list.
 
 - [`carrierStore`](frontend/src/stores/carrierStore.ts:1)
   - `currentCarrierInfo`, `currentCarrierState`, `myCarriers`, loading/error flags.
@@ -121,7 +121,7 @@ State is centralised in two Zustand stores:
     - Current docked carrier identity and services.
     - Derived cargo snapshot and buy/sell orders from `CarrierTradeOrder` events (with `Market.json` snapshot merge handled by the backend).
     - A single “Free after all buy orders” metric derived from carrier capacity usage:
-      - Uses `CarrierStats.SpaceUsage` breakdown (TotalCapacity, Crew/ModulePacks, Cargo), and
+      - Uses `CarrierStats.SpaceUsage` breakdown (TotalCapacity, Crew/ModulePacks, Cargo) and
       - Uses the live summed BUY order outstanding tonnage for reservation (so UI reacts immediately to buy-order tweaks).
     - A list of known owned/squadron carriers.
 
@@ -350,7 +350,7 @@ On Linux, helper scripts like:
 - [`run-edca-built-rhel.sh`](run-edca-built-rhel.sh:1)
 - [`run-edca-built-void.sh`](run-edca-built-void.sh:1)
 
-start the backend with production settings and, if desired, serve the built frontend from `frontend/dist`. These scripts remain valid with the new runtime and single‑instance design.
+start the backend with production settings and (if desired) serve the built frontend from `frontend/dist`. These scripts remain valid with the new runtime and single‑instance design.
 
 ---
 
@@ -377,4 +377,4 @@ start the backend with production settings and, if desired, serve the built fron
   - Single‑instance enforcement via `ApplicationInstanceLock`.
   - Frozen/runtime entry behaviour under error and success conditions.
 
-Together with [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md:1), this file gives a complete view of how EDCA is built, run, and presented to users: from journals and SQLite persistence through to React UI, Qt runtime, and single‑instance guarantees.
+Together with [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md:1), this file gives a complete view of how EDCA is built, run and presented to users: from journals and SQLite persistence through to React UI, Qt runtime and single‑instance guarantees.

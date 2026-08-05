@@ -17,6 +17,18 @@ Replaces manual tracking with automatic, journal-driven state.
 - Updates automatically as you play  
 - Runs entirely locally (no external services, no accounts) 
 
+### Who it is for and who it is not for
+
+It is for a commander running colonisation build-outs on PC who is tired of
+keeping a spreadsheet beside the cockpit and who is happy with a browser tab
+or a tablet on the same network as their HUD.
+
+It is not for you if you want squadron-wide or shared tracking: Elite
+Dangerous writes journals per player on the local machine, so EDCA can only
+ever see your own contributions and does not pretend otherwise. It is also
+Windows-only as a packaged release (a source checkout runs on Linux; see
+below); it does nothing at all when the game is not writing journals.
+
 ---
 
 <img width="1582" height="1248" alt="{D494D007-E38F-465D-9AF5-BF34A431AEF3}" src="https://github.com/user-attachments/assets/9b73bf79-8524-4c58-bd9e-ae8e70fc08ec" />
@@ -37,6 +49,17 @@ Your browser will open automatically at:
 http://127.0.0.1:8000/app/
 
 EDCA will begin reading your journal files immediately.
+
+### Upgrading and removing
+
+Run the same installer over an existing installation: it works out whether
+that is an upgrade, a reinstall or a downgrade, says which on its button and
+does it in one pass. If EDCA is running it offers to close it first, telling
+you plainly that the running session ends.
+
+To remove EDCA, use **Apps & features** (Add/Remove Programs) rather than the
+downloaded installer. That is the registered uninstaller; it cleans up the
+install directory, the shortcuts and the sign-in entry.
 
 ---
 
@@ -60,7 +83,7 @@ This has two important consequences:
 
 EDCA cannot force Elite Dangerous to write new journal data; it can only reflect what is actually present in your local `Journal.*.log` files.
 
-> **Tip:** The Fleet Carrier UI uses the carrier capacity breakdown from `CarrierStats.SpaceUsage` when available (TotalCapacity, Crew/ModulePacks usage, Cargo usage, and reserved space for buy orders).
+> **Tip:** The Fleet Carrier UI uses the carrier capacity breakdown from `CarrierStats.SpaceUsage` when available (TotalCapacity, Crew/ModulePacks usage, Cargo usage and reserved space for buy orders).
 
 > **Note:** Because this is not a code‑signed commercial product, Windows SmartScreen
 > (and some antivirus tools) may warn that the installer or runtime is from an
@@ -124,7 +147,7 @@ You can open the EDCA UI from another device (for example, a tablet) as long as:
 
 On the Windows PC where EDCA is installed:
 
-1. Press `Win + R`, type `cmd` and press Enter to open Command Prompt, or open PowerShell.
+1. Press `Win + R`, type `cmd` and press Enter to open Command Prompt or open PowerShell.
 2. Run:
 
    ```text
@@ -179,10 +202,37 @@ The current state is shown in the header via the “Keep awake” indicator in [
 
 ## Development / source checkout
 
+### What it is built with
+
+| Layer | Choice |
+|---|---|
+| Backend | Python, FastAPI, uvicorn, SQLite, watchdog |
+| Frontend | React + TypeScript, Vite, MUI, Zustand |
+| Live updates | AJAX long-poll (`/api/changes/longpoll`) |
+| Desktop runtime | PySide6 tray and splash around an in-process uvicorn |
+| Setup program | A separate PySide6 application, standard library only besides Qt |
+| Packaging | Nuitka onefile, one EXE for the runtime and one for the installer |
+| Tests | pytest with a 100% statement and branch gate, vitest for the frontend |
+
+### The three commands
+
+```bash
+python -m pytest -q     # whole gated suite: backend + setup program (from the root)
+python buildexe.py      # build the runtime EXE
+python buildinstaller.py # stage the payload and build the installer EXE
+```
+
+### Licence
+
+EDCA is free software under the GNU Lesser General Public Licence v3.0; see
+[`LICENSE`](LICENSE).
+
+### The documentation set
+
 If you have cloned the repository and want to build or run EDCA from source, the documentation set is:
 
 - [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md) - how to build the Windows release (`python buildexe.py` then `python buildinstaller.py`), run the backend and frontend from source and set up the dev environment
-- [`TESTING.md`](TESTING.md) - how to run the test suites (`pytest -v --cov` with a 100% coverage gate on the backend surface)
+- [`TESTING.md`](TESTING.md) - how to run the test suites (`python -m pytest -q` from the root, with a 100% coverage gate over the backend and the Qt-free half of the setup program)
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - high-level system and component design
 - [`TECH_DEBT.md`](TECH_DEBT.md) - what is still open, what is deliberately left and what only looks like debt
 - [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md) - backend architecture in detail

@@ -1,10 +1,10 @@
-# Elite: Dangerous Colonisation Assistant – Architecture Overview
+# Elite: Dangerous Colonisation Assistant, Architecture Overview
 
 This document is the **front door** to the EDCA architecture. It gives you the big picture and points you to the detailed backend and frontend/runtime documents that now serve as the source of truth.
 
 ---
 
-## 1. High‑level system overview
+## 1. High-level system overview
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -52,13 +52,13 @@ At a glance:
 - The **frontend** is a React/TypeScript app (MUI, Zustand, Vite) that consumes those APIs to show system progress, shopping lists, carrier state and settings.
 
 Note: EDCA previously used WebSockets for live updates; this has been replaced by AJAX long-polling via `/api/changes/longpoll`.
-- A **runtime layer** (Qt launcher, tray, packaged EXE) wraps the backend and serves the built frontend to end users, enforcing a single‑instance guarantee per OS user.
+- A **runtime layer** (Qt launcher, tray, packaged EXE) wraps the backend and serves the built frontend to end users, enforcing a single-instance guarantee per OS user.
 
 ---
 
 ## 2. Detailed architecture documents
 
-For implementation‑level detail, use the split architecture docs at the project root:
+For implementation-level detail, use the split architecture docs at the project root:
 
 ### 2.1 Backend architecture
 
@@ -69,7 +69,7 @@ That document focuses on:
 - FastAPI app structure and lifespan.
 - Journal ingestion:
   - Parser, file watcher, system tracker.
-  - First‑run import vs incremental updates.
+  - First-run import vs incremental updates.
 - Colonisation data model and SQLite repository:
   - `ConstructionSite`, `Commodity`, `SystemColonisationData`, `CommodityAggregate`.
   - DB schema, versioning and automatic reset for incompatible schema changes.
@@ -99,13 +99,40 @@ That document focuses on:
   - Journal directory configuration.
   - Commander/Inara settings (with Inara integration currently dormant).
 - Runtime / launcher / tray stack:
-  - `ApplicationInstanceLock` and single‑instance behaviour.
+  - `ApplicationInstanceLock` and single-instance behaviour.
   - Dev launcher window and tray controller.
-  - Packaged/frozen runtime (in‑process uvicorn + Qt tray).
+  - Packaged/frozen runtime (in-process uvicorn + Qt tray).
 - Deployment and helper scripts for running EDCA on different platforms.
 - Frontend and runtime tests.
 
-These two files are the authoritative, up‑to‑date references for how EDCA works internally.
+These two files are the authoritative, up-to-date references for how EDCA works internally.
+
+### 2.3 What enforces the shape
+
+The layering those documents describe is asserted by
+[tests/structural/test_structural.py](tests/structural/test_structural.py),
+which reads source files and walks their syntax trees rather than importing
+anything. Before it existed the shape held by habit rather than by rule.
+
+- **`models` is the innermost layer.** It imports nothing else from the
+  backend. `test_models_import_nothing_else_from_the_backend`.
+- **Nothing imports outwards.** `repositories` stays free of `api`, `services`
+  and `runtime`; `services` stays free of `api` and `runtime`; `api` stays free
+  of `runtime`. `IColonisationRepository` designs that seam and this guards it.
+  An import deferred inside a function counts exactly as one at module level.
+  `test_backend_layers_import_only_inwards`.
+- **The setup program is a separate program.** It imports nothing from
+  `backend/`, which is what keeps the compiled onefile down to PySide6 plus the
+  standard library. `test_the_setup_program_imports_nothing_from_the_application`.
+- **No file exceeds 400 lines** outside `_LEGACY_OVER_LIMIT`, the explicit list
+  of the nineteen that were already over it when the rule arrived. The list may
+  only shrink and a stale entry fails the suite, so new code is held to the
+  limit from the first line. `test_modules_within_line_limit`,
+  `test_legacy_allowlist_has_no_stale_entries`.
+
+The size scan reads TypeScript as well as Python, because four of the nineteen
+are front-end components. `buildexe.py` and `buildinstaller.py` are outside
+every scan: they are linear recipes read top to bottom.
 
 ---
 
@@ -266,7 +293,7 @@ spans and the per-file progress) is gated: `test_copy_tree_reports_progress_acro
   - Environment prerequisites.
   - Initial setup steps for contributors.
 
-- **Top‑level README**  
+- **Top-level README**  
   [`README.md`](README.md:1)  
   - What EDCA is, how to install and run it as an end user.
   - Links to the architecture docs and development notes.

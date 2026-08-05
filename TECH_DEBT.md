@@ -4,17 +4,7 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. There is no structural test of any kind
-
-The backend has a clean shape (`api`, `services`, `repositories`, `models`, `runtime`, `config`) and `ARCHITECTURE_1_backend.md` describes it. Nothing enforces it.
-
-The direction most worth protecting is `repositories` and `models` staying free of `api` and `services`; `services` staying free of `api`. `IColonisationRepository` already exists as an interface, so the seam is designed; it is just unguarded. A single AST import scan asserting those two rules is the cheapest structural work available in this repository.
-
-A module-size assertion belongs in the same file. Nineteen source and test files still exceed 400 lines (the largest is `carrier_service.py` at 965), so it will need an explicit allowlist to be adoptable at all: Calendifier's `_LEGACY_OVER_LIMIT` plus a staleness test is the pattern that works on a codebase which predates the rule. Building that allowlist and keeping it honest is a job in its own right, which is why this item is still open even though the setup program was split.
-
-The `installer/` package and its suite are already clear of the limit (the largest are `installer/ui/main_window.py` at 332 and `tests/installer/test_install_ops.py` at 326) and would go into the test with no allowance.
-
-## 2. `carrier_service.py` is 965 lines and the front end has three files over 500
+## 1. `carrier_service.py` is 965 lines and the front end has three files over 500
 
 | File | Lines |
 |---|---|
@@ -29,7 +19,11 @@ The `installer/` package and its suite are already clear of the limit (the large
 
 `App.tsx` at 651 lines is the second: a root component that large is usually holding state that belongs in hooks; `useKeepAwake.ts` at 406 shows the project already knows how to write them.
 
-## 3. Around thirty broad exception handlers, concentrated on the startup path
+These nineteen files (seven backend source, eight backend test, four front end) are the whole of `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py). The cap is asserted, so nothing new joins them, and a staleness test fails on any entry whose file is no longer over the limit. The list can only shrink and this item closes when it is empty. The `installer/` package and its suite are already clear of the limit and carry no allowance.
+
+`backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
+
+## 2. Around thirty broad exception handlers, concentrated on the startup path
 
 `backend/src/main.py` has fourteen, `config.py` five, `backend/src/__init__.py` four and `launcher.py` three. About half carry `# noqa: BLE001` with no reason text; the rest carry nothing.
 
@@ -37,13 +31,13 @@ The `installer/` package and its suite are already clear of the limit (the large
 
 Give each a written reason and narrow where the specific exception is known. The two in `api/carriers.py` and `api/journal.py` are at an HTTP boundary and are fine as broad handlers; they just need the reason.
 
-## 4. Five near-identical distro launcher scripts
+## 3. Five near-identical distro launcher scripts
 
 `run-edca-built-arch.sh`, `run-edca-built-debian.sh`, `run-edca-built-fedora.sh`, `run-edca-built-rhel.sh` and `run-edca-built-void.sh`, plus `run-edca.sh` and `run-edca.bat`.
 
 Five scripts that differ only in package-manager invocation means five places to update when the launch sequence changes; four of them will be stale before anyone notices because most users are on one distro. Collapse them into one script that detects the package manager (`pacman`, `apt`, `dnf`, `xbps-install`) and branches, which is a dozen lines and one file to maintain.
 
-## 5. The pre-commit hook runs a fraction of the gate, from a virtual environment that does not exist
+## 4. The pre-commit hook runs a fraction of the gate, from a virtual environment that does not exist
 
 `.githooks/pre-commit` formats staged Python files with black and then runs `pytest -q -c backend/pytest.ini backend/tests`. That is the backend half of the gate only. The installer suite lives at `tests/` and needs the repository root configuration, so a commit that breaks it (or drops the setup program's Qt-free packages below 100%) still passes the hook.
 
@@ -51,9 +45,9 @@ The interpreter selection is worse. The hook prefers `backend/.venv/bin/python`,
 
 The fix is small and entirely within the hook: point it at the root configuration (`pytest -q` from the repository root, which is what `pytest.ini` is now set up to do) and at `venv/`. It is left alone here deliberately, because changing a hook and the code it guards in the same piece of work means neither gets a clean before-and-after.
 
-## 6. flake8 and ruff are installed but nothing runs them; flake8 also has no configuration
+## 5. flake8 and ruff are installed but nothing runs them; flake8 also has no configuration
 
-Both are now in `backend/requirements-dev.txt` and `backend/requirements-dev-linux.txt`; both are installed in `venv/` and `backend/venv/`. The `installer/` package, `installer_main.py` and `tests/` are clean under `black --check`, `ruff check --isolated` and `flake8 --max-line-length=88`. Nothing enforces any of it: the hook runs black and the backend suite only (item 5); there is no lint step in CI.
+Both are now in `backend/requirements-dev.txt` and `backend/requirements-dev-linux.txt`; both are installed in `venv/` and `backend/venv/`. The `installer/` package, `installer_main.py` and `tests/` are clean under `black --check`, `ruff check --isolated` and `flake8 --max-line-length=88`. Nothing enforces any of it: the hook runs black and the backend suite only (item 4); there is no lint step in CI.
 
 The `--max-line-length=88` is load-bearing and is its own small gap. There is no `.flake8`, `setup.cfg` or `tox.ini` anywhere in the repository, so flake8 defaults to 79 characters while black is configured for 88 in `backend/pyproject.toml`. Run bare, flake8 reports fifteen E501s against lines black itself produced. Give flake8 a configuration file that sets 88 and the two tools stop disagreeing.
 
@@ -69,14 +63,14 @@ The written `[tool.ruff]` section in `backend/pyproject.toml` has never been run
 - `backend/tools/check_live_carrier_api.py` and `debug_carrier_orders.py` printing to stdout. Development instruments, correctly separated into `tools/`.
 - The three architecture documents (`ARCHITECTURE.md` plus a backend and a frontend companion). A split-stack project legitimately needs more than one; the root file indexes them.
 - `PROJECT_SETUP.md` and `GameGlass-Integration.md` alongside `DEVELOPMENT-README.md`. Distinct subjects.
-- `buildinstaller.py` at 396 lines. Delivery script, exempt from the cap by design.
+- `buildinstaller.py` at 396 lines. Delivery script, deliberately outside the structural suite's scan.
 
 ## Not debt (do not "fix" these)
 
 These look like candidates but are correct as they stand; changing them would regress or add cost for nothing.
 
 - **The 100% gate itself.** It is the right target and the suite genuinely reaches it, now across `backend/src` and the Qt-free half of `installer/` together.
-- **`IColonisationRepository` as a named interface with one implementation.** It looks like ceremony; it is the seam that lets the services be tested without a database; it is also the boundary item 1 wants asserted.
+- **`IColonisationRepository` as a named interface with one implementation.** It looks like ceremony; it is the seam that lets the services be tested without a database; it is also the boundary the structural suite now asserts.
 - **The journal-file watcher polling rather than using filesystem notifications.** Elite Dangerous appends to journal files in a way that OS notification APIs report inconsistently across platforms. Polling is the reliable choice here.
 - **`backend/src/__init__.py` resolving `VERSION` and `BUILD_ID` from two locations** (source tree, then beside the frozen executable). That dual lookup is what makes the same code work from a checkout and from a packaged build; it is also why `BUILD_ID` can be untracked and gitignored while the packaged app still reports one: `buildexe.py` writes it into the payload and the resolver copes with it being absent from a source checkout.
 - **The separate `runtime/` package holding `app_runtime.py` and `launcher_components.py`.** A backend that ships as a desktop application needs an explicit runtime layer distinct from the web app; keeping it out of `api` and `services` is correct.

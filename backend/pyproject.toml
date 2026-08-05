@@ -41,19 +41,29 @@ addopts = "-q"
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+# `source` is deliberately NOT set here. This file is the single coverage
+# configuration for the project and is read from two working directories:
+# backend/ (which passes --cov=src) and the repository root (which passes
+# --cov=backend/src and points at this file with --cov-config). A single
+# `source` value cannot be correct from both, so each pytest.ini supplies its
+# own path and everything else is shared.
+#
 # The coverage gate is scoped to the testable backend surface. The Qt
 # runtime shell (tray, splash, launcher, single-instance lock, in-process
 # uvicorn orchestration) and the thin entrypoints are excluded: they are
 # either fragile PySide6 UI surfaces or process-level composition roots.
 # Their pure logic (readiness monitor, menu wiring, process groups) is
 # extracted into testable form and covered via the unit tests.
+#
+# The patterns are prefix-agnostic so they match whether the run was started
+# from backend/ or from the root. Without that, a root-level run silently
+# measured eleven extra files and reported 84% against the same suite.
 omit = [
-    "src/main.py",
-    "src/launcher.py",
-    "src/tray_app.py",
-    "src/runtime_entry.py",
-    "src/runtime/*",
+    "**/src/main.py",
+    "**/src/launcher.py",
+    "**/src/tray_app.py",
+    "**/src/runtime_entry.py",
+    "**/src/runtime/*",
 ]
 
 [tool.coverage.report]

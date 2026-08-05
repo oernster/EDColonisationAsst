@@ -244,3 +244,8 @@ backend/src/colonization.db
 EDColonisationAsstInstaller.exe
 EDColonisationAsst.exe
 
+# Build marker: buildexe.py rewrites it on every build, so tracking it means
+# every build dirties the tree. The package resolves it at runtime and copes
+# with it being absent, and the packaged app gets a freshly written copy.
+/BUILD_ID
+

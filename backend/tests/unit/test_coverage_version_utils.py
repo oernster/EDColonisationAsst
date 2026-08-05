@@ -145,6 +145,29 @@ def test_load_build_id_falls_back_to_empty_when_paths_unusable(
     assert backend_pkg._load_build_id() == ""
 
 
+def test_load_build_id_reads_file_from_the_source_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A BUILD_ID at the project root wins, ahead of the executable lookup.
+
+    Pinned to a temporary tree on purpose. Reading the repository's own
+    BUILD_ID would make this line's coverage depend on a build artefact being
+    committed, which is exactly why that file is no longer tracked.
+    """
+    source_init = _fake_source_init(tmp_path)
+    project_root = source_init.parents[2]
+    project_root.mkdir(parents=True)
+    (project_root / "BUILD_ID").write_text("source-tree-build\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        backend_pkg,
+        "Path",
+        _redirecting_path(backend_pkg.__file__, source_init),
+    )
+
+    assert backend_pkg._load_build_id() == "source-tree-build"
+
+
 def test_load_build_id_reads_file_next_to_executable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

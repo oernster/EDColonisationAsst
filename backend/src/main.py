@@ -47,8 +47,12 @@ try:
         PROJECT_ROOT = Path(_sys.argv[0]).resolve().parent
     else:
         PROJECT_ROOT = Path(__file__).resolve().parents[2]
-except Exception:
-    # Fallback to the original behaviour if anything goes wrong.
+except (OSError, IndexError, TypeError):
+    # The three demonstrated failures: resolve() touching the filesystem
+    # (OSError), parents[2] on a shallower path (IndexError) and a
+    # non-string sys.argv[0] in an embedded host (TypeError). No file is
+    # read here, so decoding errors cannot arise. Fall back to the source
+    # layout, which is what this line computed before the frozen case existed.
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Application lifespan management
@@ -72,6 +76,10 @@ async def _prime_colonisation_database_if_empty(
     try:
         stats = await repository.get_stats()
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad: this is the repository interface, so the
+        # concrete failure depends on the implementation behind it (sqlite3
+        # errors today, anything tomorrow). The preload is an optimisation for
+        # a fresh install, so skipping it degrades nothing the user can see.
         logger.warning(
             "Initial journal preload skipped: failed to read repository stats: %s",
             exc,
@@ -90,6 +98,10 @@ async def _prime_colonisation_database_if_empty(
         config = get_config()
         journal_dir = Path(config.journal.directory)
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad: get_config parses user-edited YAML and builds
+        # pydantic models, so a bad value surfaces as a validation error rather
+        # than one predictable type. Without a journal directory there is
+        # nothing to preload, so returning is the whole recovery.
         logger.warning(
             "Initial journal preload skipped: failed to resolve journal directory: %s",
             exc,
@@ -135,6 +147,10 @@ async def _prime_colonisation_database_if_empty(
             await handler._process_file(journal_file)
             processed_files += 1
         except Exception as exc:  # noqa: BLE001
+            # Deliberately broad; per file on purpose. These are journal
+            # files written by the game across years of format changes, so one
+            # unparseable file must not abandon the remaining history. The
+            # loop continues and the count below reports what got through.
             logger.error(
                 "Error preloading journal file %s during initial import: %s",
                 journal_file,
@@ -202,9 +218,21 @@ async def _sync_latest_journals_best_effort(
         # Signal UI clients (AJAX long-poll) that data may have changed.
         try:
             await change_bus.bump()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad; deliberately not narrowed. change_bus is
+            # a module-level singleton holding an asyncio.Condition. The
+            # obvious candidate (a bump from a different event loop) does not
+            # raise: measured on CPython 3.13, reusing a Condition across
+            # loops completes silently. No failure mode could be demonstrated,
+            # so there is no honest type to name here. The guard stays because
+            # the cost of being wrong is asymmetric: swallowing it loses one
+            # refresh hint that the next poll recovers, while letting it out
+            # would fail the caller.
             pass
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad, as the docstring above says: this whole function
+        # is a best-effort catch-up over game-written files and must never
+        # take startup down with it. Logged with a traceback, then dropped.
         logger.exception("Best-effort latest journal sync failed: %s", exc)
 
 
@@ -269,6 +297,10 @@ async def lifespan(app: FastAPI):
         initial_stats = await repository.get_stats()
         db_is_empty = initial_stats.get("total_sites", 0) == 0
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad, same repository boundary as the preload above.
+        # Assuming an empty database is the safe wrong answer: it schedules a
+        # full backfill, which is slower than a tail sync but never loses data,
+        # whereas assuming a populated one would skip a genuine first run.
         logger.warning("Failed to read initial repository stats: %s", exc)
         db_is_empty = True
 
@@ -277,12 +309,12 @@ async def lifespan(app: FastAPI):
 
         - First run (empty DB): backfill the full journal history once so a
           fresh install shows existing sites. This is the only case that
-          scans everything, and it now runs in the background while the UI
+          scans everything; it now runs in the background while the UI
           is already available; the change-bus bump at the end drives the
           long-poll UI to refetch and populate progressively.
         - Repeat run (persisted DB under %LOCALAPPDATA%): only a bounded
           tail sync of the most recent journals. The full history is already
-          persisted, and live changes are handled by watchdog and polling,
+          persisted; live changes are handled by watchdog and polling,
           so re-scanning everything on every launch is unnecessary.
         """
         try:
@@ -295,18 +327,29 @@ async def lifespan(app: FastAPI):
                     parser, system_tracker, repository, journal_dir, loop
                 )
         except Exception:  # noqa: BLE001
+            # Deliberately broad. This runs as a detached task, so an escaping
+            # exception would be reported only as "Task exception was never
+            # retrieved" on the event loop, with no traceback in the
+            # application log. Catching it here is what makes the failure
+            # visible; the server itself stays up either way.
             logger.exception("Background startup journal ingestion failed")
         finally:
             # Signal long-poll clients that data may have changed so the UI
             # refetches once the background ingestion has made progress.
             try:
                 await change_bus.bump()
-            except Exception:
+            except Exception:  # noqa: BLE001
+                # Deliberately broad, as above, for the same reason: no
+                # failure mode could be demonstrated, so naming a type here
+                # would be a guess. One missed refresh hint at worst.
                 pass
 
     try:
         asyncio.create_task(_startup_ingestion(), name="edca-startup-ingestion")
-    except Exception:  # noqa: BLE001
+    except RuntimeError:
+        # create_task raises RuntimeError when there is no running loop, which
+        # is the only way scheduling can fail here. The application still
+        # serves; it just starts with whatever the database already holds.
         logger.exception("Failed to schedule background startup ingestion")
 
     # Set update callback for file watcher.
@@ -316,7 +359,11 @@ async def lifespan(app: FastAPI):
     async def _update_callback(_system_name: str) -> None:
         try:
             await change_bus.bump()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad, as above. This one runs on work scheduled
+            # from the watchdog thread, so it is the callback most exposed to
+            # loop-lifetime surprises and the one least worth guessing a type
+            # for. A dropped hint costs one delayed UI refresh.
             pass
 
     file_watcher.set_update_callback(_update_callback)
@@ -336,10 +383,15 @@ async def lifespan(app: FastAPI):
             await file_watcher.start_watching(journal_dir)
         logger.info("File watcher started successfully")
     except FileNotFoundError as e:
-        # Expected "directory missing" case – log clearly but do not block startup.
+        # Expected "directory missing" case: log clearly but do not block startup.
         logger.error("Failed to start file watcher: %s", e)
         logger.warning("Application will start but journal monitoring is disabled")
     except Exception as e:  # noqa: BLE001
+        # Deliberately broad, for the reason spelled out below: watchdog sits
+        # on OS notification APIs whose failures are platform-specific and
+        # open-ended. This is the one handler here where letting an
+        # exception through would stop the application coming up at all.
+        #
         # On some environments (or Python/runtime combinations), watchdog or the
         # underlying OS file notification APIs can raise unexpected exceptions
         # (for example, permission or low-level OS errors). In the packaged

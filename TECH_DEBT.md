@@ -23,34 +23,28 @@ These nineteen files (seven backend source, eight backend test, four front end) 
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 
-## 2. Around thirty broad exception handlers, concentrated on the startup path
-
-`backend/src/main.py` has fourteen, `config.py` five, `backend/src/__init__.py` four and `launcher.py` three. About half carry `# noqa: BLE001` with no reason text; the rest carry nothing.
-
-`main.py` and `launcher.py` are where the FastAPI server, the file watcher and the WebView runtime are brought up. A swallowed exception there is the difference between an application that fails visibly and one that opens to an empty panel. `config.py`'s five are on settings loading, where the fallback is a default the user did not choose and was not told about.
-
-Give each a written reason and narrow where the specific exception is known. The two in `api/carriers.py` and `api/journal.py` are at an HTTP boundary and are fine as broad handlers; they just need the reason.
-
-## 3. `backend/` is outside the lint step and a long way from passing
+## 2. `backend/` is outside the lint step and a long way from passing
 
 The configuration gap is closed. `.flake8` sets 88 at the repository root so flake8 and black no longer disagree, the stale top-level `[tool.ruff]` keys have moved under `[tool.ruff.lint]`; the pre-commit hook now runs `ruff check --isolated` and `flake8` over `installer`, `installer_main.py` and `tests` before the suite. That surface passes both linters and the hook fails on a planted violation, so it will stay passing.
 
-What is left is the reason the step is scoped that narrowly. `backend/src` is not close to clean and widening the list is a sweep, not a flag flip. Measured 2026-08-07 with ruff 0.16.1:
+What is left is the reason the step is scoped that narrowly. `backend/src` is not close to clean and widening the list is a sweep, not a flag flip. Re-measured 2026-08-07 with ruff 0.16.1, after the startup-path handlers were dealt with:
 
 | Rule | Count | What it is |
 |---|---|---|
-| UP045, UP006, UP035, UP037, UP017 | 226 | `Optional[X]`, `typing.List` and friends against a `py311` target |
-| BLE001 | 70 | Broad `except Exception`, the same population as item 2 |
+| UP045, UP006, UP035, UP037, UP017 | 229 | `Optional[X]`, `typing.List` and friends against a `py311` target |
 | E402 | 56 | Imports after code, mostly the runtime path juggling `sys.path` |
+| BLE001 | 55 | Broad `except Exception`, now outside the startup path |
 | I001 | 45 | Import blocks out of order |
-| S110, S112 | 34 | `try`/`except`/`pass` and `try`/`except`/`continue` |
+| S110, S112 | 29 | `try`/`except`/`pass` and `try`/`except`/`continue` |
 | E501 | 26 | Over 88 characters |
 | F401 | 24 | Unused imports |
-| everything else | 77 | RUF, PIE, ASYNC, B, TRY, FURB, SIM, PERF, PYI |
+| everything else | 73 | RUF, PIE, ASYNC, B, TRY, FURB, SIM, PERF, PYI |
 
-558 in total, 322 of them auto-fixable. `flake8` at 88 over the same tree reports 59.
+537 in total, 321 of them auto-fixable. `flake8` at 88 over the same tree reports 59.
 
-Three things make this one job rather than eight. The 226 typing findings are mechanical and safe under `--fix`. The 70 BLE001 findings are item 2 seen from the other end, so doing item 2 first shrinks this by an eighth and doing this first would pre-empt the judgement item 2 asks for. The E402 and F401 counts include the deliberate re-exports in `launcher.py`, which want `__all__` or a targeted `# noqa` with a reason rather than deletion, so the auto-fixer cannot be trusted to run unattended over the whole tree.
+Two things make this one job rather than seven. The 229 typing findings are mechanical and safe under `--fix`. The E402 and F401 counts include the deliberate re-exports in `launcher.py`, which want `__all__` or a targeted `# noqa` with a reason rather than deletion, so the auto-fixer cannot be trusted to run unattended over the whole tree.
+
+The remaining 55 BLE001 are the same kind of work already done on the startup path, in `file_watcher.py`, `runtime_entry.py`, `tray_components.py`, `journal_ingestion.py` and `app_runtime.py`. Each wants a written reason or a narrowed type, decided per handler, so `--fix` cannot touch them and a blanket `# noqa` would defeat the point.
 
 `frontend/` has no linter wired at all and is not counted above.
 

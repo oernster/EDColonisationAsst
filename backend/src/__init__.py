@@ -23,8 +23,11 @@ def _load_version() -> str:
         version_file = project_root / "VERSION"
         if version_file.exists():
             return version_file.read_text(encoding="utf-8").strip()
-    except Exception:
-        # Ignore and fall through to frozen/installed lookup.
+    except (OSError, IndexError, ValueError):
+        # The three ways this lookup can fail. None is worth failing an
+        # import over: parents[2] on a shallower path raises IndexError, an
+        # unreadable file raises OSError; a badly encoded one raises
+        # UnicodeDecodeError (a ValueError). Fall through to the frozen lookup.
         pass
 
     # Second, try to locate VERSION next to the executable in a frozen build.
@@ -36,8 +39,10 @@ def _load_version() -> str:
         version_file = exe_root / "VERSION"
         if version_file.exists():
             return version_file.read_text(encoding="utf-8").strip()
-    except Exception:
-        # Ignore and fall through to final default.
+    except (OSError, IndexError, ValueError):
+        # As above, plus sys.argv[0] being empty or unresolvable in an
+        # embedded host. The version is cosmetic here, so fall through to the
+        # final default rather than let it break the import.
         pass
 
     # Final safe default if nothing worked.
@@ -64,7 +69,9 @@ def _load_build_id() -> str:
         build_file = project_root / "BUILD_ID"
         if build_file.exists():
             return build_file.read_text(encoding="utf-8").strip()
-    except Exception:
+    except (OSError, IndexError, ValueError):
+        # Same three failures as _load_version's source-tree lookup. BUILD_ID
+        # is a diagnostic marker, so fall through to the frozen lookup.
         pass
 
     # Frozen/installed layout
@@ -76,7 +83,9 @@ def _load_build_id() -> str:
         build_file = exe_root / "BUILD_ID"
         if build_file.exists():
             return build_file.read_text(encoding="utf-8").strip()
-    except Exception:
+    except (OSError, IndexError, ValueError):
+        # As above. An empty build id is the documented fallback: it reads as
+        # "unknown build" rather than stopping the application from starting.
         pass
 
     return ""

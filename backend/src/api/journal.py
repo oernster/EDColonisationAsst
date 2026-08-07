@@ -24,7 +24,7 @@ async def get_journal_status():
         parser = JournalParser()
         events = parser.parse_file(latest_file)
 
-        # Find the latest location, FSD jump, or docked event to determine the current system
+        # Find the latest location, FSD jump or docked event to determine the current system
         current_system = None
         for event in reversed(events):
             if isinstance(event, (LocationEvent, FSDJumpEvent, DockedEvent)):
@@ -35,6 +35,11 @@ async def get_journal_status():
 
     except HTTPException as e:
         raise e
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
+        # Deliberately broad; correct at an HTTP boundary, because everything
+        # not already an HTTPException is by definition unanticipated, so
+        # the client must get a 500 rather than a stack trace. The detail is
+        # deliberately generic so nothing internal leaks into the response;
+        # the real error goes to the log.
         logger.error(f"Error getting journal status: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

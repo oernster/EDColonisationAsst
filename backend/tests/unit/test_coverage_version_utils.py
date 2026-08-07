@@ -31,10 +31,14 @@ class _AlwaysRaisingPath:
     Substituting this for the module-level Path name forces both the
     source-tree and the executable-adjacent lookups into their except
     handlers so the final hardcoded fallbacks are returned.
+
+    It raises OSError rather than an arbitrary error because that is what a
+    real path failure raises; the handlers under test now catch the
+    exceptions they can actually see rather than everything.
     """
 
     def __init__(self, *args: object) -> None:
-        raise RuntimeError("forced Path construction failure for test")
+        raise OSError("forced Path construction failure for test")
 
 
 def _redirecting_path(module_file: str, replacement: Path) -> Callable[[object], Path]:

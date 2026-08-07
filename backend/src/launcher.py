@@ -12,7 +12,7 @@ Responsibilities:
   [`ApplicationInstanceLock`](backend/src/runtime/app_singleton.py:1)
   shared with the packaged runtime and tray controller.
 - Detect the project root based on this file's location.
-- Initialise the Qt application, window icon, and top-level
+- Initialise the Qt application, window icon and top-level
   [`QtLaunchWindow`](backend/src/runtime/launcher_components.py:97).
 - Delegate all detailed initialisation logic to
   [`Launcher`](backend/src/runtime/launcher_components.py:207).
@@ -39,7 +39,11 @@ try:
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module is executed directly
+    # rather than imported as part of the package, which makes it a plain
+    # ImportError (ModuleNotFoundError included). Anything else raised while
+    # importing app_singleton is a genuine defect and should surface.
     from backend.src.runtime.app_singleton import (  # type: ignore[import-error]
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
@@ -57,7 +61,8 @@ try:
         QtLaunchWindow,
         Launcher,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # Same direct-execution fallback as the import above.
     from backend.src.runtime.launcher_components import (  # type: ignore[import-error]
         APP_NAME,
         BACKEND_PORT,
@@ -88,8 +93,11 @@ def main() -> int:
             frontend_url = f"http://127.0.0.1:{BACKEND_PORT}/app/"
             try:
                 webbrowser.open(frontend_url)
-            except Exception:
-                # Browser launch failures must not prevent a clean exit.
+            except (webbrowser.Error, OSError):
+                # No usable browser (webbrowser.Error) or the spawn itself
+                # failing (OSError). We are already exiting because another
+                # instance holds the lock, so a browser that will not open
+                # must not turn a clean exit into a crash.
                 pass
             return 0
     except ApplicationInstanceLockError:

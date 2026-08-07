@@ -101,7 +101,11 @@ def _is_frozen() -> bool:
             "python"
         ):
             return True
-    except Exception:
+    except (TypeError, ValueError):
+        # sys.argv[0] is not always a usable path string: an embedded host can
+        # leave it empty or non-string (TypeError); a null byte in it
+        # raises ValueError. Either way we cannot tell, so report not frozen,
+        # which is the safe answer because it keeps the source layout.
         return False
 
     return False
@@ -148,8 +152,10 @@ def get_config_paths() -> tuple[Path, Path]:
         # Directory containing the running EXE (install root when packaged).
         try:
             base_dir = Path(sys.argv[0]).resolve().parent
-        except Exception:
-            # Fallback to the original source-layout behaviour if anything goes wrong.
+        except (OSError, TypeError, ValueError):
+            # As in _is_frozen, plus resolve() itself hitting the filesystem
+            # (OSError). Fall back to the source layout rather than leave the
+            # configuration paths undefined.
             base_dir = Path(__file__).resolve().parents[2]
     else:
         # backend/src/config.py -> src -> backend
@@ -178,10 +184,13 @@ def get_config() -> AppConfig:
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config_dict = yaml.safe_load(f) or {}
-            except Exception:
-                # Be tolerant of user-edited YAML (e.g. Windows paths with backslashes
-                # inside double-quoted strings can be invalid YAML). Fall back to
-                # defaults rather than crashing startup/tests.
+            except (OSError, UnicodeDecodeError, yaml.YAMLError):
+                # config.yaml is hand-editable, so all three are user-caused
+                # rather than defects: an unreadable file (OSError), a file
+                # saved in another encoding (UnicodeDecodeError) and malformed
+                # YAML (yaml.YAMLError, which Windows paths with backslashes
+                # inside double-quoted strings produce readily). Fall back to
+                # defaults rather than crash startup.
                 config_dict = {}
 
         commander_dict: dict = {}
@@ -189,7 +198,10 @@ def get_config() -> AppConfig:
             try:
                 with open(commander_path, "r", encoding="utf-8") as f:
                     commander_dict = yaml.safe_load(f) or {}
-            except Exception:
+            except (OSError, UnicodeDecodeError, yaml.YAMLError):
+                # Same three user-caused failures as config.yaml above.
+                # commander.yaml only carries Inara credentials, so defaults
+                # mean "not configured" rather than a broken application.
                 commander_dict = {}
 
         inara_cfg = InaraConfig(**commander_dict.get("inara", {}))
@@ -231,8 +243,13 @@ def get_config() -> AppConfig:
                     detected = find_journal_directory()
                     if detected is not None:
                         _config.journal.directory = str(detected)
-                except Exception:
-                    # Never block startup on best-effort detection logic.
+                except Exception:  # noqa: BLE001
+                    # Deliberately broad. find_journal_directory probes Steam,
+                    # Proton and Wine layouts across distributions, so its
+                    # failure modes are open-ended and not worth enumerating.
+                    # The configured directory simply stays as it was, which
+                    # the settings page lets the user correct. Never block
+                    # startup on best-effort detection logic.
                     pass
 
     return _config

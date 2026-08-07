@@ -53,6 +53,11 @@ def _load_recent_journal_events() -> (
         logger.warning("Journal directory not found while querying carrier state.")
         return [], None, None
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad, below an HTTP boundary. The missing-directory
+        # case is handled above as the expected one, so anything reaching here
+        # is unanticipated. An empty result renders as "no carrier data"
+        # rather than failing the whole request. The traceback goes to the log
+        # so the cause stays recoverable.
         logger.exception("Unexpected error resolving journal directory: %s", exc)
         return [], None, None
 

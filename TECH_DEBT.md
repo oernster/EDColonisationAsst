@@ -4,22 +4,48 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. `carrier_service.py` is 960 lines and the front end has three files over 500
+## 1. Eighteen files are over the 400-line module cap
 
-| File | Lines |
+`carrier_service.py` was the first and is done: 960 lines split into six modules along the seams its own section markers already described, none over 263 lines.
+
+| Module | Lines | What it holds |
+|---|---|---|
+| `carrier_service.py` | 255 | The two response builders, plus the re-export surface |
+| `carrier_orders.py` | 263 | Cargo, buy and sell orders from CarrierTradeOrder events |
+| `carrier_market.py` | 254 | Market.json reconciliation and the SpaceUsage arithmetic |
+| `carrier_identity.py` | 135 | Reconciling Docked, CarrierStats and CarrierLocation into one identity |
+| `carrier_naming.py` | 109 | Commodity name normalisation, both directions |
+| `carrier_events.py` | 96 | Latest-event lookups over a journal stream |
+| `carrier_fleet.py` | 93 | The commander's own and squadron carriers |
+
+`carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
+
+Eighteen entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-07:
+
+| Lines | File |
 |---|---|
-| `backend/src/services/carrier_service.py` | 960 |
-| `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` | 752 |
-| `frontend/src/App.tsx` | 651 |
-| `frontend/src/components/SiteList/SiteList.tsx` | 598 |
-| `backend/src/services/journal_ingestion.py` | 545 |
-| `backend/src/runtime/app_runtime.py` | 526 |
+| 927 | `backend/tests/unit/test_file_watcher.py` |
+| 794 | `backend/tests/unit/test_coverage_journal_ingestion.py` |
+| 793 | `backend/tests/unit/test_api_carriers.py` |
+| 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
+| 745 | `backend/tests/unit/test_coverage_file_watcher.py` |
+| 670 | `backend/tests/unit/test_coverage_carrier_service.py` |
+| 651 | `frontend/src/App.tsx` |
+| 598 | `frontend/src/components/SiteList/SiteList.tsx` |
+| 575 | `backend/src/services/journal_ingestion.py` |
+| 542 | `backend/src/runtime/app_runtime.py` |
+| 540 | `backend/tests/unit/test_runtime_components.py` |
+| 494 | `backend/src/main.py` |
+| 488 | `backend/src/services/journal_parser.py` |
+| 470 | `backend/src/repositories/colonisation_repository.py` |
+| 466 | `backend/tests/unit/test_api_routes.py` |
+| 448 | `backend/tests/unit/test_journal_parser.py` |
+| 425 | `backend/src/runtime/launcher_components.py` |
+| 406 | `frontend/src/hooks/useKeepAwake.ts` |
 
-`carrier_service.py` is the one to take first. It is the largest non-installer source file, it has its own 793-line API test and its own 670-line coverage test; fleet-carrier state reconstruction from journal events is the most intricate logic in the project. Splitting it along the seams the tests already imply (order reconstruction, docking context, cargo and market state) would make each part reviewable.
+The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit, which is what removed `carrier_service.py` from the list. The list can only shrink and this item closes when it is empty.
 
-`App.tsx` at 651 lines is the second: a root component that large is usually holding state that belongs in hooks; `useKeepAwake.ts` at 406 shows the project already knows how to write them.
-
-These nineteen files (seven backend source, eight backend test, four front end) are the whole of `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py). The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit. The list can only shrink and this item closes when it is empty. The `installer/` package and its suite are already clear of the limit and carry no allowance.
+`App.tsx` at 651 is the one to take next: a root component that large is usually holding state that belongs in hooks; `useKeepAwake.ts` shows the project already knows how to write them. The six test files are the cheapest of the rest, since splitting a suite by the surface it exercises carries no behavioural risk at all.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 

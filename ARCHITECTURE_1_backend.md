@@ -62,6 +62,13 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── journal_parser.py          # Parses Journal.*.log events
 │   │   ├── journal_ingestion.py       # Ingestion pipeline using JournalParser
+│   │   ├── carrier_service.py         # Carrier response builders (public surface)
+│   │   ├── carrier_events.py          # Latest-event lookups over a journal stream
+│   │   ├── carrier_fleet.py           # Own and squadron carriers
+│   │   ├── carrier_identity.py        # Docked + CarrierStats + CarrierLocation -> identity
+│   │   ├── carrier_market.py          # Market.json merge and SpaceUsage arithmetic
+│   │   ├── carrier_naming.py          # Commodity name normalisation
+│   │   ├── carrier_orders.py          # Cargo, buy and sell orders
 │   │   ├── file_watcher.py            # Watchdog integration and event pipeline
 │   │   ├── file_watcher_polling.py    # Polling fallback, mixed into FileWatcher
 │   │   ├── data_aggregator.py         # Aggregates per-system data, Inara merge

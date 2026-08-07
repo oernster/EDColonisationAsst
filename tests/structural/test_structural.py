@@ -1,7 +1,7 @@
 """Structural tests: the shape the architecture documents describe, asserted.
 
 `ARCHITECTURE_1_backend.md` describes a backend of `api`, `services`,
-`repositories`, `models`, `runtime`, `config` and `utils`, and section 3 of
+`repositories`, `models`, `runtime`, `config` and `utils`; section 3 of
 `ARCHITECTURE.md` states that the setup program imports nothing from the
 application it ships. Until this file existed nothing enforced either
 statement, so the shape held by habit rather than by rule.
@@ -79,7 +79,6 @@ _LEGACY_OVER_LIMIT = frozenset(
         # Backend source. carrier_service.py is the one to take first: it is the
         # largest non-installer file in the repository and the seams are already
         # implied by its own tests.
-        "backend/src/services/carrier_service.py",
         "backend/src/services/journal_ingestion.py",
         "backend/src/runtime/app_runtime.py",
         "backend/src/services/journal_parser.py",

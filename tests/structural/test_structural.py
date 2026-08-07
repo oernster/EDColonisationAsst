@@ -86,14 +86,6 @@ _LEGACY_OVER_LIMIT = frozenset(
         "backend/src/main.py",
         "backend/src/runtime/launcher_components.py",
         # Backend tests. The cap applies to test files exactly as to source.
-        "backend/tests/unit/test_file_watcher.py",
-        "backend/tests/unit/test_coverage_journal_ingestion.py",
-        "backend/tests/unit/test_api_carriers.py",
-        "backend/tests/unit/test_coverage_file_watcher.py",
-        "backend/tests/unit/test_coverage_carrier_service.py",
-        "backend/tests/unit/test_runtime_components.py",
-        "backend/tests/unit/test_api_routes.py",
-        "backend/tests/unit/test_journal_parser.py",
         # Front end. App.tsx is a root component holding state that belongs in
         # hooks; useKeepAwake.ts shows the project already knows how to write
         # them.

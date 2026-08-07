@@ -1,207 +1,31 @@
-"""Coverage tests for src.services.file_watcher.
+"""Status reporting, lifecycle and stop behaviour.
 
-These tests target the FileWatcher lifecycle, diagnostics and the polling
-fallback without any mocking libraries. All collaborators are hand-written
-fakes; watchdog observers are replaced with in-memory stand-ins so no real
-observer threads are started; asyncio.sleep is replaced with a scripted
-coroutine so the polling loop runs deterministically and fast.
+Split out of test_coverage_file_watcher.py; the scaffolding lives in _test_coverage_file_watcher_support.py.
 """
 
-from __future__ import annotations
-
 import asyncio
-import os
 import sys
-from datetime import timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Optional
-
 import pytest
-
 import src.services.file_watcher as fw_module
 import src.services.file_watcher_polling as polling_module
 from src.services.file_watcher import FileWatcher, IFileWatcher
 
-# Fixed epoch base and step used only to give journal files deterministic,
-# clearly ordered modification times in tests.
-BASE_MTIME = 1_700_000_000.0
-MTIME_STEP = 100.0
-
-
-# ---------------------------------------------------------------------------
-# Hand-written fakes
-# ---------------------------------------------------------------------------
-
-
-class _StubParser:
-    """Parser stand-in; FileWatcher only stores it in these tests."""
-
-    def parse_file(self, file_path: Path) -> list:
-        return []
-
-    def parse_line(self, line: str) -> None:
-        return None
-
-
-class _StubTracker:
-    """System tracker stand-in; never consulted by these tests."""
-
-
-class _StubRepo:
-    """Repository stand-in; never consulted by these tests."""
-
-
-class _DummyLoop:
-    """Truthy loop placeholder; FileWatcher only stores and forwards it."""
-
-
-class _RecordingHandler:
-    """Handler fake that records which files the poller asked it to process."""
-
-    def __init__(self) -> None:
-        self.paths: list[Path] = []
-
-    async def _process_file(self, file_path: Path) -> None:
-        self.paths.append(file_path)
-
-
-class _HealthyObserver:
-    """Fake watchdog Observer that starts cleanly and reports alive."""
-
-    def __init__(self) -> None:
-        self.scheduled: list[tuple[Any, str, bool]] = []
-        self.started = False
-        self.stopped = False
-        self.joined = False
-
-    def schedule(self, handler: Any, path: str, recursive: bool) -> None:
-        self.scheduled.append((handler, path, recursive))
-
-    def start(self) -> None:
-        self.started = True
-
-    def is_alive(self) -> bool:
-        return True
-
-    def stop(self) -> None:
-        self.stopped = True
-
-    def join(self) -> None:
-        self.joined = True
-
-
-class _NotAliveObserver(_HealthyObserver):
-    """Observer fake whose thread never comes alive after start()."""
-
-    def is_alive(self) -> bool:
-        return False
-
-
-class _FailingStartObserver(_HealthyObserver):
-    """Observer fake whose start() raises."""
-
-    def start(self) -> None:
-        raise RuntimeError("cannot start observer thread")
-
-
-class _AliveProbeErrorObserver(_HealthyObserver):
-    """Observer fake whose is_alive() probe raises."""
-
-    def is_alive(self) -> bool:
-        raise RuntimeError("probe failed")
-
-
-class _PendingTask:
-    """Task fake representing a still-running poller task."""
-
-    def done(self) -> bool:
-        return False
-
-
-class _CancelledTask:
-    """Task fake representing a cancelled poller task."""
-
-    def done(self) -> bool:
-        return True
-
-    def exception(self) -> None:
-        raise asyncio.CancelledError()
-
-
-class _FailedTask:
-    """Task fake whose exception() reports a stored failure."""
-
-    def done(self) -> bool:
-        return True
-
-    def exception(self) -> Exception:
-        return ValueError("poller exploded")
-
-
-class _ExceptionProbeErrorTask:
-    """Task fake whose exception() itself raises a non-cancel error."""
-
-    def done(self) -> bool:
-        return True
-
-    def exception(self) -> None:
-        raise RuntimeError("cannot read exception")
-
-
-class _FlakyDoneTask:
-    """Task fake whose done() raises on the first call then reports done."""
-
-    def __init__(self) -> None:
-        self._calls = 0
-
-    def done(self) -> bool:
-        self._calls += 1
-        if self._calls == 1:
-            raise RuntimeError("done probe failed")
-        return True
-
-    def exception(self) -> None:
-        return None
-
-
-def _make_watcher(loop: Any = None) -> FileWatcher:
-    """Build a FileWatcher wired to inert stub collaborators."""
-    return FileWatcher(
-        parser=_StubParser(),  # type: ignore[arg-type]
-        system_tracker=_StubTracker(),  # type: ignore[arg-type]
-        repository=_StubRepo(),  # type: ignore[arg-type]
-        loop=loop if loop is not None else _DummyLoop(),  # type: ignore[arg-type]
-    )
-
-
-def _broken_datetime_module() -> SimpleNamespace:
-    """Fake datetime module whose datetime.now raises.
-
-    Installing this in sys.modules makes the in-function
-    `from datetime import datetime, timezone` succeed while the subsequent
-    now() call fails, driving the defensive except branches.
-    """
-
-    class _BrokenDateTime:
-        @staticmethod
-        def now(tz: Any) -> Any:
-            raise RuntimeError("clock unavailable")
-
-    return SimpleNamespace(datetime=_BrokenDateTime, timezone=timezone)
-
-
-def _write_journal(directory: Path, name: str, mtime: float) -> Path:
-    """Create a journal file with a deterministic modification time."""
-    path = directory / name
-    path.write_text("{}", encoding="utf-8")
-    os.utime(path, (mtime, mtime))
-    return path
-
-
-# ---------------------------------------------------------------------------
-# IFileWatcher abstract interface
-# ---------------------------------------------------------------------------
+from tests.unit._test_coverage_file_watcher_support import (
+    BASE_MTIME,
+    _AliveProbeErrorObserver,
+    _CancelledTask,
+    _ExceptionProbeErrorTask,
+    _FailedTask,
+    _FailingStartObserver,
+    _FlakyDoneTask,
+    _HealthyObserver,
+    _NotAliveObserver,
+    _PendingTask,
+    _broken_datetime_module,
+    _make_watcher,
+)
 
 
 async def test_interface_abstract_methods_raise_not_implemented() -> None:
@@ -216,11 +40,6 @@ async def test_interface_abstract_methods_raise_not_implemented() -> None:
 
     with pytest.raises(NotImplementedError):
         IFileWatcher.set_update_callback(watcher, lambda: None)
-
-
-# ---------------------------------------------------------------------------
-# Diagnostics: is_running, watchdog_status, poller_running, poller_status
-# ---------------------------------------------------------------------------
 
 
 def test_is_running_variants() -> None:
@@ -324,11 +143,6 @@ def test_watched_directory_and_set_update_callback() -> None:
     watcher._handler = handler  # type: ignore[assignment]
     watcher.set_update_callback(_callback)
     assert handler.update_callback is _callback
-
-
-# ---------------------------------------------------------------------------
-# start_watching lifecycle branches
-# ---------------------------------------------------------------------------
 
 
 async def test_start_watching_returns_when_observer_alive(tmp_path: Path) -> None:
@@ -442,11 +256,6 @@ async def test_start_watching_logs_existing_file_processing_errors(
     assert watcher._observer.started is True
 
 
-# ---------------------------------------------------------------------------
-# stop_watching branches
-# ---------------------------------------------------------------------------
-
-
 async def test_stop_watching_cancels_active_poll_task() -> None:
     """An active poller task is cancelled and the state fields reset."""
     watcher = _make_watcher()
@@ -477,269 +286,3 @@ async def test_stop_watching_logs_failed_poll_task() -> None:
     await watcher.stop_watching()
 
     assert watcher._poll_task is None
-
-
-# ---------------------------------------------------------------------------
-# Polling fallback: _start_polling_if_enabled
-# ---------------------------------------------------------------------------
-
-
-def test_start_polling_disabled_outside_frozen_runtime(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Polling is a packaged-runtime feature only."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
-    watcher = _make_watcher()
-
-    watcher._start_polling_if_enabled(tmp_path)
-
-    assert watcher._poll_task is None
-
-
-def test_start_polling_skips_when_task_already_active(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A live poller task is never replaced."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
-    watcher = _make_watcher()
-    pending = _PendingTask()
-    watcher._poll_task = pending  # type: ignore[assignment]
-
-    watcher._start_polling_if_enabled(tmp_path)
-
-    assert watcher._poll_task is pending
-
-
-async def test_start_polling_creates_task_when_frozen(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """In frozen mode a real poller task is created."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
-    watcher = _make_watcher()
-
-    watcher._start_polling_if_enabled(tmp_path)
-
-    assert watcher.poller_running() is True
-    task = watcher._poll_task
-    assert task is not None
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-
-
-async def test_start_polling_handles_create_task_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A create_task failure is logged and leaves no poller task behind."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
-    watcher = _make_watcher()
-
-    def not_a_coroutine(directory: Path) -> object:
-        # Returning a plain object makes asyncio.create_task raise TypeError
-        # without leaving an unawaited coroutine behind.
-        return object()
-
-    monkeypatch.setattr(watcher, "_poll_for_latest_changes", not_a_coroutine)
-
-    watcher._start_polling_if_enabled(tmp_path)
-
-    assert watcher._poll_task is None
-
-
-# ---------------------------------------------------------------------------
-# Polling fallback: _poll_for_latest_changes
-# ---------------------------------------------------------------------------
-
-
-def _scripted_sleep(script: list[Callable[[], None]]) -> Callable[..., Any]:
-    """Build an asyncio.sleep replacement that runs one script step per call.
-
-    Each call executes the next scripted action (mutating the filesystem or
-    the watcher between loop iterations). Once the script is exhausted the
-    fake raises CancelledError to end the otherwise infinite polling loop.
-    """
-    state = {"index": 0}
-
-    async def fake_sleep(_delay: float) -> None:
-        index = state["index"]
-        state["index"] += 1
-        if index >= len(script):
-            raise asyncio.CancelledError()
-        script[index]()
-
-    return fake_sleep
-
-
-async def test_poll_loop_processes_changes_across_iterations(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The poll loop detects new files, mtime bumps and unchanged states.
-
-    Iteration plan (one scripted action runs between iterations):
-      1. empty directory, nothing to do
-      2. J1 appears, processed because no file was seen before
-      3. J1 mtime bumped, processed again
-      4. last seen mtime cleared, processed again via the None-mtime branch
-      5. nothing changed, skipped
-      6. newer J2 appears but the handler is gone, change detected yet skipped
-    """
-    watch_dir = tmp_path / "journals"
-    watch_dir.mkdir()
-
-    watcher = _make_watcher()
-    handler = _RecordingHandler()
-    watcher._handler = handler  # type: ignore[assignment]
-
-    j1 = watch_dir / "Journal.2026-01-01T000000.01.log"
-    j2 = watch_dir / "Journal.2026-01-02T000000.01.log"
-
-    def create_j1() -> None:
-        _write_journal(watch_dir, j1.name, BASE_MTIME)
-
-    def bump_j1_mtime() -> None:
-        os.utime(j1, (BASE_MTIME + MTIME_STEP, BASE_MTIME + MTIME_STEP))
-
-    def clear_last_mtime() -> None:
-        watcher._poll_last_mtime = None
-
-    def no_change() -> None:
-        return None
-
-    def new_file_and_drop_handler() -> None:
-        _write_journal(watch_dir, j2.name, BASE_MTIME + 2 * MTIME_STEP)
-        watcher._handler = None
-
-    script = [
-        create_j1,
-        bump_j1_mtime,
-        clear_last_mtime,
-        no_change,
-        new_file_and_drop_handler,
-    ]
-
-    with monkeypatch.context() as mp:
-        mp.setattr(asyncio, "sleep", _scripted_sleep(script))
-        with pytest.raises(asyncio.CancelledError):
-            await watcher._poll_for_latest_changes(watch_dir)
-
-    # Iterations 2, 3 and 4 each processed J1; iteration 6 saw a change on J2
-    # but could not process it because the handler was gone.
-    assert handler.paths == [j1, j1, j1]
-    assert watcher._poll_last_path == j1
-    assert watcher._poll_last_checked_at is not None
-
-
-async def test_poll_loop_reraises_cancellation_from_handler(tmp_path: Path) -> None:
-    """CancelledError raised while processing propagates out of the loop."""
-    watch_dir = tmp_path / "journals"
-    watch_dir.mkdir()
-    _write_journal(watch_dir, "Journal.2026-01-01T000000.01.log", BASE_MTIME)
-
-    class _CancellingHandler:
-        async def _process_file(self, file_path: Path) -> None:
-            raise asyncio.CancelledError()
-
-    watcher = _make_watcher()
-    watcher._handler = _CancellingHandler()  # type: ignore[assignment]
-
-    with pytest.raises(asyncio.CancelledError):
-        await watcher._poll_for_latest_changes(watch_dir)
-
-
-async def test_poll_loop_records_generic_errors_and_clock_failures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Handler failures are logged and recorded; clock failures are ignored."""
-    watch_dir = tmp_path / "journals"
-    watch_dir.mkdir()
-    _write_journal(watch_dir, "Journal.2026-01-01T000000.01.log", BASE_MTIME)
-
-    class _FailingHandler:
-        async def _process_file(self, file_path: Path) -> None:
-            raise ValueError("parse exploded")
-
-    watcher = _make_watcher()
-    watcher._handler = _FailingHandler()  # type: ignore[assignment]
-
-    with monkeypatch.context() as mp:
-        mp.setitem(sys.modules, "datetime", _broken_datetime_module())
-        mp.setattr(asyncio, "sleep", _scripted_sleep([]))
-        with pytest.raises(asyncio.CancelledError):
-            await watcher._poll_for_latest_changes(watch_dir)
-
-    assert watcher._poll_last_error == (
-        "Polling fallback encountered an error; see logs"
-    )
-    # The broken clock means the diagnostic timestamp was never recorded.
-    assert watcher._poll_last_checked_at is None
-
-
-class _ExplodingErrorFieldWatcher(FileWatcher):
-    """FileWatcher variant whose _poll_last_error assignment can be armed to fail.
-
-    This exercises the innermost defensive except in the polling loop where
-    even recording the error message fails.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._arm_explosion = False
-        super().__init__(*args, **kwargs)
-
-    @property
-    def _poll_last_error(self) -> Optional[str]:
-        return self.__dict__.get("_poll_last_error_value")
-
-    @_poll_last_error.setter
-    def _poll_last_error(self, value: Optional[str]) -> None:
-        if self._arm_explosion:
-            raise RuntimeError("diagnostics store unavailable")
-        self.__dict__["_poll_last_error_value"] = value
-
-
-async def test_poll_loop_swallows_error_recording_failures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Even a failing error-field assignment must not break the poll loop."""
-    watch_dir = tmp_path / "journals"
-    watch_dir.mkdir()
-    _write_journal(watch_dir, "Journal.2026-01-01T000000.01.log", BASE_MTIME)
-
-    watcher = _ExplodingErrorFieldWatcher(
-        parser=_StubParser(),  # type: ignore[arg-type]
-        system_tracker=_StubTracker(),  # type: ignore[arg-type]
-        repository=_StubRepo(),  # type: ignore[arg-type]
-        loop=_DummyLoop(),  # type: ignore[arg-type]
-    )
-    handler = _RecordingHandler()
-    watcher._handler = handler  # type: ignore[assignment]
-    watcher._arm_explosion = True
-
-    with monkeypatch.context() as mp:
-        mp.setattr(asyncio, "sleep", _scripted_sleep([]))
-        with pytest.raises(asyncio.CancelledError):
-            await watcher._poll_for_latest_changes(watch_dir)
-
-    # The change-branch reset of _poll_last_error raised before processing,
-    # so the handler was never invoked and no error message was stored.
-    assert handler.paths == []
-    assert watcher._poll_last_error is None
-
-
-# ---------------------------------------------------------------------------
-# _process_existing_files
-# ---------------------------------------------------------------------------
-
-
-async def test_process_existing_files_skips_when_handler_missing(
-    tmp_path: Path,
-) -> None:
-    """Existing journals are ignored when no handler has been created yet."""
-    watch_dir = tmp_path / "journals"
-    watch_dir.mkdir()
-    _write_journal(watch_dir, "Journal.2026-01-01T000000.01.log", BASE_MTIME)
-
-    watcher = _make_watcher()
-    assert watcher._handler is None
-
-    # Must complete without error despite the missing handler.
-    await watcher._process_existing_files(watch_dir)

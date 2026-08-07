@@ -98,7 +98,6 @@ _LEGACY_OVER_LIMIT = frozenset(
         # hooks; useKeepAwake.ts shows the project already knows how to write
         # them.
         "frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx",
-        "frontend/src/App.tsx",
         "frontend/src/components/SiteList/SiteList.tsx",
         "frontend/src/hooks/useKeepAwake.ts",
     }

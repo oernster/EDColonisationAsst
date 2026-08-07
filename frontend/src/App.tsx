@@ -1,65 +1,38 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { ThemeProvider, createTheme, CssBaseline, Container, Box, Typography, Tabs, Tab, Link, Button, Chip, Tooltip } from '@mui/material';
+import { useState } from 'react';
+import {
+  ThemeProvider,
+  CssBaseline,
+  Container,
+  Box,
+  Typography,
+  Tabs,
+  Tab,
+  Button,
+} from '@mui/material';
+
 import { SystemSelector } from './components/SystemSelector/SystemSelector';
 import { SiteList } from './components/SiteList/SiteList';
 import { FleetCarriersPanel } from './components/FleetCarriers/FleetCarriersPanel';
-import { useColonisationStore } from './stores/colonisationStore';
 import { SettingsPage } from './components/Settings/SettingsPage';
-import { api } from './services/api';
+import { AboutPanel } from './components/About/AboutPanel';
+import { LicensePanel } from './components/About/LicensePanel';
+import { KeepAwakeChip } from './components/KeepAwake/KeepAwakeChip';
+import { useColonisationStore } from './stores/colonisationStore';
 import { useKeepAwake } from './hooks/useKeepAwake';
-import { isMobileOrTablet } from './utils/device';
+import { useKeepAwakePreference } from './hooks/useKeepAwakePreference';
+import { useThemeMode } from './hooks/useThemeMode';
+import { useLiveUpdates } from './hooks/useLiveUpdates';
+import { useBackendMeta } from './hooks/useBackendMeta';
+import { darkTheme, lightTheme } from './theme';
 
-const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#FF6B00', // Elite orange
-    },
-    secondary: {
-      main: '#4CAF50', // Green for completed
-    },
-    background: {
-      default: '#1a1a1a',
-      paper: '#2d2d2d',
-    },
-    success: {
-      main: '#4CAF50', // Green
-    },
-    warning: {
-      main: '#FF9800', // Orange
-    },
-  },
-  typography: {
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
-  },
-});
-
-const lightTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#FF6B00', // Elite orange
-    },
-    secondary: {
-      main: '#2e7d32', // Darker green
-    },
-    background: {
-      default: '#fafafa',
-      paper: '#ffffff',
-    },
-    success: {
-      main: '#2e7d32',
-    },
-    warning: {
-      main: '#FF9800',
-    },
-  },
-  typography: {
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
-  },
-});
+const THEME_BUTTON_SX = {
+  minWidth: 36,
+  width: 36,
+  height: 36,
+  borderRadius: 1,
+  padding: 0,
+  lineHeight: 1,
+};
 
 function App() {
   const {
@@ -71,183 +44,16 @@ function App() {
     setSystemData,
     setAllSystems,
   } = useColonisationStore();
+
   const [currentTab, setCurrentTab] = useState(0);
   const [systemViewTab, setSystemViewTab] = useState(0);
-  const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [pythonVersion, setPythonVersion] = useState<string | null>(null);
-  const [healthError, setHealthError] = useState<string | null>(null);
-  const [commanderName, setCommanderName] = useState<string | null>(null);
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
-  const keepAwakeStorageKey = 'edcaKeepAwakeEnabled';
-  const currentSystemRef = useRef<string | null>(currentSystem);
 
-  const readKeepAwakeEnabled = () => {
-    try {
-      const raw = window.localStorage.getItem(keepAwakeStorageKey);
-      if (raw === 'true') return true;
-      if (raw === 'false') return false;
-      // Default ON for mobile/tablet, but do not override an explicit user choice.
-      return isMobileOrTablet();
-    } catch {
-      return isMobileOrTablet();
-    }
-  };
+  const { themeMode, setThemeModeAndPersist } = useThemeMode();
+  const keepAwakeEnabled = useKeepAwakePreference();
+  const { appVersion, pythonVersion, healthError, commanderName } =
+    useBackendMeta(settingsVersion);
 
-  // Initialise from localStorage synchronously to avoid a "flash" of Off in tests/UI.
-  const [keepAwakeEnabled, setKeepAwakeEnabled] = useState<boolean>(() => readKeepAwakeEnabled());
-
-  useEffect(() => {
-    currentSystemRef.current = currentSystem;
-  }, [currentSystem]);
-
-  // Initialise theme mode from localStorage so we remember the user's choice.
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem('edcaThemeMode');
-      if (saved === 'dark' || saved === 'light') {
-        setThemeMode(saved);
-      }
-    } catch {
-      // If localStorage is unavailable, just stick with the default.
-    }
-  }, []);
-
-  // Initialise keep-awake preference.
-  useEffect(() => {
-    // Persist the default for mobile/tablet so the behaviour is stable.
-    try {
-      const existing = window.localStorage.getItem(keepAwakeStorageKey);
-      if (existing === null) {
-        window.localStorage.setItem(keepAwakeStorageKey, String(readKeepAwakeEnabled()));
-      }
-    } catch {
-      // Ignore.
-    }
-
-    const onLocalPreferenceChanged = () => {
-      setKeepAwakeEnabled(readKeepAwakeEnabled());
-    };
-
-    // Custom event fired by Settings when toggled.
-    window.addEventListener('edcaKeepAwakeChanged', onLocalPreferenceChanged);
-    // Also respond to cross-tab changes.
-    window.addEventListener('storage', onLocalPreferenceChanged);
-
-    return () => {
-      window.removeEventListener('edcaKeepAwakeChanged', onLocalPreferenceChanged);
-      window.removeEventListener('storage', onLocalPreferenceChanged);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const refreshFromBackend = async () => {
-    try {
-      // Refresh system list (may change after journal reloads).
-      const systems = await api.getSystems();
-      setAllSystems(systems);
-    } catch {
-      // Ignore; UI can continue with cached list.
-    }
-
-    // Refresh selected system snapshot.
-    const selectedSystem = currentSystemRef.current;
-
-    if (selectedSystem) {
-      const data = await api.getSystemData(selectedSystem);
-      setSystemData(data);
-    }
-  };
-
-  // AJAX long-poll loop: wait for backend ingestion changes, then refetch.
-  // This replaces the old WebSocket live update mechanism.
-  const changeSeqRef = useRef<number>(0);
-  useEffect(() => {
-    let cancelled = false;
-    let backoffMs = 500;
-
-    const sleep = (ms: number) =>
-      new Promise<void>((resolve) => {
-        window.setTimeout(() => resolve(), ms);
-      });
-
-    const run = async () => {
-      while (!cancelled) {
-        const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
-        const timeoutS = hidden ? 60 : 25;
-
-        try {
-          const res = await api.longPollChanges(changeSeqRef.current, timeoutS);
-          changeSeqRef.current = res.seq;
-          backoffMs = 500;
-
-          if (res.changed) {
-            await refreshFromBackend();
-            // Let feature panels that are not part of refreshFromBackend
-            // (e.g. Fleet carriers) react immediately.
-            window.dispatchEvent(new Event('edcaBackendChanged'));
-          } else {
-            // Safety net: long-polling should normally block for many seconds.
-            // If the backend returns immediately with changed=false (misconfig,
-            // proxy, or test mocks), avoid a tight loop that can consume CPU/memory.
-            await sleep(250);
-          }
-        } catch {
-          await sleep(backoffMs);
-          backoffMs = Math.min(backoffMs * 2, 30000);
-        }
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const loadMeta = async () => {
-      try {
-        const health = await api.healthCheck();
-        setAppVersion(
-          health.build_id ? `${health.version} (${health.build_id})` : health.version,
-        );
-        // New in 1.5.0+: surface the actual Python runtime version reported by the backend.
-        // This lets us verify at a glance which embedded interpreter the packaged EXE is using.
-        setPythonVersion(health.python_version ?? null);
-      } catch (err) {
-        setHealthError('Failed to load version information');
-      }
-
-      try {
-        const settings = await api.getAppSettings();
-        setCommanderName(settings.inara_commander_name);
-      } catch {
-        // Ignore settings load errors here; commander name is optional display
-      }
-    };
-
-    loadMeta();
-  }, [settingsVersion]);
-
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setCurrentTab(newValue);
-  };
-
-  const handleSystemViewTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setSystemViewTab(newValue);
-  };
-
-  const setThemeModeAndPersist = (next: 'dark' | 'light') => {
-    setThemeMode(next);
-    try {
-      window.localStorage.setItem('edcaThemeMode', next);
-    } catch {
-      // Ignore persistence errors; theme will still switch for this session.
-    }
-  };
-
-  const theme = themeMode === 'dark' ? darkTheme : lightTheme;
+  useLiveUpdates({ currentSystem, setSystemData, setAllSystems });
 
   const {
     status: keepAwakeStatus,
@@ -259,107 +65,15 @@ function App() {
     allowFallbackVideo: keepAwakeEnabled,
   });
 
-  // If Settings enables keep-awake, try to start immediately within the same user gesture.
-  useEffect(() => {
-    const onTryEnableNow = () => {
-      void enableFromUserGesture();
-    };
-    window.addEventListener('edcaKeepAwakeTryEnableNow', onTryEnableNow);
-    return () => window.removeEventListener('edcaKeepAwakeTryEnableNow', onTryEnableNow);
-  }, [enableFromUserGesture]);
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
 
-  const keepAwakeChip = useMemo(() => {
-    // Only show the keep-awake status indicator on mobile/tablet devices.
-    // Desktop users typically don't need it and it adds visual noise.
-    if (!isMobileOrTablet()) return null;
+  const handleSystemViewTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setSystemViewTab(newValue);
+  };
 
-    const tooltip = keepAwakeStatus.message;
-    const labelBase = 'Keep awake';
-
-    // Avoid a brief "Off" state while the keep-awake hook is attempting to enable.
-    if (keepAwakeEnabled && keepAwakeStatus.state === 'off') {
-      return (
-        <Tooltip title="Enabling keep-awake…" arrow>
-          <Chip
-            size="small"
-            label={`${labelBase}: Starting`}
-            color="default"
-            variant="outlined"
-          />
-        </Tooltip>
-      );
-    }
-
-    if (keepAwakeStatus.state === 'active') {
-      return (
-        <Tooltip title={tooltip} arrow>
-          <Chip
-            size="small"
-            label={`${labelBase}: On`}
-            color="success"
-            variant="filled"
-          />
-        </Tooltip>
-      );
-    }
-
-    if (keepAwakeStatus.state === 'needs-user-gesture') {
-      return (
-        <Tooltip title={tooltip} arrow>
-          <Chip
-            size="small"
-            label={`${labelBase}: Tap to enable`}
-            color="warning"
-            variant="filled"
-            onClick={() => {
-              void enableFromUserGesture();
-            }}
-          />
-        </Tooltip>
-      );
-    }
-
-    if (keepAwakeEnabled && keepAwakeStatus.state === 'unsupported') {
-      const extra =
-        wakeLockPossible || secureContext
-          ? ''
-          : ' (HTTP/LAN often blocks Wake Lock; fallback requires a tap)';
-      return (
-        <Tooltip title={`${tooltip}${extra}`} arrow>
-          <Chip
-            size="small"
-            label={`${labelBase}: Unsupported`}
-            color="default"
-            variant="outlined"
-          />
-        </Tooltip>
-      );
-    }
-
-    if (keepAwakeEnabled && keepAwakeStatus.state === 'error') {
-      return (
-        <Tooltip title={tooltip} arrow>
-          <Chip
-            size="small"
-            label={`${labelBase}: Error`}
-            color="error"
-            variant="filled"
-          />
-        </Tooltip>
-      );
-    }
-
-    return (
-      <Tooltip title={keepAwakeEnabled ? tooltip : 'Off'} arrow>
-        <Chip
-          size="small"
-          label={`${labelBase}: Off`}
-          color="default"
-          variant="outlined"
-        />
-      </Tooltip>
-    );
-  }, [keepAwakeEnabled, keepAwakeStatus, wakeLockPossible, secureContext]);
+  const theme = themeMode === 'dark' ? darkTheme : lightTheme;
 
   return (
     <ThemeProvider theme={theme}>
@@ -390,23 +104,19 @@ function App() {
                 Real-time tracking for colonisation efforts
               </Typography>
             </Box>
-            <Box
-              sx={{
-                textAlign: { xs: 'left', sm: 'right' },
-              }}
-            >
+            <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               <Typography variant="body2" sx={{ color: 'primary.main' }}>
                 Commander:
               </Typography>
-              <Typography
-                variant="body1"
-                fontWeight="medium"
-                color="text.primary"
-              >
+              <Typography variant="body1" fontWeight="medium" color="text.primary">
                 {commanderName || 'Unknown'}
               </Typography>
               {!commanderName && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: 'block', mt: 0.5 }}
+                >
                   Set your commander name in the Settings tab.
                 </Typography>
               )}
@@ -420,19 +130,20 @@ function App() {
                   flexWrap: 'wrap',
                 }}
               >
-                {keepAwakeChip}
+                <KeepAwakeChip
+                  enabled={keepAwakeEnabled}
+                  status={keepAwakeStatus}
+                  wakeLockPossible={wakeLockPossible}
+                  secureContext={secureContext}
+                  onEnableFromUserGesture={() => {
+                    void enableFromUserGesture();
+                  }}
+                />
                 <Button
                   variant={themeMode === 'light' ? 'contained' : 'outlined'}
                   size="small"
                   onClick={() => setThemeModeAndPersist('light')}
-                  sx={{
-                    minWidth: 36,
-                    width: 36,
-                    height: 36,
-                    borderRadius: 1,
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
+                  sx={THEME_BUTTON_SX}
                 >
                   ☀️
                 </Button>
@@ -440,14 +151,7 @@ function App() {
                   variant={themeMode === 'dark' ? 'contained' : 'outlined'}
                   size="small"
                   onClick={() => setThemeModeAndPersist('dark')}
-                  sx={{
-                    minWidth: 36,
-                    width: 36,
-                    height: 36,
-                    borderRadius: 1,
-                    padding: 0,
-                    lineHeight: 1,
-                  }}
+                  sx={THEME_BUTTON_SX}
                 >
                   🌙
                 </Button>
@@ -528,120 +232,14 @@ function App() {
           )}
 
           {currentTab === 2 && (
-            <Box sx={{ pt: 4, maxWidth: 900 }}>
-              <Typography variant="h5" gutterBottom>
-                About
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                Application Name: EDColonisationAsst
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                Author: Oliver Ernster
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 1.5 }}>
-                Version: {appVersion ?? 'Loading...'}
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 3 }}>
-                Python runtime: {pythonVersion ?? 'Loading...'}
-              </Typography>
-              {healthError && (
-                <Typography variant="body2" color="error" sx={{ mt: 1, mb: 2 }}>
-                  {healthError}
-                </Typography>
-              )}
-
-              <Typography variant="body1" sx={{ mb: 3 }}>
-                <Link
-                  href="https://github.com/oernster/EDColonisationAsst/releases"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Check for Updates
-                </Link>
-              </Typography>
-
-              <Typography variant="h6" gutterBottom>
-                Third‑party components
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                This project makes use of several third‑party libraries. In particular:
-              </Typography>
-
-              <Typography variant="subtitle1" sx={{ mt: 1 }}>
-                Python backend (key libraries)
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                The backend is built on top of a number of open‑source Python projects, including
-                but not limited to:
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, pl: 2 }}>
-                • <strong>FastAPI</strong> – modern, async web framework for the API layer.<br />
-                • <strong>Uvicorn</strong> – ASGI server used to host the FastAPI application.<br />
-                • <strong>Pydantic</strong> – data validation and settings management.<br />
-                • <strong>PySide6</strong> – Qt for Python bindings used for the Windows tray UI
-                  and installer tooling.<br />
-                • <strong>SQLAlchemy / SQLite</strong> and related tools – persistence layer for
-                  colonisation data.<br />
-                • Various supporting libraries for logging, testing, and utilities as listed in
-                  <code>backend/requirements.txt</code> and <code>backend/requirements-dev.txt</code>.
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                I gratefully acknowledge the maintainers and contributors of these projects and
-                the broader Python ecosystem.
-              </Typography>
-
-              <Typography variant="subtitle1">
-                Frontend and tooling (Node.js ecosystem)
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                The React/TypeScript frontend and build tooling rely on many projects from the
-                Node.js ecosystem, including:
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, pl: 2 }}>
-                • <strong>React</strong> and <strong>React‑DOM</strong> – core UI framework.<br />
-                • <strong>Material UI (MUI)</strong> – component library for the web UI.<br />
-                • <strong>Vite</strong> – dev server and build tool.<br />
-                • <strong>Zustand</strong> – state management.<br />
-                • <strong>Axios</strong> – HTTP client.<br />
-                • A number of testing, linting, and type‑checking tools (Vitest, ESLint,
-                  TypeScript, Testing Library, etc.) as listed in
-                  <code>frontend/package.json</code> and <code>frontend/package-lock.json</code>.
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                I also gratefully acknowledge the authors and maintainers of these libraries and
-                the wider JavaScript/TypeScript ecosystem.
-              </Typography>
-
-              <Typography variant="body2">
-                Please refer to the upstream project documentation and license notices for each
-                of these dependencies for their full terms and acknowledgements.
-              </Typography>
-            </Box>
+            <AboutPanel
+              appVersion={appVersion}
+              pythonVersion={pythonVersion}
+              healthError={healthError}
+            />
           )}
 
-          {currentTab === 3 && (
-            <Box sx={{ pt: 4, maxWidth: 900 }}>
-              <Typography variant="h5" gutterBottom>
-                License
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                Elite Dangerous Colonisation Assistant (EDCA) is distributed under the
-                terms of the <strong>GNU Lesser General Public License, version 3</strong> (LGPL‑3.0).
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                The full text of the license is available online at{' '}
-                <Link
-                  href="https://github.com/oernster/EDColonisationAsst/blob/main/LICENSE"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  LICENSE
-                </Link>{' '}
-                and is also included in the installed application as the file
-                <code> LICENSE</code>. By using this software you agree to the terms of that license.
-              </Typography>
-            </Box>
-          )}
+          {currentTab === 3 && <LicensePanel />}
         </Box>
       </Container>
     </ThemeProvider>

@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Eighteen files are over the 400-line module cap
+## 1. Seventeen files are over the 400-line module cap
 
-`carrier_service.py` was the first and is done: 960 lines split into six modules along the seams its own section markers already described, none over 263 lines.
+Two are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding.
 
 | Module | Lines | What it holds |
 |---|---|---|
@@ -30,7 +30,6 @@ Eighteen entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_struct
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 745 | `backend/tests/unit/test_coverage_file_watcher.py` |
 | 670 | `backend/tests/unit/test_coverage_carrier_service.py` |
-| 651 | `frontend/src/App.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
 | 575 | `backend/src/services/journal_ingestion.py` |
 | 542 | `backend/src/runtime/app_runtime.py` |
@@ -45,11 +44,23 @@ Eighteen entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_struct
 
 The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit, which is what removed `carrier_service.py` from the list. The list can only shrink and this item closes when it is empty.
 
-`App.tsx` at 651 is the one to take next: a root component that large is usually holding state that belongs in hooks; `useKeepAwake.ts` shows the project already knows how to write them. The six test files are the cheapest of the rest, since splitting a suite by the surface it exercises carries no behavioural risk at all.
+What came out of `App.tsx`, with why each piece is one: `theme.ts` (62) because two MUI themes are configuration rather than component logic; `useThemeMode` (44), `useKeepAwakePreference` (61), `useLiveUpdates` (102) and `useBackendMeta` (52) because each owns one piece of state and the effects that maintain it; `KeepAwakeChip` (96), `AboutPanel` (105) and `LicensePanel` (32) because a status indicator and two pages of static copy are components, not root-component body.
+
+`useLiveUpdates` is the one worth reading before changing. The long-poll loop subscribes once and never again, so it reads the selected system through a ref rather than closing over a value that would go stale immediately. Its two safety nets are load-bearing: a short sleep when the backend returns `changed=false` straight away, which a misconfigured proxy or a test double will do and which would otherwise spin the CPU; and exponential backoff when the request itself fails.
+
+The six test files are the cheapest of what is left, since splitting a suite by the surface it exercises carries no behavioural risk at all. `FleetCarriersPanel.tsx` at 752 is the largest and the only remaining front-end component of real size.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 
-## 2. The US spelling of the colonisation events is documented but not implemented
+## 2. `npm run lint` cannot run: there is no ESLint configuration
+
+`frontend/package.json` defines `lint` as `eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0`. It fails immediately with "ESLint couldn't find an eslint.config.(js|mjs|cjs) file". There is no `eslint.config.*` and no `.eslintrc*` anywhere in `frontend/`. ESLint 9.39 is installed and requires flat config, so the script has not worked since that major version landed.
+
+This is why the front end appears in no lint report: not because it is clean; nothing has ever checked it. `tsc --noEmit` and the Vitest suite both pass, so the type layer is honest; the style and correctness layer is simply absent.
+
+Two steps, in order. Add a flat `eslint.config.js` with the TypeScript and React plugins the project already depends on, then read what it reports before deciding whether `--max-warnings 0` is reachable in one pass or wants an allowlist the way the module cap does. The `--ext` flag is also obsolete under flat config and wants removing from the script at the same time.
+
+## 3. The US spelling of the colonisation events is documented but not implemented
 
 `journal_parser.py` said it three times over: `RELEVANT_EVENTS` is commented "accept both US and UK spellings", the dispatch reaches for the parsers through set literals shaped to hold more than one name each; `_parse_construction_depot`'s docstring lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats it handles.
 

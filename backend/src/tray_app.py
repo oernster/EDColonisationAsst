@@ -27,7 +27,10 @@ try:
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.app_singleton import (  # type: ignore[import-error]
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
@@ -38,7 +41,10 @@ try:
     from .runtime.tray_components import (
         TrayController,  # type: ignore[import-not-found]
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.tray_components import (
         TrayController,  # type: ignore[import-error]
     )

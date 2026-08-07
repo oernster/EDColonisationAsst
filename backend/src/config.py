@@ -244,7 +244,7 @@ def get_config() -> AppConfig:
                     detected = find_journal_directory()
                     if detected is not None:
                         _config.journal.directory = str(detected)
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S110
                     # Deliberately broad. find_journal_directory probes Steam,
                     # Proton and Wine layouts across distributions, so its
                     # failure modes are open-ended and not worth enumerating.

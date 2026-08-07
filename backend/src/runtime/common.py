@@ -38,14 +38,21 @@ def _debug_log(message: str) -> None:
     try:
         try:
             exe_dir = Path(sys.argv[0]).resolve().parent
-        except Exception:
+        except (OSError, TypeError, ValueError):
+            # resolve() touching the filesystem (OSError) and an unusable
+            # sys.argv[0] (TypeError, ValueError) are the ways this fails.
+            # The current directory is a fine second choice for a log file.
             exe_dir = Path.cwd()
 
         log_path = exe_dir / "EDColonisationAsst-runtime.log"
         with log_path.open("a", encoding="utf-8") as f:
             f.write(message + "\n")
-    except Exception:
-        # Never let debug logging break the runtime.
+    except Exception:  # noqa: BLE001, S110
+        # Deliberately broad, the broadest in the file on purpose. This
+        # is the logger the frozen runtime uses to explain its own startup
+        # failures, so it runs before anything else is known to work and it
+        # must never be the thing that breaks. An unwritable install
+        # directory raises OSError; everything else is unknowable here.
         pass
 
 
@@ -54,7 +61,11 @@ try:
         from ..main import app as fastapi_app  # type: ignore[import-not-found]
         from ..utils.logger import get_logger, setup_logging
         from ..utils.runtime import RuntimeMode, get_runtime_mode
-    except Exception:
+    except ImportError:
+        # The relative form fails only when this module is executed as a
+        # top-level script, which the frozen Nuitka onefile build does. That
+        # is an ImportError; anything else raised while importing the app is
+        # a real failure and belongs to the outer handler below.
         from backend.src.main import app as fastapi_app  # type: ignore[import-error]
         from backend.src.utils.logger import (  # type: ignore[import-error]
             get_logger,
@@ -64,7 +75,7 @@ try:
             RuntimeMode,
             get_runtime_mode,
         )
-except Exception as exc:  # pragma: no cover - catastrophic import failure
+except Exception as exc:  # pragma: no cover
     _debug_log(
         f"[runtime.common] FATAL importing FastAPI app or runtime utilities: {exc!r}"
     )

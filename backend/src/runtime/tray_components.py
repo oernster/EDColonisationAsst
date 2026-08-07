@@ -35,7 +35,10 @@ try:
         add_help_menu,
         resolve_about_icon,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.help_menu import (  # type: ignore[import-error]
         add_help_menu,
         resolve_about_icon,
@@ -62,19 +65,27 @@ class ProcessGroup:
         try:
             # Prefer terminate() first.
             self._popen.terminate()
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback to kill if terminate is not supported on this platform.
             try:
                 self._popen.kill()
-            except Exception:
+            except Exception:  # noqa: BLE001
+                # Deliberately broad. Reaching here means the process could not be
+                # killed after it could not be terminated: it has already gone,
+                # cannot be reached. Either way there is nothing further to try.
                 return
 
         try:
             self._popen.wait(timeout=graceful_timeout)
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. TimeoutExpired is the expected case; a process
+            # that exits between terminate() and wait() raises OSError on some
+            # platforms. Both mean escalate to kill below.
             try:
                 self._popen.kill()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad, as above. This is the second kill attempt; failing
+                # it leaves the process to the OS, which is the only remaining option.
                 pass
 
 
@@ -110,7 +121,7 @@ class TrayController:
         self._pid_file = self._root / "tray.pid"
         try:
             self._pid_file.write_text(str(os.getpid()), encoding="utf-8")
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Never let logging/housekeeping break tray startup.
             self._pid_file = self._root / "tray.pid"
 
@@ -151,7 +162,7 @@ class TrayController:
             root_log = self._root / "run-edca.log"
             with root_log.open("a", encoding="utf-8") as f:
                 f.write(message + "\n")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             # Logging failures must never crash the tray.
             pass
 
@@ -164,7 +175,7 @@ class TrayController:
                 user_log = user_log_dir / "run-edca.log"
                 with user_log.open("a", encoding="utf-8") as f:
                     f.write(message + "\n")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             # Ignore all errors here as well.
             pass
 
@@ -255,7 +266,7 @@ class TrayController:
                 log_path = self._root / "frontend-dev.log"
                 try:
                     log_file = log_path.open("ab")
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # If we cannot open the log file, fall back to discarding output.
                     kwargs["stdout"] = subprocess.DEVNULL
                     kwargs["stderr"] = subprocess.DEVNULL
@@ -279,7 +290,7 @@ class TrayController:
 
             popen = subprocess.Popen(cmd, **kwargs)  # type: ignore[arg-type]
             return ProcessGroup(popen)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # We don't want frontend/backend startup failures to be completely
             # silent from an installed build. Log the failure and continue so
             # the tray icon can still be shown.
@@ -309,7 +320,10 @@ class TrayController:
             pid_file = getattr(self, "_pid_file", None)
             if pid_file is not None and pid_file.exists():
                 pid_file.unlink()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
+            # Deliberately broad, on the exit path. The pid file is a courtesy for the
+            # next launch, so failing to remove it must not stop the application
+            # quitting.
             pass
 
         self._app.quit()

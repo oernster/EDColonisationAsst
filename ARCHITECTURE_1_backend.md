@@ -63,6 +63,7 @@ backend/
 │   │   ├── journal_parser.py          # Parses Journal.*.log events
 │   │   ├── journal_ingestion.py       # Ingestion pipeline using JournalParser
 │   │   ├── file_watcher.py            # Watchdog integration and event pipeline
+│   │   ├── file_watcher_polling.py    # Polling fallback, mixed into FileWatcher
 │   │   ├── data_aggregator.py         # Aggregates per-system data, Inara merge
 │   │   ├── system_tracker.py          # Tracks current system/station
 │   │   └── inara_service.py           # Thin wrapper around Inara API

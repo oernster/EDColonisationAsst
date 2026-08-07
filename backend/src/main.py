@@ -221,7 +221,7 @@ async def _sync_latest_journals_best_effort(
         # Signal UI clients (AJAX long-poll) that data may have changed.
         try:
             await change_bus.bump()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             # Deliberately broad; deliberately not narrowed. change_bus is
             # a module-level singleton holding an asyncio.Condition. The
             # obvious candidate (a bump from a different event loop) does not
@@ -343,7 +343,7 @@ async def lifespan(app: FastAPI):
             # refetches once the background ingestion has made progress.
             try:
                 await change_bus.bump()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 # Deliberately broad, as above, for the same reason: no
                 # failure mode could be demonstrated, so naming a type here
                 # would be a guess. One missed refresh hint at worst.
@@ -364,7 +364,7 @@ async def lifespan(app: FastAPI):
     async def _update_callback(_system_name: str) -> None:
         try:
             await change_bus.bump()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             # Deliberately broad, as above. This one runs on work scheduled
             # from the watchdog thread, so it is the callback most exposed to
             # loop-lifetime surprises and the one least worth guessing a type

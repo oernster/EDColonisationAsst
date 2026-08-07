@@ -43,7 +43,10 @@ from PySide6.QtWidgets import (
 # package layouts (src.* and backend.src.*) work.
 try:
     from .. import __version__  # type: ignore[import-not-found]
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src import __version__  # type: ignore[import-error]
 
 
@@ -181,7 +184,7 @@ def open_releases_page() -> None:
     """Open the GitHub releases page in the default browser."""
     try:
         webbrowser.open(RELEASES_URL)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001, S110
         # A browser launch failure must never crash the tray.
         pass
 

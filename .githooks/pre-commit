@@ -79,22 +79,25 @@ fi
 # 2. Lint the surface that is already clean
 # ---------------------------------------------------------------------------
 #
-# Scoped deliberately. The setup program, its entry point and its suite pass
-# both linters today, so gating them here locks that in at no cost. backend/ and
-# frontend/ are not clean under either tool and sweeping them is its own job, so
-# widening this list means doing that sweep first rather than relaxing the step.
+# backend/src joined this list once its sweep finished; it now passes both
+# linters with zero findings; the point of gating it here is that it stays
+# that way. frontend/ has no linter wired at all and is still outside.
 #
-# --isolated because these paths sit above backend/pyproject.toml and there is
-# no configuration for them to discover; the flag makes that explicit instead of
-# depending on where ruff stops walking. flake8 needs no line-length flag now
-# that .flake8 carries it.
+# ruff runs twice because the two halves resolve different configuration:
+# backend/src is linted against backend/pyproject.toml, named explicitly so the
+# result does not depend on the working directory, while installer/,
+# installer_main.py and tests/ sit above that file with no configuration to
+# discover, which --isolated states outright rather than leaving to wherever
+# ruff stops walking. flake8 reads .flake8 at the root for all of them and
+# needs no line-length flag.
 
 LINT_PATHS=(installer installer_main.py tests)
 
-echo "[pre-commit] Linting: ${LINT_PATHS[*]}"
+echo "[pre-commit] Linting: ${LINT_PATHS[*]} backend/src"
 
 "${PY[@]}" -m ruff check --isolated "${LINT_PATHS[@]}"
-"${PY[@]}" -m flake8 "${LINT_PATHS[@]}"
+"${PY[@]}" -m ruff check --config backend/pyproject.toml backend/src
+"${PY[@]}" -m flake8 "${LINT_PATHS[@]}" backend/src
 
 echo "[pre-commit] Linters clean."
 

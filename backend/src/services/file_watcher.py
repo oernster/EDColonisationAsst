@@ -12,7 +12,7 @@ from watchdog.observers import Observer
 
 from ..repositories.colonisation_repository import IColonisationRepository
 from ..utils.logger import get_logger
-from ..utils.runtime import is_frozen
+from .file_watcher_polling import PollingFallbackMixin
 from .journal_ingestion import JournalFileHandler
 from .journal_parser import IJournalParser
 from .system_tracker import ISystemTracker
@@ -41,7 +41,7 @@ class IFileWatcher(ABC):
         raise NotImplementedError
 
 
-class FileWatcher(IFileWatcher):
+class FileWatcher(PollingFallbackMixin, IFileWatcher):
     """
     Watches the Elite: Dangerous journal directory for changes.
 
@@ -89,7 +89,7 @@ class FileWatcher(IFileWatcher):
         # watchdog Observer exposes is_alive() on its thread-like object.
         try:
             return bool(self._observer.is_alive())
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Best-effort fallback.
             return True
 
@@ -100,7 +100,11 @@ class FileWatcher(IFileWatcher):
             alive = (
                 bool(self._observer.is_alive()) if self._observer is not None else False
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. watchdog's Observer is a thread subclass whose
+            # is_alive() reaches into platform observer internals, so its failure modes
+            # are not enumerable from here. None means 'cannot tell', which the status
+            # endpoint renders as such.
             alive = None
 
         return {
@@ -127,10 +131,17 @@ class FileWatcher(IFileWatcher):
                 except asyncio.CancelledError:
                     task_exc = None
                 except Exception as e:  # noqa: BLE001
+                    # Deliberately broad. Task.exception() re-raises whatever the task
+                    # failed with; that task runs the polling loop, so this is the
+                    # failure being reported rather than a new one. Capturing it is the
+                    # point.
                     task_exc = e
                 if task_exc is not None:
                     exc = f"{type(task_exc).__name__}: {task_exc}"
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. Reading a task's completion state can race with the
+            # loop shutting down. None means 'cannot tell', which is what the diagnostic
+            # reports.
             done = None
 
         return {
@@ -180,7 +191,12 @@ class FileWatcher(IFileWatcher):
             # If the previous observer thread died, treat this as a restart.
             try:
                 alive = bool(self._observer.is_alive())
-            except Exception:
+            except Exception:  # noqa: BLE001
+                # Deliberately broad. watchdog's Observer is a thread subclass whose
+                # is_alive() reaches into platform observer internals, so its failure
+                # modes are not enumerable from here. Assuming alive is the conservative
+                # answer: it keeps the existing observer rather than starting a second
+                # one.
                 alive = True
 
             if alive:
@@ -214,7 +230,10 @@ class FileWatcher(IFileWatcher):
             from datetime import datetime
 
             self._watchdog_started_at = datetime.now(UTC).isoformat()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. This only stamps a start time for diagnostics. A
+            # missing stamp is invisible; failing here would abandon a watcher that
+            # started successfully.
             self._watchdog_started_at = None
 
         try:
@@ -224,7 +243,11 @@ class FileWatcher(IFileWatcher):
 
             try:
                 alive = bool(self._observer.is_alive())
-            except Exception:
+            except Exception:  # noqa: BLE001
+                # Deliberately broad. watchdog's Observer is a thread subclass whose
+                # is_alive() reaches into platform observer internals, so its failure
+                # modes are not enumerable from here. Assuming alive keeps the watcher
+                # that has just been started.
                 alive = True
 
             if alive:
@@ -236,6 +259,10 @@ class FileWatcher(IFileWatcher):
                 )
                 logger.error(self._watchdog_last_error)
         except Exception as exc:
+            # Deliberately broad, the reason the polling fallback exists. watchdog
+            # sits on OS notification APIs whose failures are platform-specific and
+            # open-ended. Recording the error and falling through to polling is what
+            # keeps live updates working.
             self._watchdog_last_error = f"{type(exc).__name__}: {exc}"
             logger.exception(
                 "Failed to start watchdog observer: %s", self._watchdog_last_error
@@ -250,6 +277,9 @@ class FileWatcher(IFileWatcher):
             if process_existing:
                 await self._process_existing_files(directory)
         except Exception:
+            # Deliberately broad. This scans journal files the game owns, so one
+            # unreadable file must not stop the watcher from starting. Logged with a
+            # traceback and then dropped.
             logger.exception("Error while processing existing journals")
         finally:
             # In the packaged runtime, watchdog can fail to deliver events on some
@@ -267,6 +297,9 @@ class FileWatcher(IFileWatcher):
             except asyncio.CancelledError:
                 pass
             except Exception:
+                # Deliberately broad, on the shutdown path. Awaiting a cancelled task
+                # surfaces whatever it died of; none of it should stop the rest of the
+                # shutdown.
                 logger.exception("Error while stopping poller task")
             finally:
                 self._poll_task = None
@@ -285,72 +318,6 @@ class FileWatcher(IFileWatcher):
         self._watchdog_last_error = None
 
         logger.info("Stopped watching journal directory")
-
-    # --------------------------------------------------------- polling fallback
-
-    def _start_polling_if_enabled(self, directory: Path) -> None:
-        """Start the polling fallback task (packaged runtime only)."""
-        # Only enable in frozen runtime to avoid duplicate work during dev.
-        if not is_frozen():
-            return
-        if self._poll_task is not None and not self._poll_task.done():
-            return
-
-        try:
-            self._poll_task = asyncio.create_task(
-                self._poll_for_latest_changes(directory),
-                name="edca-journal-poller",
-            )
-            logger.info(
-                "Started journal polling fallback (interval=%ss) for %s",
-                self._poll_interval_s,
-                directory,
-            )
-        except Exception:
-            # Polling is best-effort; watchdog remains the primary mechanism.
-            logger.exception("Failed to start polling fallback")
-
-    async def _poll_for_latest_changes(self, directory: Path) -> None:
-        """Periodically process the newest Journal.*.log when it changes."""
-        # Small epsilon to avoid float edge cases.
-        epsilon = 1e-6
-        while True:
-            try:
-                # Diagnostics: remember we are alive.
-                try:
-                    from datetime import datetime
-
-                    self._poll_last_checked_at = datetime.now(UTC).isoformat()
-                except Exception:
-                    pass
-
-                journal_files = list(directory.glob("Journal.*.log"))
-                if journal_files:
-                    # Newest file by modified time.
-                    latest = max(journal_files, key=lambda p: p.stat().st_mtime)
-                    latest_mtime = latest.stat().st_mtime
-
-                    prev, prev_t = self._poll_last_path, self._poll_last_mtime
-                    stale = prev_t is not None and latest_mtime > prev_t + epsilon
-                    changed = prev is None or prev_t is None or latest != prev or stale
-
-                    if changed and self._handler is not None:
-                        self._poll_last_path = latest
-                        self._poll_last_mtime = latest_mtime
-                        self._poll_last_error = None
-                        await self._handler._process_file(latest)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("Polling fallback encountered an error")
-                try:
-                    self._poll_last_error = (
-                        "Polling fallback encountered an error; see logs"
-                    )
-                except Exception:
-                    pass
-
-            await asyncio.sleep(self._poll_interval_s)
 
     async def _process_existing_files(self, directory: Path) -> None:
         """

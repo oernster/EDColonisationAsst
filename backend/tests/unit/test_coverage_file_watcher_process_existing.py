@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 import src.services.file_watcher as fw_module
+import src.services.file_watcher_polling as polling_module
 from src.services.file_watcher import FileWatcher
 
 
@@ -67,7 +68,7 @@ async def test_start_watching_skips_existing_scan_when_disabled(
     """process_existing=False must not run the full existing-file scan."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
     # Polling only starts in the frozen runtime; keep it off so no task leaks.
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
 
@@ -89,7 +90,7 @@ async def test_start_watching_runs_existing_scan_by_default(
 ) -> None:
     """The default (process_existing=True) still performs the scan."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
 

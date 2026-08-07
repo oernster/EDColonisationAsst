@@ -57,7 +57,10 @@ class RuntimeEnvironment:
         try:
             exe_dir = Path(sys.argv[0]).resolve().parent
             candidates.append(exe_dir / "EDColonisationAsst.ico")
-        except Exception:
+        except (OSError, TypeError, ValueError):
+            # resolve() touching the filesystem (OSError) and an unusable
+            # sys.argv[0] (TypeError, ValueError). Skipping this candidate
+            # leaves the project-root one below, which is the dev path.
             pass
 
         # 2) Project root as detected by RuntimeEnvironment.detect().
@@ -71,7 +74,9 @@ class RuntimeEnvironment:
         # extract an icon resource from the EXE if available.
         try:
             return Path(sys.argv[0]).resolve()
-        except Exception:
+        except (OSError, TypeError, ValueError):
+            # resolve() touching the filesystem (OSError) and an unusable
+            # sys.argv[0] (TypeError, ValueError) are the demonstrated failures.
             return self.project_root
 
     @classmethod
@@ -90,7 +95,9 @@ class RuntimeEnvironment:
         if mode is RuntimeMode.FROZEN:
             try:
                 project_root = Path(sys.argv[0]).resolve().parent
-            except Exception:
+            except (OSError, TypeError, ValueError):
+                # As above. The source layout is the right fallback: it is
+                # what the non-frozen branch below uses unconditionally.
                 project_root = Path(__file__).resolve().parents[2]
         else:
             project_root = Path(__file__).resolve().parents[2]

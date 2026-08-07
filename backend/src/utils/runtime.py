@@ -48,8 +48,11 @@ def is_frozen() -> bool:
             "python"
         ):
             return True
-    except Exception:
-        # If anything goes wrong here, fall back to non-frozen.
+    except (TypeError, ValueError):
+        # sys.argv[0] is not guaranteed to be a usable path string: an
+        # embedded host can leave it non-string (TypeError) and a null byte
+        # in it raises ValueError. Falling back to non-frozen is the safe
+        # answer because it keeps the source layout.
         return False
 
     return False

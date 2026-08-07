@@ -80,7 +80,11 @@ class JournalParser(IJournalParser):
                         event = self.parse_line(line)
                         if event:
                             events.append(event)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
+                        # Deliberately broad, per line. These are lines the
+                        # game wrote across years of format changes, so one
+                        # this parser cannot read must not abandon the rest
+                        # of the file. The loop continues below.
                         logger.warning(
                             f"Failed to parse line {line_num} in {file_path.name}: {e}"
                         )
@@ -89,7 +93,11 @@ class JournalParser(IJournalParser):
             logger.info(f"Parsed {len(events)} relevant events from {file_path.name}")
             return events
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Deliberately broad, per file. A journal being written by the
+            # game while it is read, a permissions problem or an encoding
+            # surprise all end here. An empty event list means this file
+            # contributed nothing, which the caller already handles.
             logger.error(f"Failed to parse file {file_path}: {e}")
             return []
 
@@ -141,7 +149,11 @@ class JournalParser(IJournalParser):
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid JSON: {e}")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Deliberately broad. json.JSONDecodeError is the expected case,
+            # but the per-event parsers below build pydantic models from
+            # whatever the game wrote, so a validation error is just as
+            # likely and neither should drop the rest of the file.
             logger.warning(f"Error parsing line: {e}")
             return None
 

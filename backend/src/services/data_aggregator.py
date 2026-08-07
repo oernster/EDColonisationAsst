@@ -68,9 +68,12 @@ class DataAggregator(IDataAggregator):
             self._prefer_local_for_commander_systems: bool = (
                 config.inara.prefer_local_for_commander_systems
             )
-        except Exception:
-            # On any config load failure, fall back to the safest behaviour:
-            # rely on local journal data as the primary source.
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. get_config reads two hand-editable YAML
+            # files and builds pydantic models from them, so a bad value
+            # arrives as a validation error rather than one predictable
+            # type. On any config load failure, fall back to the safest
+            # behaviour: rely on local journal data as the primary source.
             self._prefer_local_for_commander_systems = True
 
     async def aggregate_by_system(self, system_name: str) -> SystemColonisationData:
@@ -122,7 +125,12 @@ class DataAggregator(IDataAggregator):
             inara_sites = [
                 self._transform_inara_data(site_data) for site_data in inara_sites_data
             ]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Deliberately broad. This spans an HTTP call to a third-party
+            # API and the transform of whatever it returns, so the failure
+            # set covers httpx transport errors, non-JSON bodies and shape
+            # changes at the far end. Inara is an enrichment source: without
+            # it the local journal data is still complete and correct.
             logger.error(f"Error fetching or transforming Inara data: {e}")
             inara_sites = []
 

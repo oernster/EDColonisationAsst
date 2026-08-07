@@ -75,7 +75,11 @@ async def get_watcher_status() -> dict:
         from ..main import app as fastapi_app
 
         watcher = getattr(fastapi_app.state, "file_watcher", None)
-    except Exception:
+    except ImportError:
+        # The local import exists to avoid a cycle during test imports;
+        # a cycle surfaces as ImportError. getattr with a default cannot
+        # raise, so the import is the only failure here. No app means no
+        # watcher, which the diagnostics below report as such.
         watcher = None
 
     running = (
@@ -339,7 +343,12 @@ async def reload_journals() -> dict:
     # Notify UI clients (AJAX long-poll) that data changed.
     try:
         await change_bus.bump()
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
+        # Deliberately broad; deliberately not narrowed. No failure mode
+        # for a bump could be demonstrated (a cross-loop asyncio.Condition,
+        # the obvious candidate, completes silently on CPython 3.13). The
+        # guard stays because losing one refresh hint is cheaper than
+        # failing the reload the caller asked for.
         pass
 
     return {

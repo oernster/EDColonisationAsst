@@ -30,7 +30,10 @@ from .environment import RuntimeEnvironment
 # Canonical application version, resolved from the top-level VERSION file.
 try:
     from .. import __version__  # type: ignore[import-not-found]
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src import __version__  # type: ignore[import-error]
 
 # Shared Help menu (About + Check for Updates) used by the tray UI.
@@ -39,7 +42,10 @@ try:
         add_help_menu,
         resolve_about_icon,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.help_menu import (  # type: ignore[import-error]
         add_help_menu,
         resolve_about_icon,
@@ -53,7 +59,10 @@ try:
         StartupMonitor,
         StartupSplashWindow,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.splash import (  # type: ignore[import-error]
         SPLASH_FAILURE_CLOSE_DELAY_MS,
         STATUS_TIMED_OUT,
@@ -216,6 +225,10 @@ class BackendServerController:
                 or "127.0.0.1"
             )
         except Exception as exc:  # noqa: BLE001
+            # Deliberately broad. This reads host and port out of the parsed
+            # configuration, which is built from hand-editable YAML, so a bad value
+            # arrives as a validation error rather than one predictable type. The
+            # loopback defaults below are what the installer configures anyway.
             host = "127.0.0.1"
             _debug_log(
                 "[BackendServerController] Failed to read config for host; "
@@ -253,6 +266,9 @@ class BackendServerController:
                     "[BackendServerController] uvicorn.Server.run() returned normally",
                 )
             except Exception as exc:  # noqa: BLE001
+                # Deliberately broad, around the uvicorn server's whole run. Anything
+                # escaping here would kill the thread silently and leave the tray icon
+                # sitting over a dead backend; logging it is what makes that visible.
                 logger.exception("In-process uvicorn server crashed.")
                 _debug_log(
                     "[BackendServerController] In-process uvicorn server crashed: "

@@ -45,12 +45,15 @@ def _bootstrap_debug_log(message: str) -> None:
     try:
         try:
             exe_dir = Path(sys.argv[0]).resolve().parent
-        except Exception:
+        except (OSError, TypeError, ValueError):
+            # resolve() touching the filesystem (OSError) and an unusable sys.argv[0]
+            # (TypeError, ValueError) are the demonstrated failures. The current
+            # directory is a fine second choice for a log file.
             exe_dir = Path.cwd()
         log_path = exe_dir / "EDColonisationAsst-runtime.log"
         with log_path.open("a", encoding="utf-8") as f:
             f.write(message + "\n")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         # Never let debug logging break the runtime.
         pass
 
@@ -61,7 +64,10 @@ def _bootstrap_debug_log(message: str) -> None:
 try:
     # When imported as src.runtime_entry or backend.src.runtime_entry
     from .runtime.common import _debug_log  # type: ignore[import-not-found]
-except Exception as exc1:  # noqa: BLE001
+except ImportError as exc1:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     try:
         # Fallback for environments where Nuitka packages modules differently.
         from backend.src.runtime.common import _debug_log  # type: ignore[import-error]
@@ -86,7 +92,10 @@ try:
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.app_singleton import (  # type: ignore[import-error]
         ApplicationInstanceLock,
         ApplicationInstanceLockError,
@@ -99,7 +108,10 @@ try:
     from .runtime.app_runtime import (
         RuntimeApplication,  # type: ignore[import-not-found]
     )
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.app_runtime import (
         RuntimeApplication,  # type: ignore[import-error]
     )
@@ -141,7 +153,7 @@ def main() -> int:
                 if not no_browser:
                     try:
                         webbrowser.open("http://127.0.0.1:8000/app/")
-                    except Exception:  # noqa: BLE001
+                    except Exception:  # noqa: BLE001, S110
                         # Browser launch failures must not crash the runtime.
                         pass
                 return 0
@@ -163,6 +175,9 @@ def main() -> int:
             mode = getattr(runtime_app, "_env", None)
             mode_repr = getattr(mode, "mode", mode)
         except Exception:  # noqa: BLE001
+            # Deliberately broad. This reaches a private attribute purely to label a log
+            # line, so any shape change there is expected to be survivable. An unknown
+            # mode still logs; it must not stop shutdown.
             mode_repr = "<unknown>"
         _debug_log(
             f"[runtime_entry] RuntimeApplication created; mode={mode_repr}",
@@ -177,7 +192,10 @@ def main() -> int:
 
         try:
             exe_dir = Path(sys.argv[0]).resolve().parent
-        except Exception:
+        except (OSError, TypeError, ValueError):
+            # resolve() touching the filesystem (OSError) and an unusable sys.argv[0]
+            # (TypeError, ValueError) are the demonstrated failures. The current
+            # directory is a fine second choice for a log file.
             exe_dir = Path.cwd()
 
         log_path = exe_dir / "EDColonisationAsst-runtime-error.log"
@@ -188,7 +206,7 @@ def main() -> int:
                 f.write("Traceback:\n")
                 f.write(traceback.format_exc())
                 f.write("\n\n")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             # Never let logging failures crash the process again.
             pass
 
@@ -196,7 +214,10 @@ def main() -> int:
         # console in development.
         try:
             print(f"[runtime_entry] FATAL: {exc!r}", file=sys.stderr)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
+            # Deliberately broad. This is the last-resort console report in a windowed
+            # build, where sys.stderr may be absent or closed. There is nowhere left to
+            # report a failure to report.
             pass
 
         _debug_log(f"[runtime_entry] FATAL exception: {exc!r}")

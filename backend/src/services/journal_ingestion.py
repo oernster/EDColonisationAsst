@@ -130,7 +130,10 @@ class JournalFileHandler(FileSystemEventHandler):
             self.last_watchdog_event_at = datetime.now(UTC).isoformat()
             self.last_watchdog_event_type = "modified"
             self.last_watchdog_event_path = str(file_path)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
+            # Deliberately broad. This is diagnostic bookkeeping for the status
+            # endpoint, not ingestion. Losing a field there is invisible to the user;
+            # raising here would abandon journal processing that had already succeeded.
             pass
 
         # Schedule processing on the main event loop from the watchdog thread
@@ -159,7 +162,10 @@ class JournalFileHandler(FileSystemEventHandler):
             self.last_watchdog_event_at = datetime.now(UTC).isoformat()
             self.last_watchdog_event_type = "created"
             self.last_watchdog_event_path = str(file_path)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
+            # Deliberately broad. This is diagnostic bookkeeping for the status
+            # endpoint, not ingestion. Losing a field there is invisible to the user;
+            # raising here would abandon journal processing that had already succeeded.
             pass
 
         # Schedule processing on the main event loop from the watchdog thread
@@ -182,7 +188,11 @@ class JournalFileHandler(FileSystemEventHandler):
                 self.last_processed_file = str(file_path)
                 self.last_processed_at = datetime.now(UTC).isoformat()
                 self.last_error = None
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad. This is diagnostic bookkeeping for the status
+                # endpoint, not ingestion. Losing a field there is invisible to the
+                # user; raising here would abandon journal processing that had already
+                # succeeded.
                 pass
 
             # Parse the file incrementally (append-only journal semantics).
@@ -279,7 +289,11 @@ class JournalFileHandler(FileSystemEventHandler):
             # Diagnostics
             try:
                 self.last_events_parsed = len(events)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad. This is diagnostic bookkeeping for the status
+                # endpoint, not ingestion. Losing a field there is invisible to the
+                # user; raising here would abandon journal processing that had already
+                # succeeded.
                 pass
 
             if not events:
@@ -328,14 +342,26 @@ class JournalFileHandler(FileSystemEventHandler):
             try:
                 self.last_updated_systems = sorted(updated_systems)
                 self.last_depot_market_ids = sorted(depot_market_ids)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad. This is diagnostic bookkeeping for the status
+                # endpoint, not ingestion. Losing a field there is invisible to the
+                # user; raising here would abandon journal processing that had already
+                # succeeded.
                 pass
 
         except Exception as exc:  # noqa: BLE001
+            # Deliberately broad, per file. This is the whole ingestion of one journal
+            # file: reading it while the game writes it, parsing lines across years of
+            # format changes and persisting the results. One bad file must not stop the
+            # watcher.
             logger.error("Error processing file %s: %s", file_path, exc)
             try:
                 self.last_error = f"{type(exc).__name__}: {exc}"
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad. This is diagnostic bookkeeping for the status
+                # endpoint, not ingestion. Losing a field there is invisible to the
+                # user; raising here would abandon journal processing that had already
+                # succeeded.
                 pass
 
     async def _process_construction_depot(
@@ -382,13 +408,17 @@ class JournalFileHandler(FileSystemEventHandler):
         # fields are missing.
         try:
             current_system = self.system_tracker.get_current_system()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. The tracker is an injected collaborator, so its
+            # failure modes belong to the implementation behind the interface. None
+            # means 'unknown system', which the callers below already handle.
             current_system = None
 
         try:
             # get_current_station only returns a value when docked
             current_station = self.system_tracker.get_current_station()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad, as above, for the station.
             current_station = None
 
         # For depot snapshots, prefer any existing site metadata where present.

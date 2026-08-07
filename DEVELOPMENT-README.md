@@ -248,11 +248,18 @@ flake8 installer installer_main.py tests
 ```
 
 flake8 needs no line-length flag: `.flake8` at the repository root sets 88 to
-match black. These three are the same commands the pre-commit hook runs, so
-a clean run here means a clean hook.
+match black.
 
-`backend/` is not yet clean under either linter and is deliberately outside
-that list; see [TECH_DEBT.md](TECH_DEBT.md).
+`backend/src` is clean under both too and is linted against its own
+configuration:
+
+```bash
+ruff check --config backend/pyproject.toml backend/src
+flake8 backend/src
+```
+
+The pre-commit hook runs all of these, so a clean run here means a clean hook.
+`frontend/` has no linter wired and is still outside.
 
 ### Git hooks
 

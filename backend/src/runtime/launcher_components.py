@@ -210,6 +210,10 @@ class Launcher:
             self._view.set_status(f"Ready. Open {frontend_url}", PROGRESS_MAX)
             self._view.allow_open_frontend(frontend_url)
         except Exception as exc:  # noqa: BLE001
+            # Deliberately broad. The steps this runs span venv creation, pip, npm and
+            # process spawning, so the failure set is the union of everything those can
+            # do. The launcher's job here is to show the user what went wrong rather
+            # than to disappear.
             self._view.show_error(str(exc))
 
     # Step construction ------------------------------------------------

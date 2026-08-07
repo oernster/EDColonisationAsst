@@ -139,7 +139,7 @@ class ColonisationRepository(IColonisationRepository):
         db_dir = DB_FILE.parent
         try:
             db_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:
+        except OSError as exc:
             logger.error("Failed to create DB directory %s: %s", db_dir, exc)
             # Let sqlite3.connect raise a clearer error below.
         return sqlite3.connect(DB_FILE)
@@ -191,7 +191,10 @@ class ColonisationRepository(IColonisationRepository):
                 if not row:
                     return None
                 return int(row[0])
-        except Exception as exc:  # noqa: BLE001
+        except sqlite3.Error as exc:
+            # Reading a metadata row can only fail as a sqlite3.Error here: a missing
+            # table on a pre-migration database, a locked file. Treating the version
+            # as unknown triggers the migration path.
             logger.warning(
                 "Failed to read db_schema_version from metadata; "
                 "treating as unknown: %s",
@@ -251,7 +254,10 @@ class ColonisationRepository(IColonisationRepository):
         except FileNotFoundError:
             # Someone else may have removed it; that's fine.
             pass
-        except Exception as exc:  # noqa: BLE001
+        except OSError as exc:
+            # unlink() fails as OSError: the file being held open by another process,
+            # a permissions problem. Both are worth reporting to the user rather than
+            # crashing the reset.
             logger.error("Failed to delete colonisation DB %s: %s", DB_FILE, exc)
 
         self._create_tables()

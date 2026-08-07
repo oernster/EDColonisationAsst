@@ -731,7 +731,12 @@ def build_current_carrier_state_response(
                 resolved = journal_dir
 
             snap = load_market_export(resolved)
-        except Exception:
+        except Exception:  # noqa: BLE001
+            # Deliberately broad. Resolving the journal directory reads
+            # user configuration and the export read parses a file the game
+            # owns. The Market.json merge below is an enrichment: without a
+            # snapshot the response falls back to the journal trade orders,
+            # which is the documented behaviour rather than a degraded one.
             snap = None
 
         if (
@@ -871,6 +876,11 @@ def build_current_carrier_state_response(
                 free_space=_as_int(free_space),
             )
         except Exception:
+            # Deliberately broad. raw_data is the untouched CarrierStats
+            # payload, so this arithmetic walks keys the game may rename or
+            # omit between updates. Leaving the metrics unset renders as
+            # 'unknown' in the UI, which is honest; a raised exception here
+            # would lose the carrier identity as well.
             logger.warning(
                 "Failed to derive cargo/capacity metrics from CarrierStats",
                 exc_info=True,

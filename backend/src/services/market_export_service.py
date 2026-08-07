@@ -26,7 +26,10 @@ def _parse_ts(ts: str) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(ts)
-    except Exception:
+    except (TypeError, ValueError):
+        # fromisoformat raises ValueError on a malformed stamp and TypeError
+        # on a non-string. Market.json is written by the game, so both are
+        # data problems rather than defects here; None means 'no timestamp'.
         return None
 
 
@@ -99,7 +102,11 @@ def load_market_export(journal_dir: Path) -> MarketExportSnapshot | None:
     try:
         raw = path.read_text(encoding="utf-8", errors="replace")
         data = json.loads(raw)
-    except Exception:
+    except (OSError, ValueError):
+        # errors="replace" absorbs any decoding problem, so the read can only
+        # fail as OSError (the file vanishing after the existence check,
+        # permissions problem) and json.loads only as JSONDecodeError, which
+        # is a ValueError. Both mean there is no export to merge.
         return None
 
     if not isinstance(data, dict):

@@ -52,15 +52,24 @@ def get_saved_games_path() -> Path | None:
             path = ptr.value
             if path:
                 return Path(path)
-        except Exception:
-            # Any WinAPI failures fall through to USERPROFILE below.
+        except Exception:  # noqa: BLE001, S110
+            # Deliberately broad. This is a raw ctypes call into shell32:
+            # a missing symbol raises AttributeError, a bad call raises
+            # OSError; a wrong argument type raises ctypes.ArgumentError,
+            # which does not share a useful base with the others. Any WinAPI
+            # failure falls through to USERPROFILE below, which is the whole
+            # point of the fallback.
             pass
         finally:
             # Free pointer if possible; failures are non-fatal.
             try:
                 if ptr is not None:
                     windll.ole32.CoTaskMemFree(ptr)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
+                # Deliberately broad, in a finally block. Failing to free the
+                # pointer leaks a few bytes once per call; raising here would
+                # replace the caller's result (or its exception) with this
+                # one, which is strictly worse than the leak.
                 pass
 
     # Fallback to user profile

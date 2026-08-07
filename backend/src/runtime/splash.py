@@ -33,7 +33,10 @@ from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
 # modules so both package layouts (src.* and backend.src.*) work.
 try:
     from .help_menu import APP_AUTHOR, APP_NAME  # type: ignore[import-not-found]
-except Exception:  # noqa: BLE001
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
     from backend.src.runtime.help_menu import (  # type: ignore[import-error]
         APP_AUTHOR,
         APP_NAME,
@@ -176,6 +179,10 @@ class StartupMonitor:
         try:
             self._latest = self._probe()
         except Exception:  # noqa: BLE001
+            # Deliberately broad. The probe makes HTTP requests to a backend that is by
+            # definition still starting, so refused connections, timeouts and half-open
+            # sockets are all normal here. Not-ready is the honest answer and the next
+            # tick tries again.
             self._latest = (False, False)
 
     def poll_once(self) -> None:

@@ -23,31 +23,7 @@ These nineteen files (seven backend source, eight backend test, four front end) 
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 
-## 2. `backend/` is outside the lint step and a long way from passing
-
-The configuration gap is closed. `.flake8` sets 88 at the repository root so flake8 and black no longer disagree, the stale top-level `[tool.ruff]` keys have moved under `[tool.ruff.lint]`; the pre-commit hook now runs `ruff check --isolated` and `flake8` over `installer`, `installer_main.py` and `tests` before the suite. That surface passes both linters and the hook fails on a planted violation, so it will stay passing.
-
-The sweep is most of the way there. `backend/src` was at 558 findings; it is now at 80, all of one kind. Re-measured 2026-08-07 with ruff 0.16.1:
-
-| Rule | Was | Now | What happened |
-|---|---|---|---|
-| UP045, UP006, UP035, UP037, UP017 | 229 | 0 | `--fix` |
-| E402 | 56 | 0 | Ten files had `from __future__` above the docstring, so the docstring was a no-op statement and every import counted as "after code". Moving it below the docstring cleared all 56 and restored ten `__doc__` values that were `None`. |
-| I001, F401, E501 and the long tail | 193 | 0 | `--fix` for the import order, hand rewrapping for the 27 long lines, `__all__` for the re-export surfaces |
-| BLE001 | 55 | 53 | Still open |
-| S110, S112 | 29 | 27 | Still open |
-
-What is left is 80 exception handlers wanting the treatment the startup path already had: a written reason or a narrowed type where one can be demonstrated. They sit mostly in `journal_ingestion.py` (18), `tray_components.py` (14), `file_watcher.py` (10) and `runtime_entry.py` (9). `--fix` cannot touch them and a blanket `# noqa` would defeat the point, so this is the one part of the sweep that is judgement per site rather than a flag.
-
-`flake8` at 88 over the same tree reports 0. The lint step widens to `backend/src` when the 80 are done, not before.
-
-**Do not run `ruff check --fix` unattended over this tree.** It deleted the re-export block in `runtime/common.py` and broke the runtime with `cannot import name RuntimeMode`. `common.py` and `launcher.py` now carry `__all__` to say the names are intentional, which is the durable fix; `--fix` still needs its diff read.
-
-`frontend/` has no linter wired at all and is not counted above.
-
-`file_watcher.py` sits at 377 lines, four below the danger band. The next edit that adds five lines takes it in; the rule then asks for 350 rather than 380.
-
-## 3. The US spelling of the colonisation events is documented but not implemented
+## 2. The US spelling of the colonisation events is documented but not implemented
 
 `journal_parser.py` said it three times over: `RELEVANT_EVENTS` is commented "accept both US and UK spellings", the dispatch reaches for the parsers through set literals shaped to hold more than one name each; `_parse_construction_depot`'s docstring lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats it handles.
 

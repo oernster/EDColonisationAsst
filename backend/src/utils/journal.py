@@ -25,7 +25,12 @@ def _get_home_dir() -> Path:
     """
     try:
         home_env = os.environ.get("HOME") or os.environ.get("USERPROFILE")
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # Deliberately broad. On the real stdlib os this cannot fail; the
+        # the docstring above explains that the tests substitute a fake os
+        # module to keep this deterministic; a substitute is free to
+        # raise anything from .environ. Treating that as 'no home set'
+        # keeps the fallback below in charge.
         home_env = None
     if home_env:
         return Path(home_env)

@@ -21,7 +21,7 @@ from .journal_events import (
     LocationEvent,
 )
 
-__all__ = [  # noqa: RUF022 - grouped by model family, not alphabetically
+__all__ = [  # noqa: RUF022
     # Colonisation models
     "Commodity",
     "CommodityStatus",

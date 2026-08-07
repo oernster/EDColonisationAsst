@@ -193,9 +193,16 @@ flake8 needs no line-length flag any more. `.flake8` at the repository root
 sets 88 to match black in `backend/pyproject.toml`, so the two tools no longer
 disagree about the lines black itself produced.
 
-The last two of those run inside the pre-commit hook over exactly these paths.
-`backend/` is not yet clean under either linter and is deliberately outside the
-step; see [TECH_DEBT.md](TECH_DEBT.md).
+`backend/src` is clean under both as well and is linted against its own
+configuration:
+
+```bash
+ruff check --config backend/pyproject.toml backend/src
+flake8 backend/src
+```
+
+The pre-commit hook runs every one of these before the suite, so a clean run
+here means a clean hook. `frontend/` has no linter wired and is still outside.
 
 ## Pre-commit hook
 

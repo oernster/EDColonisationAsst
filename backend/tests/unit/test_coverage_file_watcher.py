@@ -20,6 +20,7 @@ from typing import Any, Callable, Optional
 import pytest
 
 import src.services.file_watcher as fw_module
+import src.services.file_watcher_polling as polling_module
 from src.services.file_watcher import FileWatcher, IFileWatcher
 
 # Fixed epoch base and step used only to give journal files deterministic,
@@ -360,7 +361,7 @@ async def test_start_watching_restarts_dead_observer(
 ) -> None:
     """A dead observer triggers stop_watching then a fresh start."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
     dead = _NotAliveObserver()
@@ -382,7 +383,7 @@ async def test_start_watching_survives_clock_failure(
     """A failing datetime.now leaves started_at as None without raising."""
     with monkeypatch.context() as mp:
         mp.setattr(fw_module, "Observer", _HealthyObserver)
-        mp.setattr(fw_module, "is_frozen", lambda: False)
+        mp.setattr(polling_module, "is_frozen", lambda: False)
         mp.setitem(sys.modules, "datetime", _broken_datetime_module())
 
         watcher = _make_watcher()
@@ -397,7 +398,7 @@ async def test_start_watching_records_error_when_observer_not_alive(
 ) -> None:
     """An observer that never comes alive is recorded as a watchdog error."""
     monkeypatch.setattr(fw_module, "Observer", _NotAliveObserver)
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
     await watcher.start_watching(tmp_path)
@@ -411,7 +412,7 @@ async def test_start_watching_records_error_when_observer_start_fails(
 ) -> None:
     """An exception from Observer.start is captured and the observer cleared."""
     monkeypatch.setattr(fw_module, "Observer", _FailingStartObserver)
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
     await watcher.start_watching(tmp_path)
@@ -426,7 +427,7 @@ async def test_start_watching_logs_existing_file_processing_errors(
 ) -> None:
     """Failures while processing existing journals must not abort startup."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
 
     watcher = _make_watcher()
 
@@ -487,7 +488,7 @@ def test_start_polling_disabled_outside_frozen_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Polling is a packaged-runtime feature only."""
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
     watcher = _make_watcher()
 
     watcher._start_polling_if_enabled(tmp_path)
@@ -499,7 +500,7 @@ def test_start_polling_skips_when_task_already_active(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A live poller task is never replaced."""
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: True)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
     watcher = _make_watcher()
     pending = _PendingTask()
     watcher._poll_task = pending  # type: ignore[assignment]
@@ -513,7 +514,7 @@ async def test_start_polling_creates_task_when_frozen(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """In frozen mode a real poller task is created."""
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: True)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
     watcher = _make_watcher()
 
     watcher._start_polling_if_enabled(tmp_path)
@@ -530,7 +531,7 @@ async def test_start_polling_handles_create_task_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A create_task failure is logged and leaves no poller task behind."""
-    monkeypatch.setattr(fw_module, "is_frozen", lambda: True)
+    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
     watcher = _make_watcher()
 
     def not_a_coroutine(directory: Path) -> object:

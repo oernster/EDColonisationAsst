@@ -126,8 +126,12 @@ async def update_app_settings(
 
         # Prompt connected clients (AJAX long-poll) to refetch their data.
         await change_bus.bump()
-    except Exception:
-        # Never fail settings save due to watcher restart issues.
+    except Exception:  # noqa: BLE001, S110
+        # Deliberately broad. The settings are already written to disk by
+        # this point; everything in this block is the live watcher catching
+        # up with them. Restarting a watchdog observer can fail in
+        # platform-specific ways; the next restart picks the new
+        # directory up regardless, so never fail the save over it.
         pass
 
     return settings

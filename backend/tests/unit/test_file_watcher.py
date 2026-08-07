@@ -374,7 +374,7 @@ async def test_file_watcher_start_raises_for_missing_directory(
 async def test_journal_file_handler_process_file_updates_tracker_and_repository(
     repository: ColonisationRepository,
 ):
-    """_process_file should drive tracker updates, site creation, and callbacks for legacy schema."""
+    """_process_file should drive tracker updates, site creation and callbacks for legacy schema."""
     from src.models.journal_events import (
         LocationEvent,
         FSDJumpEvent,
@@ -597,7 +597,7 @@ async def test_journal_file_handler_process_file_handles_colonisation_contributi
         raw_data={},
     )
 
-    # ColonisationContribution in the new schema (we still use the model, but simulate the payload)
+    # ColonisationContribution in the new schema (we still use the model but simulate the payload)
     contribution = ColonisationContributionEvent(
         timestamp=ts,
         event="ColonisationContribution",
@@ -683,13 +683,9 @@ async def test_journal_file_handler_process_file_handles_colonisation_contributi
     site = await repository.get_site_by_market_id(3960951554)
     assert site is not None
     assert site.system_name == "Lupus Dark Region BQ-Y d66"
-    assert (
-        site.station_name == "Orbital Construction Site: Blast Furnace Vista"
-    )
+    assert site.station_name == "Orbital Construction Site: Blast Furnace Vista"
 
-    titanium = next(
-        c for c in site.commodities if c.name_localised == "Titanium"
-    )
+    titanium = next(c for c in site.commodities if c.name_localised == "Titanium")
     # Provided amount should reflect at least the 23 units delivered
     assert titanium.provided_amount >= 23
     assert titanium.required_amount == 1594

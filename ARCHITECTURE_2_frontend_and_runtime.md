@@ -1,4 +1,4 @@
-# Elite: Dangerous Colonisation Assistant – Frontend & Runtime Architecture
+# Elite: Dangerous Colonisation Assistant, Frontend & Runtime Architecture
 
 This document complements [`ARCHITECTURE_1_backend.md`](ARCHITECTURE_1_backend.md:1) by focusing on:
 
@@ -66,12 +66,12 @@ frontend/
 The frontend talks to the backend over HTTP (REST + AJAX long-polling), using helpers in [`api.ts`](frontend/src/services/api.ts:1).
 
 - **Initial data via REST**:
-  - `/api/systems` – for the system selector.
-  - `/api/system` – `SystemColonisationData` for the selected system.
-  - `/api/system/commodities` – aggregated per‑commodity “shopping list”.
-  - `/api/journal/status` – journal/latest‑file status.
-  - `/api/settings` – app/journal/Inara settings.
-  - `/api/carriers/*` – Fleet carrier identity and state.
+  - `/api/systems`: for the system selector.
+  - `/api/system`: `SystemColonisationData` for the selected system.
+  - `/api/system/commodities`: aggregated per‑commodity “shopping list”.
+  - `/api/journal/status`: journal/latest‑file status.
+  - `/api/settings`: app/journal/Inara settings.
+  - `/api/carriers/*`: Fleet carrier identity and state.
 
 - **Live updates via AJAX long-polling**:
   - The UI holds a request open to `GET /api/changes/longpoll?since=<seq>`.
@@ -93,13 +93,13 @@ State is centralised in two Zustand stores:
 
 ### 1.4 Key components
 
-- **SystemSelector** – [`SystemSelector.tsx`](frontend/src/components/SystemSelector/SystemSelector.tsx:1)
+- **SystemSelector**: [`SystemSelector.tsx`](frontend/src/components/SystemSelector/SystemSelector.tsx:1)
 
   - Renders an autocomplete/dropdown of known systems.
   - Uses `/api/systems` and `/api/systems/search`.
   - Updates the selected system in `colonisationStore` and triggers fetch/subscription.
 
-- **SiteList & SiteCard** – [`SiteList.tsx`](frontend/src/components/SiteList/SiteList.tsx:1)
+- **SiteList & SiteCard**: [`SiteList.tsx`](frontend/src/components/SiteList/SiteList.tsx:1)
 
   - Shows a **system summary**, **system shopping list** and **per‑station cards**.
   - Reads `systemData` from `colonisationStore`:
@@ -111,7 +111,7 @@ State is centralised in two Zustand stores:
       - If the site has no commodity requirements yet, the UI shows an indeterminate progress bar with the text “Awaiting requirements”.
       - Note: this intentionally does **not** use the journal field `ConstructionProgress`, which can remain static while commodity deliveries are happening.
 
-- **FleetCarriersPanel** – [`FleetCarriersPanel.tsx`](frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx:1)
+- **FleetCarriersPanel**: [`FleetCarriersPanel.tsx`](frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx:1)
 
   - “Fleet Carriers” tab in the UI.
   - Uses `carrierStore` to:
@@ -130,14 +130,14 @@ State is centralised in two Zustand stores:
   - The carrier detail view uses two sub-tabs: **Market** (left) and **Cargo** (right).
   - Default selected sub-tab is **Market** (stored in `carrierStore`).
 
-- **SettingsPage** – [`SettingsPage.tsx`](frontend/src/components/Settings/SettingsPage.tsx:1)
+- **SettingsPage**: [`SettingsPage.tsx`](frontend/src/components/Settings/SettingsPage.tsx:1)
 
   - Uses `/api/settings` to:
     - Read and update journal directory.
     - Configure Inara/commander settings.
   - Writes back to the backend, which persists to YAML.
 
-- **App / main** – [`App.tsx`](frontend/src/App.tsx:1), [`main.tsx`](frontend/src/main.tsx:1)
+- **App / main**: [`App.tsx`](frontend/src/App.tsx:1), [`main.tsx`](frontend/src/main.tsx:1)
 
   - Compose the overall layout and route tabs/screens.
   - Initialise stores and start the AJAX long-poll live update loop.
@@ -175,8 +175,8 @@ The runtime code lives under [`backend/src/runtime`](backend/src/runtime:1) and 
 
 API:
 
-- `acquire() -> bool` – returns `True` if this process acquires the lock, `False` if another instance holds it; may raise `ApplicationInstanceLockError` on I/O or directory creation errors.
-- `release()` – best‑effort unlock and file close.
+- `acquire() -> bool`: returns `True` if this process acquires the lock, `False` if another instance holds it; may raise `ApplicationInstanceLockError` on I/O or directory creation errors.
+- `release()`: best‑effort unlock and file close.
 - Context manager: usable as `with ApplicationInstanceLock(...):`.
 
 **Behavioural contract across entrypoints**:
@@ -211,13 +211,13 @@ This guarantees only one EDCA backend/tray/launcher combination runs at a time p
 
 [`launcher_components.py`](backend/src/runtime/launcher_components.py:1) factors out most of the dev launcher logic:
 
-- `QtLaunchWindow` – PySide6 window with:
+- `QtLaunchWindow`: PySide6 window with:
   - Icon, title.
   - Status label.
   - Progress bar.
   - “Open Web UI” button.
 
-- `Launcher` – orchestrates:
+- `Launcher`: orchestrates:
 
   - Python availability checks.
   - Backend virtualenv creation (`backend/venv`).
@@ -237,7 +237,7 @@ In DEV mode, this is the simplest way to start both backend and frontend with he
 
 [`tray_components.py`](backend/src/runtime/tray_components.py:1) implements the dev tray controller:
 
-- `ProcessGroup` – simple wrapper around `subprocess.Popen` with `terminate()` and optional `kill()` handling for process groups.
+- `ProcessGroup`: simple wrapper around `subprocess.Popen` with `terminate()` and optional `kill()` handling for process groups.
 - `TrayController`:
   - Starts/stops:
     - Backend: `uvicorn backend.src.main:app` (via system Python or `backend/venv`).
@@ -259,20 +259,20 @@ For Windows installers and similar packaged distributions, the main entrypoint i
 
 Key classes:
 
-- `BackendServerController` – starts/stops an in‑process `uvicorn.Server` hosting `fastapi_app`:
+- `BackendServerController`: starts/stops an in‑process `uvicorn.Server` hosting `fastapi_app`:
 
   - Uses a custom `_QuietUvicornConfig` that disables uvicorn’s own logging configuration (to avoid conflicts in certain frozen environments).
   - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the EXE.
   - `probe_ready()` runs a single non‑blocking readiness probe of `/api/health` and `/app/`; `wait_until_ready(timeout=...)` is the blocking wrapper around it for callers that need a synchronous wait.
 
-- `StartupSplashWindow` and `StartupMonitor` ([`splash.py`](backend/src/runtime/splash.py:1)) – first‑run feedback in frozen mode:
+- `StartupSplashWindow` and `StartupMonitor` ([`splash.py`](backend/src/runtime/splash.py:1)): first‑run feedback in frozen mode:
 
   - The splash shows the app icon, “by Oliver Ernster”, the version (from the top‑level `VERSION` file via `src.__version__`) and a live status line.
   - `StartupMonitor` polls `BackendServerController.probe_ready()` on a Qt timer, so the UI thread never blocks; status progresses from “Starting the local backend...” to “Preparing the web interface...” to “Ready”.
   - The browser is opened only when both endpoints actually respond; on timeout the splash reports the problem and closes while the tray stays available.
   - Silent starts (`--no-browser`, used for login autostart) show no splash and open no browser.
 
-- `TrayUIController` – simple Qt system tray UI in frozen mode:
+- `TrayUIController`: simple Qt system tray UI in frozen mode:
 
   - Sets EDCA icon and tooltip.
   - Offers:
@@ -281,7 +281,7 @@ Key classes:
     - “Exit” (with confirmation).
   - Clicking/double‑clicking the tray icon also opens the web UI.
 
-- `RuntimeApplication` – top‑level orchestrator:
+- `RuntimeApplication`: top‑level orchestrator:
 
   - `run()`:
     - In DEV mode: delegates to the legacy launcher window (`_run_dev()`).
@@ -342,15 +342,9 @@ On Windows, a Nuitka/EXE‑based runtime:
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:
   - Additional launches open the existing browser UI rather than starting a new backend.
 
-On Linux, helper scripts like:
+On Linux, the helper script [`run-edca-built.sh`](run-edca-built.sh:1) starts the backend with production settings and (if desired) serves the built frontend from `frontend/dist`. It remains valid with the runtime and single‑instance design above.
 
-- [`run-edca-built-debian.sh`](run-edca-built-debian.sh:1)
-- [`run-edca-built-fedora.sh`](run-edca-built-fedora.sh:1)
-- [`run-edca-built-arch.sh`](run-edca-built-arch.sh:1)
-- [`run-edca-built-rhel.sh`](run-edca-built-rhel.sh:1)
-- [`run-edca-built-void.sh`](run-edca-built-void.sh:1)
-
-start the backend with production settings and (if desired) serve the built frontend from `frontend/dist`. These scripts remain valid with the new runtime and single‑instance design.
+It is one script rather than one per distribution. The package manager is detected at runtime and used only to phrase install hints, so the executable path is identical everywhere and cannot drift between distributions the way five hand-maintained copies did.
 
 ---
 

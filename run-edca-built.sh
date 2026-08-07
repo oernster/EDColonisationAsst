@@ -7,9 +7,17 @@ set -euo pipefail
 #   Avoid Flatpak entirely. Build the frontend to frontend/dist (served by FastAPI at /app),
 #   set up a Python venv for the backend, run the backend, then open the browser.
 #
+# This replaces the five per-distro copies (debian, fedora, arch, rhel, void).
+# They differed only in the package-manager line and in which script name their
+# own messages quoted, so four of them were free to drift out of step with the
+# one that gets run: void had already lost the black step the other four had.
+# The package manager is detected at runtime and only ever used to phrase the
+# install hint printed when a prerequisite is missing; nothing is installed for
+# you and no privileged command is run.
+#
 # Usage:
-#   chmod +x ./run-edca-built-debian.sh
-#   ./run-edca-built-debian.sh
+#   chmod +x ./run-edca-built.sh
+#   ./run-edca-built.sh
 #
 # Options via env:
 #   EDCA_HOST=127.0.0.1                   (bind host for uvicorn)
@@ -25,8 +33,10 @@ set -euo pipefail
 #  - This is NOT a Flatpak build. It runs from source on your machine.
 #  - You need Python 3.10+.
 #  - Node.js/npm are only required when actually building the frontend.
+#  - Tested on Debian family. The other distro paths are UNTESTED helpers.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 cd "${SCRIPT_DIR}"
 
 APP_HOST="${EDCA_HOST:-127.0.0.1}"
@@ -35,6 +45,43 @@ UI_URL="http://${APP_HOST}:${APP_PORT}/app/"
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+
+# ----------------------------- package manager detection
+#
+# Used for hint text only. The first match wins, so a system carrying more than
+# one manager gets the one that is idiomatic for it rather than an arbitrary
+# choice: apt-get is checked before dnf because Debian derivatives sometimes
+# ship dnf; a Debian user should be told to use apt.
+
+detect_pkg_manager() {
+  local candidate
+  for candidate in apt-get dnf pacman zypper xbps-install apk yum; do
+    if command -v "${candidate}" >/dev/null 2>&1; then
+      printf '%s' "${candidate}"
+      return 0
+    fi
+  done
+  printf '%s' "unknown"
+}
+
+PKG_MANAGER="$(detect_pkg_manager)"
+
+# Print the install command for the given packages in the detected distro's own
+# idiom. Package names differ between families, so each branch names its own.
+install_hint() {
+  case "${PKG_MANAGER}" in
+    apt-get)     printf 'sudo apt-get update && sudo apt-get install -y %s' "$*" ;;
+    dnf)         printf 'sudo dnf install -y %s' "$*" ;;
+    yum)         printf 'sudo yum install -y %s' "$*" ;;
+    pacman)      printf 'sudo pacman -Syu --needed %s' "$*" ;;
+    zypper)      printf 'sudo zypper install -y %s' "$*" ;;
+    xbps-install) printf 'sudo xbps-install -Sy %s' "$*" ;;
+    apk)         printf 'sudo apk add %s' "$*" ;;
+    *)           printf 'install %s with your distribution package manager' "$*" ;;
+  esac
+}
+
+log "Package manager detected: ${PKG_MANAGER}"
 
 # ----------------------------- prerequisites
 #
@@ -56,7 +103,7 @@ if ! command -v "${PYTHON}" >/dev/null 2>&1; then
   if [ -z "${EDCA_PYTHON:-}" ] && command -v python >/dev/null 2>&1; then
     PYTHON="python"
   else
-    die "Python is required but was not found on PATH. Install Python 3.10+ (Debian default: 3.13). You can also set EDCA_PYTHON=python3.13"
+    die "Python is required but was not found on PATH. Install Python 3.10+ ($(install_hint python3)). You can also set EDCA_PYTHON to an interpreter you already have."
   fi
 fi
 
@@ -64,14 +111,14 @@ PY_VER="$("${PYTHON}" -c 'import sys; print(f"{sys.version_info.major}.{sys.vers
 log "Using Python: ${PYTHON} (${PY_VER})"
 
 if ! command -v uv >/dev/null 2>&1; then
-  die "uv is required but was not found on PATH. Install uv (https://docs.astral.sh/uv/) and ensure it's on PATH (often: export PATH=\"\$HOME/.local/bin:\$PATH\")."
+  die "uv is required but was not found on PATH. Install uv (https://docs.astral.sh/uv/) and ensure it is on PATH (often: export PATH=\"\$HOME/.local/bin:\$PATH\")."
 fi
 
 # pydantic==2.5.0 pulls pydantic-core which may not have wheels for Python 3.13,
 # causing a Rust build requirement (maturin/cargo). If you hit build issues, use uv-managed Python 3.12.
 PY_MAJOR_MINOR="$("${PYTHON}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
 if [ "${PY_MAJOR_MINOR}" = "3.13" ]; then
-  log "NOTE: Python 3.13 detected. If you hit pydantic-core build errors, use Python 3.12 via uv and run with: EDCA_PYTHON=python3.12 EDCA_VENV_DIR=.venv312 ./run-edca-built-debian.sh"
+  log "NOTE: Python 3.13 detected. If you hit pydantic-core build errors, use Python 3.12 via uv and run with: EDCA_PYTHON=python3.12 EDCA_VENV_DIR=.venv312 ./${SCRIPT_NAME}"
 fi
 
 # Node/npm are only required if we are going to build the frontend.
@@ -87,7 +134,7 @@ fi
 
 if [ "${NEED_FRONTEND_BUILD}" = "1" ]; then
   if ! command -v npm >/dev/null 2>&1; then
-    die "Node.js/npm are required to build the frontend, but were not found on PATH. Either install Node.js (20+ recommended) or set EDCA_SKIP_FRONTEND_BUILD=1 with an existing frontend/dist."
+    die "Node.js/npm are required to build the frontend but were not found on PATH. Install Node.js 20+ ($(install_hint nodejs npm)). You can also set EDCA_SKIP_FRONTEND_BUILD=1 with an existing frontend/dist."
   fi
 fi
 
@@ -104,10 +151,10 @@ if [ -n "${EDCA_PYTHON:-}" ] && [ -x "${VENV_PY}" ]; then
   VENV_MAJOR_MINOR="$("${VENV_PY}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
   if [ -n "${PY_MAJOR_MINOR:-}" ] && [ -n "${VENV_MAJOR_MINOR}" ] && [ "${VENV_MAJOR_MINOR}" != "${PY_MAJOR_MINOR}" ]; then
     if [ "${RECREATE_VENV}" = "1" ]; then
-      log "Venv at ${VENV_DIR} uses Python ${VENV_MAJOR_MINOR}, but requested ${PY_MAJOR_MINOR}; recreating (EDCA_RECREATE_VENV=1) ..."
+      log "Venv at ${VENV_DIR} uses Python ${VENV_MAJOR_MINOR} but requested ${PY_MAJOR_MINOR}; recreating (EDCA_RECREATE_VENV=1) ..."
       rm -rf "${VENV_DIR}"
     else
-      die "Venv at ${VENV_DIR} uses Python ${VENV_MAJOR_MINOR}, but requested ${PY_MAJOR_MINOR}. Set EDCA_RECREATE_VENV=1 to recreate it, or set EDCA_VENV_DIR to a different venv (e.g. .venv312)."
+      die "Venv at ${VENV_DIR} uses Python ${VENV_MAJOR_MINOR} but requested ${PY_MAJOR_MINOR}. Set EDCA_RECREATE_VENV=1 to recreate it. You can also set EDCA_VENV_DIR to a different venv (e.g. .venv312)."
     fi
   fi
 fi

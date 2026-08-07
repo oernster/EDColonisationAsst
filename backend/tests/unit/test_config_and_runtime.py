@@ -195,11 +195,9 @@ def test_get_config_linux_autodetect_overrides_windows_default(
     #
     # Important: write YAML using forward slashes + single quotes so the YAML
     # is valid on all platforms. Double-quoted Windows paths with backslashes
-    # can be invalid YAML (e.g. "\U" unicode escapes), and config.get_config()
+    # can be invalid YAML (e.g. "\U" unicode escapes) and config.get_config()
     # intentionally falls back to defaults on YAML parse errors.
-    win_default = (
-        "C:/Users/%USERNAME%/Saved Games/Frontier Developments/Elite Dangerous/__edca_test_missing__"
-    )
+    win_default = "C:/Users/%USERNAME%/Saved Games/Frontier Developments/Elite Dangerous/__edca_test_missing__"
     config_file.write_text(
         f"journal:\n  directory: '{win_default}'\n",
         encoding="utf-8",

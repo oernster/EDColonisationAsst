@@ -244,13 +244,15 @@ clean under all three:
 ```bash
 black --check installer installer_main.py tests
 ruff check --isolated installer installer_main.py tests
-flake8 --max-line-length=88 installer installer_main.py tests
+flake8 installer installer_main.py tests
 ```
 
-The explicit line length is needed because the repository has no flake8
-configuration file, so flake8 defaults to 79 while black is configured for
-88. The rest of the repository is not yet clean under either linter; see
-[TECH_DEBT.md](TECH_DEBT.md).
+flake8 needs no line-length flag: `.flake8` at the repository root sets 88 to
+match black. These three are the same commands the pre-commit hook runs, so
+a clean run here means a clean hook.
+
+`backend/` is not yet clean under either linter and is deliberately outside
+that list; see [TECH_DEBT.md](TECH_DEBT.md).
 
 ### Git hooks
 
@@ -262,14 +264,15 @@ git config core.hooksPath .githooks
 chmod +x .githooks/pre-commit
 ```
 
-It formats staged Python files with black and runs the backend test suite
-(including its coverage gate) before every commit.
+It formats staged Python files with black and then runs a bare `pytest -q`
+from the repository root, which is the full gate: both suites under the
+100% coverage requirement. It resolves its interpreter from the root
+`venv/`, the environment that actually carries the tooling. If that
+environment is missing pytest or black it fails with a named error rather
+than falling through to `PATH`.
 
-Know its limits: it runs neither the setup program's suite nor either
-linter; the interpreter it prefers (`backend/.venv`) does not exist in
-this repository, so it falls back to whatever is on `PATH`. Run
-`python -m pytest -q` from the root yourself before committing rather than
-relying on the hook. Both gaps are recorded in [TECH_DEBT.md](TECH_DEBT.md).
+One limit remains: it runs neither linter. That gap is recorded in
+[TECH_DEBT.md](TECH_DEBT.md).
 
 ---
 
@@ -309,15 +312,15 @@ Or use the convenience scripts [run-edca.bat](run-edca.bat) /
 
 ### Linux
 
-Use the distro-specific helper from the project root; each creates a venv,
-installs backend requirements, ensures `frontend/dist` exists and serves
-everything on `http://127.0.0.1:8000/app/`:
+Use [run-edca-built.sh](run-edca-built.sh) from the project root. It creates a
+venv, installs backend requirements, ensures `frontend/dist` exists and serves
+everything on `http://127.0.0.1:8000/app/`.
 
-- Debian / Ubuntu / Mint: [run-edca-built-debian.sh](run-edca-built-debian.sh) (recommended)
-- Fedora: [run-edca-built-fedora.sh](run-edca-built-fedora.sh) (UNTESTED)
-- Arch: [run-edca-built-arch.sh](run-edca-built-arch.sh) (UNTESTED)
-- RHEL / Rocky / Alma: [run-edca-built-rhel.sh](run-edca-built-rhel.sh) (UNTESTED)
-- Void: [run-edca-built-void.sh](run-edca-built-void.sh) (UNTESTED)
+It replaced five per-distro copies that differed only in their package-manager
+hints. Those hints are now printed at runtime and only when a prerequisite is
+actually missing, phrased for whichever of apt, dnf, pacman, zypper, xbps, apk
+or yum is on the machine. It installs nothing itself. Debian, Ubuntu and Mint
+are the tested path; the rest are UNTESTED but take the same route.
 
 Useful environment variables: `EDCA_HOST`, `EDCA_PORT`, `EDCA_PYTHON`,
 `EDCA_VENV_DIR`, `EDCA_RECREATE_VENV=1` and `EDCA_SKIP_FRONTEND_BUILD=1`

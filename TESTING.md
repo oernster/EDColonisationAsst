@@ -186,27 +186,29 @@ run from the repository root:
 ```bash
 black --check installer installer_main.py tests
 ruff check --isolated installer installer_main.py tests
-flake8 --max-line-length=88 installer installer_main.py tests
+flake8 installer installer_main.py tests
 ```
 
-The explicit line length is not optional: the repository has no flake8
-configuration file, so flake8 defaults to 79 characters while black is
-configured for 88 in `backend/pyproject.toml`; a bare run reports E501
-against lines black itself produced. The rest of the repository is not yet
-clean under either linter, so neither is wired into the hook; see
-[TECH_DEBT.md](TECH_DEBT.md).
+flake8 needs no line-length flag any more. `.flake8` at the repository root
+sets 88 to match black in `backend/pyproject.toml`, so the two tools no longer
+disagree about the lines black itself produced.
+
+The last two of those run inside the pre-commit hook over exactly these paths.
+`backend/` is not yet clean under either linter and is deliberately outside the
+step; see [TECH_DEBT.md](TECH_DEBT.md).
 
 ## Pre-commit hook
 
 With the shared hook enabled (`git config core.hooksPath .githooks`), every
-commit formats staged Python files with black and runs the backend suite
-including its coverage gate.
+commit formats staged Python files with black and then runs a bare
+`pytest -q` from the repository root. That is the same command documented
+above and the same gate: both suites, 100% coverage, exit code or nothing.
 
-That is less than the full gate. The hook runs `backend/tests` only, so the
-installer suite is not exercised and a change that drops `installer/ops`,
-`installer/state` or `installer/shared` below 100% still commits. It also
-prefers an interpreter at `backend/.venv`, which does not exist here (the two
-environments are `venv/` and `backend/venv/`), so it falls back to whatever is
-on `PATH`. Run `python -m pytest -q` from the root before committing and treat
-the hook as a backstop rather than the gate. Both gaps are recorded in
+The interpreter is resolved once, from the root `venv/`, which is where the
+tooling lives. If that environment is absent or lacks pytest and black the
+hook stops with a named error rather than falling through to whatever is on
+`PATH`, so the check that runs is never silently a different check.
+
+One limit remains: the hook runs neither linter, because the repository is
+not yet clean under either. That gap is recorded in
 [TECH_DEBT.md](TECH_DEBT.md).

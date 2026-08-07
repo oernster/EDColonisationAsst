@@ -93,15 +93,19 @@ EDCA cannot force Elite Dangerous to write new journal data; it can only reflect
 
 ## Run on Linux
 
-If you are running EDCA from a local checkout on Linux, use the distro-specific helper script from the project root:
+If you are running EDCA from a local checkout on Linux, use the helper script from the project root:
 
-- Debian / Ubuntu / Linux Mint: [`./run-edca-built-debian.sh`](run-edca-built-debian.sh:1) (recommended)
-- Fedora: [`./run-edca-built-fedora.sh`](run-edca-built-fedora.sh:1) (**UNTESTED** helper)
-- Arch Linux: [`./run-edca-built-arch.sh`](run-edca-built-arch.sh:1) (**UNTESTED** helper)
-- RHEL / Rocky / Alma: [`./run-edca-built-rhel.sh`](run-edca-built-rhel.sh:1) (**UNTESTED** helper)
-- Void: [`./run-edca-built-void.sh`](run-edca-built-void.sh:1) (**UNTESTED** helper)
+```bash
+chmod +x ./run-edca-built.sh
+./run-edca-built.sh
+```
 
-Each script:
+It detects your package manager (apt, dnf, pacman, zypper, xbps, apk or yum) and phrases any
+install hint it needs to print in that distribution's own idiom. Nothing is installed for you
+and no privileged command is run. Debian, Ubuntu and Linux Mint are the tested path; the others
+are **UNTESTED** but take the same route.
+
+The script:
 
 - Sets up a Python virtual environment and backend runtime dependencies.
 - Ensures the frontend is built (or lets you skip the build via environment variables).

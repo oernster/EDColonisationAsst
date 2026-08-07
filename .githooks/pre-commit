@@ -1,27 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Git pre-commit hook for EDColonizationAsst
+# Git pre-commit hook for EDColonisationAsst
 #
 # This hook automatically:
 #   1. Formats staged Python files with black.
 #   2. Re-stages any reformatted files.
-#   3. Runs the backend pytest suite and blocks the commit if tests fail.
+#   3. Runs the full gated suite and blocks the commit if it fails.
 #
 # To enable this hook, run once in the repo root:
 #   git config core.hooksPath .githooks
-
-echo "[pre-commit] Checking for staged Python files to format with black..."
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "${REPO_ROOT}"
 
 # ---------------------------------------------------------------------------
+# 0. Resolve one interpreter for every step
+# ---------------------------------------------------------------------------
+#
+# The tooling (black, flake8, ruff, pytest) lives in the repository-root venv/.
+# An earlier version of this hook preferred backend/.venv, which has never
+# existed here, so it always fell through to whatever was on PATH and the
+# interpreter depended on which shell the commit was made from. backend/venv/
+# exists but carries none of the tooling, so it is deliberately not a candidate.
+
+PY=()
+if [ -x "venv/Scripts/python.exe" ]; then
+  PY=("venv/Scripts/python.exe")
+elif [ -x "venv/bin/python" ]; then
+  PY=("venv/bin/python")
+elif command -v python3 >/dev/null 2>&1; then
+  PY=("python3")
+elif command -v python >/dev/null 2>&1; then
+  PY=("python")
+else
+  echo "[pre-commit] ERROR: no Python interpreter found."
+  echo "[pre-commit]        Create the root venv/ and install requirements-dev."
+  exit 1
+fi
+
+if ! "${PY[@]}" -c "import pytest, black, flake8, ruff" >/dev/null 2>&1; then
+  echo "[pre-commit] ERROR: ${PY[*]} is missing pytest, black, flake8 or ruff."
+  echo "[pre-commit]        Install backend/requirements-dev.txt into it."
+  exit 1
+fi
+
+echo "[pre-commit] Using interpreter: ${PY[*]}"
+
+# ---------------------------------------------------------------------------
 # 1. Format staged Python files with black
 # ---------------------------------------------------------------------------
 
-# List staged Python files (respecting git add -p, etc.)
-CHANGED_PY_FILES="$(git diff --cached --name-only -- '*.py' || true)"
+echo "[pre-commit] Checking for staged Python files to format with black..."
+
+# List staged Python files (respecting git add -p, etc.), skipping any that the
+# commit deletes: black cannot format a path that is no longer on disk.
+CHANGED_PY_FILES="$(git diff --cached --name-only --diff-filter=d -- '*.py' || true)"
 
 if [ -z "${CHANGED_PY_FILES}" ]; then
   echo "[pre-commit] No staged Python files; skipping black."
@@ -30,23 +64,9 @@ else
   # shellcheck disable=SC2086
   printf '  %s\n' ${CHANGED_PY_FILES}
 
-  # Choose how to invoke black:
-  #  - Prefer backend/.venv/bin/python (Linux/macOS venv)
-  #  - Then backend/.venv/Scripts/python.exe (Windows venv via Git Bash, etc.)
-  #  - Fall back to plain 'black' on PATH
-  BLACK_CMD=()
-  if [ -x "backend/.venv/bin/python" ]; then
-    BLACK_CMD=("backend/.venv/bin/python" "-m" "black")
-  elif [ -x "backend/.venv/Scripts/python.exe" ]; then
-    BLACK_CMD=("backend/.venv/Scripts/python.exe" "-m" "black")
-  else
-    BLACK_CMD=("black")
-  fi
-
-  # Run black on the staged Python files.
   # Use NUL-separated xargs to handle spaces safely.
   # shellcheck disable=SC2086
-  printf '%s\0' ${CHANGED_PY_FILES} | xargs -0 "${BLACK_CMD[@]}"
+  printf '%s\0' ${CHANGED_PY_FILES} | xargs -0 "${PY[@]}" -m black
 
   # Re-stage any files that black reformatted.
   # shellcheck disable=SC2086
@@ -56,28 +76,42 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Run backend unit tests with pytest and block commit on failure
+# 2. Lint the surface that is already clean
 # ---------------------------------------------------------------------------
+#
+# Scoped deliberately. The setup program, its entry point and its suite pass
+# both linters today, so gating them here locks that in at no cost. backend/ and
+# frontend/ are not clean under either tool and sweeping them is its own job, so
+# widening this list means doing that sweep first rather than relaxing the step.
+#
+# --isolated because these paths sit above backend/pyproject.toml and there is
+# no configuration for them to discover; the flag makes that explicit instead of
+# depending on where ruff stops walking. flake8 needs no line-length flag now
+# that .flake8 carries it.
 
-echo "[pre-commit] Running backend unit tests (pytest)..."
+LINT_PATHS=(installer installer_main.py tests)
 
-TEST_CMD=()
-if [ -x "backend/.venv/bin/python" ]; then
-  TEST_CMD=("backend/.venv/bin/python" "-m" "pytest" "-q" "-c" "backend/pytest.ini")
-elif [ -x "backend/.venv/Scripts/python.exe" ]; then
-  TEST_CMD=("backend/.venv/Scripts/python.exe" "-m" "pytest" "-q" "-c" "backend/pytest.ini")
-elif command -v pytest >/dev/null 2>&1; then
-  TEST_CMD=("pytest" "-q" "-c" "backend/pytest.ini")
-else
-  echo "[pre-commit] ERROR: pytest not found (no backend/.venv and no pytest on PATH)."
-  echo "[pre-commit]        Ensure the backend environment is set up before committing."
-  exit 1
-fi
+echo "[pre-commit] Linting: ${LINT_PATHS[*]}"
 
-# Run tests targeting the backend test suite. Any failure will cause the hook
-# to exit non-zero (due to set -e), blocking the commit.
-"${TEST_CMD[@]}" backend/tests
+"${PY[@]}" -m ruff check --isolated "${LINT_PATHS[@]}"
+"${PY[@]}" -m flake8 "${LINT_PATHS[@]}"
 
-echo "[pre-commit] Backend pytest suite passed."
+echo "[pre-commit] Linters clean."
+
+# ---------------------------------------------------------------------------
+# 3. Run the full gated suite and block the commit on failure
+# ---------------------------------------------------------------------------
+#
+# A bare `pytest` from the repository root picks up pytest.ini, which runs both
+# suites (backend/tests and tests) under the 100% coverage gate with asyncio_mode
+# set. The previous `-c backend/pytest.ini backend/tests` ran the backend half
+# only, so a commit breaking the installer suite (or dropping the setup
+# program's Qt-free packages below the gate) still passed the hook.
+
+echo "[pre-commit] Running the full gated suite (pytest)..."
+
+"${PY[@]}" -m pytest -q
+
+echo "[pre-commit] Gated suite passed."
 echo "[pre-commit] All checks passed; proceeding with commit."
 exit 0

@@ -13,7 +13,11 @@ version = { file = ["../VERSION"] }
 [tool.black]
 line-length = 88
 target-version = ["py311"]
-include = "src/.*\\.pyi?$"
+# Both trees, not just src/. This read "src/.*" alone, so every file under
+# backend/tests/ was silently skipped: black reported "no Python files are
+# present" against a directory of 37 of them. The pre-commit hook's format step
+# was a no-op for any staged test file as a result.
+include = "(src|tests)/.*\\.pyi?$"
 exclude = """
 /(
     \\.git
@@ -82,14 +86,19 @@ skip_covered = false
 line-length = 88
 target-version = "py311"
 src = ["src"]
+
+# The linter settings live under [tool.ruff.lint]. They were written as
+# top-level keys, which current ruff accepts only with a deprecation warning, so
+# the first real run of this configuration started by complaining about itself.
+[tool.ruff.lint]
 extend-select = [
   "E",
   "F",
   "W",
-  "I",  # isort-compatible import rules via Ruff, if you choose to enable them later
+  "I",  # isort-compatible import ordering; "I" enables it, it is not a stub
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["src"]
 force-sort-within-sections = true
 combine-as-imports = true

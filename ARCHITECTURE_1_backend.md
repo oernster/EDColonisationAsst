@@ -1,4 +1,4 @@
-# Elite: Dangerous Colonisation Assistant – Backend Architecture
+# Elite: Dangerous Colonisation Assistant, Backend Architecture
 
 This document focuses on the **Python backend** of the Elite: Dangerous Colonisation Assistant: how it ingests Elite journals, stores colonisation data and exposes APIs. It is a backend‑only slice of the full architecture described in [`ARCHITECTURE.md`](ARCHITECTURE.md:1).
 
@@ -394,27 +394,27 @@ Fleet carrier endpoints are defined in [`backend/src/api/carriers.py`](backend/s
 
 Key carrier endpoints:
 
-- `GET /api/carriers/current` – current docking context (docked carrier identity when docked at a Fleet carrier).
-- `GET /api/carriers/current/state` – reconstructed snapshot including:
+- `GET /api/carriers/current`: current docking context (docked carrier identity when docked at a Fleet carrier).
+- `GET /api/carriers/current/state`: reconstructed snapshot including:
   - Identity + services
   - Buy and sell orders from `CarrierTradeOrder` events
   - Capacity metrics from `CarrierStats.SpaceUsage`
   - `space_usage` breakdown (when present)
   - Market.json merge to avoid “missing order” artefacts when the journal only emits deltas
-- `GET /api/carriers/mine` – known own/squadron carriers derived from recent `CarrierStats`/`CarrierLocation`.
+- `GET /api/carriers/mine`: known own/squadron carriers derived from recent `CarrierStats`/`CarrierLocation`.
 
 Key colonisation endpoints:
 
-- `GET /api/health` – health check + journal directory info.
-- `GET /api/systems` – systems with construction sites.
-- `GET /api/systems/search?q=...` – fuzzy search over known systems.
-- `GET /api/systems/current` – current system/station from `SystemTracker`.
-- `GET /api/system?name=...` – `SystemColonisationData` for one system.
-- `GET /api/system/commodities?name=...` – aggregated `CommodityAggregate` list.
-- `GET /api/sites` – global list of in‑progress and completed sites.
-- `GET /api/sites/{market_id}` – detail view of a single site.
-- `GET /api/stats` – high-level stats from the repository.
-- `POST /api/debug/reload-journals` – explicit full re‑import using the same pipeline as the first‑run preload.
+- `GET /api/health`: health check + journal directory info.
+- `GET /api/systems`: systems with construction sites.
+- `GET /api/systems/search?q=...`: fuzzy search over known systems.
+- `GET /api/systems/current`: current system/station from `SystemTracker`.
+- `GET /api/system?name=...`: `SystemColonisationData` for one system.
+- `GET /api/system/commodities?name=...`: aggregated `CommodityAggregate` list.
+- `GET /api/sites`: global list of in‑progress and completed sites.
+- `GET /api/sites/{market_id}`: detail view of a single site.
+- `GET /api/stats`: high-level stats from the repository.
+- `POST /api/debug/reload-journals`: explicit full re‑import using the same pipeline as the first‑run preload.
 
 Live updates:
 

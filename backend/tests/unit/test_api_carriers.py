@@ -240,7 +240,7 @@ async def test_carrier_sell_order_without_stock_or_outstanding_does_not_create_c
     """Regression: do not treat SaleOrder (configured size) as cargo stock.
 
     Some journals emit CarrierTradeOrder lines with only SaleOrder + Price and
-    omit Stock/Outstanding. Those lines should still create a SELL order, but
+    omit Stock/Outstanding. Those lines should still create a SELL order but
     must NOT create a cargo commodity row, otherwise the UI shows phantom cargo.
     """
     journal_dir = tmp_path / "journals"
@@ -363,8 +363,12 @@ async def test_carriers_scan_recent_files_for_most_recent_trade_orders(
         }
     ]
 
-    older_file.write_text("\n".join(json.dumps(e) for e in older_events), encoding="utf-8")
-    newer_file.write_text("\n".join(json.dumps(e) for e in newer_events), encoding="utf-8")
+    older_file.write_text(
+        "\n".join(json.dumps(e) for e in older_events), encoding="utf-8"
+    )
+    newer_file.write_text(
+        "\n".join(json.dumps(e) for e in newer_events), encoding="utf-8"
+    )
 
     # Simulate newest file being "newer" by mtime to match production ordering.
     older_file.touch()
@@ -372,7 +376,9 @@ async def test_carriers_scan_recent_files_for_most_recent_trade_orders(
 
     monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
     # Let get_journal_files return both.
-    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [older_file, newer_file])
+    monkeypatch.setattr(
+        carriers_api, "get_journal_files", lambda _dir: [older_file, newer_file]
+    )
 
     app = FastAPI()
     app.include_router(carriers_router)
@@ -427,7 +433,7 @@ async def test_carriers_current_state_ignores_trade_orders_before_latest_docked_
         },
     ]
 
-    # New session: commander docks again, but no trade orders at all.
+    # New session: commander docks again but no trade orders at all.
     new_events = [
         {
             "timestamp": "2025-12-15T10:54:47Z",
@@ -449,7 +455,9 @@ async def test_carriers_current_state_ignores_trade_orders_before_latest_docked_
     new_file.write_text("\n".join(json.dumps(e) for e in new_events), encoding="utf-8")
 
     monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
-    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [old_file, new_file])
+    monkeypatch.setattr(
+        carriers_api, "get_journal_files", lambda _dir: [old_file, new_file]
+    )
 
     app = FastAPI()
     app.include_router(carriers_router)
@@ -537,16 +545,17 @@ async def test_carriers_state_falls_back_to_market_json_when_no_trade_orders_sin
 
         buy_orders = carrier_state["buy_orders"]
         assert any(
-            o["commodity_name"] == "steel" and o["remaining_amount"] == 7705 for o in buy_orders
+            o["commodity_name"] == "steel" and o["remaining_amount"] == 7705
+            for o in buy_orders
         )
         assert any(
-            o["commodity_name"] == "titanium" and o["remaining_amount"] == 4606 for o in buy_orders
+            o["commodity_name"] == "titanium" and o["remaining_amount"] == 4606
+            for o in buy_orders
         )
 
         assert carrier_state["sell_orders"] == []
         assert carrier_state["cargo"] == []
         assert carrier_state["trade_orders_scope"] == "market_export"
-
 
 
 @pytest.mark.asyncio
@@ -670,8 +679,7 @@ async def test_carriers_current_state_clears_sold_out_cargo(
         # Titanium should not report any positive stock after the zero-stock
         # CarrierTradeOrder update.
         assert not any(
-            item["commodity_name"] == "titanium" and item["stock"] > 0
-            for item in cargo
+            item["commodity_name"] == "titanium" and item["stock"] > 0 for item in cargo
         )
 
 
@@ -725,7 +733,7 @@ async def test_carriers_mine_lists_own_and_squadron(
 
         assert len(own_carriers) == 1
         assert own_carriers[0]["name"] == "MIDNIGHT ELOQUENCE"
-        # DockingAccess 'squadron' is now surfaced on the identity, but we no longer
+        # DockingAccess 'squadron' is now surfaced on the identity but we no longer
         # infer an official squadron carrier list from it.
         assert own_carriers[0]["docking_access"] == "squadron"
         assert len(squadron_carriers) == 0

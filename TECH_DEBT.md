@@ -15,11 +15,11 @@ A standing reference to the project's outstanding technical debt. It records wha
 | `backend/src/services/journal_ingestion.py` | 526 |
 | `backend/src/runtime/app_runtime.py` | 523 |
 
-`carrier_service.py` is the one to take first. It is the largest non-installer source file, it has its own 785-line API test and its own 670-line coverage test; fleet-carrier state reconstruction from journal events is the most intricate logic in the project. Splitting it along the seams the tests already imply (order reconstruction, docking context, cargo and market state) would make each part reviewable.
+`carrier_service.py` is the one to take first. It is the largest non-installer source file, it has its own 793-line API test and its own 670-line coverage test; fleet-carrier state reconstruction from journal events is the most intricate logic in the project. Splitting it along the seams the tests already imply (order reconstruction, docking context, cargo and market state) would make each part reviewable.
 
 `App.tsx` at 651 lines is the second: a root component that large is usually holding state that belongs in hooks; `useKeepAwake.ts` at 406 shows the project already knows how to write them.
 
-These nineteen files (seven backend source, eight backend test, four front end) are the whole of `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py). The cap is asserted, so nothing new joins them, and a staleness test fails on any entry whose file is no longer over the limit. The list can only shrink and this item closes when it is empty. The `installer/` package and its suite are already clear of the limit and carry no allowance.
+These nineteen files (seven backend source, eight backend test, four front end) are the whole of `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py). The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit. The list can only shrink and this item closes when it is empty. The `installer/` package and its suite are already clear of the limit and carry no allowance.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 
@@ -31,29 +31,28 @@ These nineteen files (seven backend source, eight backend test, four front end) 
 
 Give each a written reason and narrow where the specific exception is known. The two in `api/carriers.py` and `api/journal.py` are at an HTTP boundary and are fine as broad handlers; they just need the reason.
 
-## 3. Five near-identical distro launcher scripts
+## 3. `backend/` is outside the lint step and a long way from passing
 
-`run-edca-built-arch.sh`, `run-edca-built-debian.sh`, `run-edca-built-fedora.sh`, `run-edca-built-rhel.sh` and `run-edca-built-void.sh`, plus `run-edca.sh` and `run-edca.bat`.
+The configuration gap is closed. `.flake8` sets 88 at the repository root so flake8 and black no longer disagree, the stale top-level `[tool.ruff]` keys have moved under `[tool.ruff.lint]`; the pre-commit hook now runs `ruff check --isolated` and `flake8` over `installer`, `installer_main.py` and `tests` before the suite. That surface passes both linters and the hook fails on a planted violation, so it will stay passing.
 
-Five scripts that differ only in package-manager invocation means five places to update when the launch sequence changes; four of them will be stale before anyone notices because most users are on one distro. Collapse them into one script that detects the package manager (`pacman`, `apt`, `dnf`, `xbps-install`) and branches, which is a dozen lines and one file to maintain.
+What is left is the reason the step is scoped that narrowly. `backend/src` is not close to clean and widening the list is a sweep, not a flag flip. Measured 2026-08-07 with ruff 0.16.1:
 
-## 4. The pre-commit hook runs a fraction of the gate, from a virtual environment that does not exist
+| Rule | Count | What it is |
+|---|---|---|
+| UP045, UP006, UP035, UP037, UP017 | 226 | `Optional[X]`, `typing.List` and friends against a `py311` target |
+| BLE001 | 70 | Broad `except Exception`, the same population as item 2 |
+| E402 | 56 | Imports after code, mostly the runtime path juggling `sys.path` |
+| I001 | 45 | Import blocks out of order |
+| S110, S112 | 34 | `try`/`except`/`pass` and `try`/`except`/`continue` |
+| E501 | 26 | Over 88 characters |
+| F401 | 24 | Unused imports |
+| everything else | 77 | RUF, PIE, ASYNC, B, TRY, FURB, SIM, PERF, PYI |
 
-`.githooks/pre-commit` formats staged Python files with black and then runs `pytest -q -c backend/pytest.ini backend/tests`. That is the backend half of the gate only. The installer suite lives at `tests/` and needs the repository root configuration, so a commit that breaks it (or drops the setup program's Qt-free packages below 100%) still passes the hook.
+558 in total, 322 of them auto-fixable. `flake8` at 88 over the same tree reports 59.
 
-The interpreter selection is worse. The hook prefers `backend/.venv/bin/python`, then `backend/.venv/Scripts/python.exe`; only then does it fall back to whatever `black` and `pytest` are on `PATH`. There is no `backend/.venv` anywhere in this repository. The environment that actually has the tooling is `venv/` at the root; a `backend/venv/` directory exists but has no pytest in it. So the hook always takes the `PATH` branch; which interpreter that is depends on which shell the commit was made from.
+Three things make this one job rather than eight. The 226 typing findings are mechanical and safe under `--fix`. The 70 BLE001 findings are item 2 seen from the other end, so doing item 2 first shrinks this by an eighth and doing this first would pre-empt the judgement item 2 asks for. The E402 and F401 counts include the deliberate re-exports in `launcher.py`, which want `__all__` or a targeted `# noqa` with a reason rather than deletion, so the auto-fixer cannot be trusted to run unattended over the whole tree.
 
-The fix is small and entirely within the hook: point it at the root configuration (`pytest -q` from the repository root, which is what `pytest.ini` is now set up to do) and at `venv/`. It is left alone here deliberately, because changing a hook and the code it guards in the same piece of work means neither gets a clean before-and-after.
-
-## 5. flake8 and ruff are installed but nothing runs them; flake8 also has no configuration
-
-Both are now in `backend/requirements-dev.txt` and `backend/requirements-dev-linux.txt`; both are installed in `venv/` and `backend/venv/`. The `installer/` package, `installer_main.py` and `tests/` are clean under `black --check`, `ruff check --isolated` and `flake8 --max-line-length=88`. Nothing enforces any of it: the hook runs black and the backend suite only (item 4); there is no lint step in CI.
-
-The `--max-line-length=88` is load-bearing and is its own small gap. There is no `.flake8`, `setup.cfg` or `tox.ini` anywhere in the repository, so flake8 defaults to 79 characters while black is configured for 88 in `backend/pyproject.toml`. Run bare, flake8 reports fifteen E501s against lines black itself produced. Give flake8 a configuration file that sets 88 and the two tools stop disagreeing.
-
-The rest of the repository is not clean, so turning either linter on repo-wide is a separate job rather than a flag flip. The proportionate next step is to add `ruff check --isolated installer installer_main.py tests` and the matching flake8 run to the hook, which locks in the surface that is already clean without demanding the sweep first.
-
-The written `[tool.ruff]` section in `backend/pyproject.toml` has never been run and is stale against current ruff: it emits `The top-level linter settings are deprecated in favour of their counterparts in the lint section` and wants `extend-select` moved to `lint.extend-select` and `isort` to `lint.isort`. Fix that at the same time or the first real run starts with a warning.
+`frontend/` has no linter wired at all and is not counted above.
 
 ---
 

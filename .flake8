@@ -1,0 +1,29 @@
+[flake8]
+# The single flake8 configuration for the repository.
+#
+# It exists to stop flake8 and black disagreeing. black is configured for 88 in
+# backend/pyproject.toml; without a file here flake8 defaults to 79 and reports
+# E501 against lines black itself produced. flake8 reads none of pyproject.toml,
+# so the value has to be repeated in its own idiom rather than derived.
+max-line-length = 88
+
+# E203 (whitespace before ':') and W503 (line break before a binary operator)
+# are the two checks black's own output triggers by design. Both are on the
+# recommended ignore list in black's documentation.
+extend-ignore = E203, W503
+
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    node_modules,
+    build,
+    dist,
+    dist-installer,
+    dist-runtime,
+    htmlcov,
+    frontend,
+    .ruff_cache,
+    .pytest_cache,
+    .benchmarks

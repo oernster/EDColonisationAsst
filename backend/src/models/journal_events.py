@@ -1,7 +1,8 @@
 """Journal event data models"""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -10,7 +11,7 @@ class JournalEvent(BaseModel):
 
     timestamp: datetime = Field(description="Event timestamp")
     event: str = Field(description="Event type")
-    raw_data: Dict[str, Any] = Field(default_factory=dict, description="Raw event data")
+    raw_data: dict[str, Any] = Field(default_factory=dict, description="Raw event data")
 
 
 class ColonisationConstructionDepotEvent(JournalEvent):
@@ -28,7 +29,7 @@ class ColonisationConstructionDepotEvent(JournalEvent):
     construction_failed: bool = Field(
         default=False, description="Construction failed flag"
     )
-    commodities: List[Dict[str, Any]] = Field(
+    commodities: list[dict[str, Any]] = Field(
         default_factory=list, description="List of required commodities"
     )
 
@@ -38,7 +39,7 @@ class ColonisationContributionEvent(JournalEvent):
 
     market_id: int = Field(description="Market ID")
     commodity: str = Field(description="Commodity name")
-    commodity_localised: Optional[str] = Field(
+    commodity_localised: str | None = Field(
         None, description="Localized commodity name"
     )
     quantity: int = Field(description="Quantity contributed")
@@ -51,12 +52,12 @@ class LocationEvent(JournalEvent):
 
     star_system: str = Field(description="Star system name")
     system_address: int = Field(description="System address")
-    star_pos: List[float] = Field(
+    star_pos: list[float] = Field(
         default_factory=list, description="Star position coordinates"
     )
-    station_name: Optional[str] = Field(None, description="Station name if docked")
-    station_type: Optional[str] = Field(None, description="Station type if docked")
-    market_id: Optional[int] = Field(None, description="Market ID if docked")
+    station_name: str | None = Field(None, description="Station name if docked")
+    station_type: str | None = Field(None, description="Station type if docked")
+    market_id: int | None = Field(None, description="Market ID if docked")
     docked: bool = Field(default=False, description="Whether docked at station")
 
 
@@ -65,7 +66,7 @@ class FSDJumpEvent(JournalEvent):
 
     star_system: str = Field(description="Destination star system")
     system_address: int = Field(description="System address")
-    star_pos: List[float] = Field(
+    star_pos: list[float] = Field(
         default_factory=list, description="Star position coordinates"
     )
     jump_dist: float = Field(description="Jump distance in light years")
@@ -81,10 +82,10 @@ class DockedEvent(JournalEvent):
     star_system: str = Field(description="Star system name")
     system_address: int = Field(description="System address")
     market_id: int = Field(description="Market ID")
-    station_faction: Dict[str, Any] = Field(description="Station faction info")
+    station_faction: dict[str, Any] = Field(description="Station faction info")
     station_government: str = Field(description="Station government type")
     station_economy: str = Field(description="Station economy type")
-    station_economies: List[Dict[str, Any]] = Field(description="Station economies")
+    station_economies: list[dict[str, Any]] = Field(description="Station economies")
 
 
 class CommanderEvent(JournalEvent):
@@ -112,10 +113,10 @@ class CarrierStatsEvent(JournalEvent):
 
     carrier_id: int = Field(description="Unique carrier ID")
     name: str = Field(description="Carrier name")
-    callsign: Optional[str] = Field(
+    callsign: str | None = Field(
         default=None, description="Carrier callsign (e.g. ABC-123)"
     )
-    market_id: Optional[int] = Field(
+    market_id: int | None = Field(
         default=None,
         description=(
             "Market ID for the carrier when available in the journal payload. "
@@ -136,12 +137,14 @@ class CarrierTradeOrderEvent(JournalEvent):
 
     carrier_id: int = Field(description="Unique carrier ID")
     commodity: str = Field(description="Commodity or material name")
-    commodity_localised: Optional[str] = Field(
+    commodity_localised: str | None = Field(
         default=None, description="Localized commodity or material name"
     )
     purchase_order: int = Field(
         default=0,
-        description="Total units the carrier intends to buy (PurchaseOrder, if present)",
+        description=(
+            "Total units the carrier intends to buy (PurchaseOrder, if present)"
+        ),
     )
     sale_order: int = Field(
         default=0,

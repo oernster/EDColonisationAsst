@@ -1,13 +1,13 @@
 """Configuration management for the application"""
 
 import os
-import sys
 from pathlib import Path
-from typing import List
-import yaml
+import sys
+
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+import yaml
 
 # Load .env file at the top level of the module
 load_dotenv()
@@ -17,7 +17,9 @@ class JournalConfig(BaseSettings):
     """Journal file configuration"""
 
     directory: str = Field(
-        default=r"C:\Users\%USERNAME%\Saved Games\Frontier Developments\Elite Dangerous",
+        default=(
+            r"C:\Users\%USERNAME%\Saved Games\Frontier Developments" "\\Elite Dangerous"
+        ),
         description="Path to Elite: Dangerous journal directory",
     )
     watch_interval: float = Field(
@@ -30,7 +32,7 @@ class ServerConfig(BaseSettings):
 
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, description="Server port")
-    cors_origins: List[str] = Field(
+    cors_origins: list[str] = Field(
         default=["http://localhost:5173"], description="Allowed CORS origins"
     )
 
@@ -224,8 +226,7 @@ def get_config() -> AppConfig:
             configured_str = _config.journal.directory
             looks_like_windows_default = (
                 "%USERNAME%" in configured_str
-                or configured_str.startswith("C:\\")
-                or configured_str.startswith("C:/")
+                or configured_str.startswith(("C:\\", "C:/"))
             )
 
             configured_path = Path(configured_str)

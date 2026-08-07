@@ -1,17 +1,16 @@
 """API request and response models"""
 
-from enum import Enum
-from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from .colonisation import ConstructionSite, SystemColonisationData, CommodityAggregate
+
 from .carriers import CarrierIdentity, CarrierState
+from .colonisation import CommodityAggregate, ConstructionSite
 
 
 class SystemResponse(BaseModel):
     """Response model for system colonisation data"""
 
     system_name: str = Field(description="Star system name")
-    construction_sites: List[ConstructionSite] = Field(
+    construction_sites: list[ConstructionSite] = Field(
         description="Construction sites in system"
     )
     total_sites: int = Field(description="Total number of sites")
@@ -29,16 +28,16 @@ class SiteResponse(BaseModel):
 class SystemListResponse(BaseModel):
     """Response model for list of systems"""
 
-    systems: List[str] = Field(description="List of system names with construction")
+    systems: list[str] = Field(description="List of system names with construction")
 
 
 class SiteListResponse(BaseModel):
     """Response model for a list of construction sites, categorized by status."""
 
-    in_progress_sites: List[ConstructionSite] = Field(
+    in_progress_sites: list[ConstructionSite] = Field(
         description="List of sites currently under construction"
     )
-    completed_sites: List[ConstructionSite] = Field(
+    completed_sites: list[ConstructionSite] = Field(
         description="List of completed construction sites"
     )
 
@@ -46,7 +45,7 @@ class SiteListResponse(BaseModel):
 class CommodityAggregateResponse(BaseModel):
     """Response model for aggregated commodity data"""
 
-    commodities: List[CommodityAggregate] = Field(
+    commodities: list[CommodityAggregate] = Field(
         description="Aggregated commodity data"
     )
 
@@ -55,7 +54,7 @@ class ErrorResponse(BaseModel):
     """Error response model"""
 
     error: str = Field(description="Error message")
-    detail: Optional[str] = Field(None, description="Detailed error information")
+    detail: str | None = Field(None, description="Detailed error information")
     status_code: int = Field(description="HTTP status code")
 
 
@@ -87,7 +86,7 @@ class AppSettings(BaseModel):
         default=True,
         description=(
             "When true (default), prefer local journal data for systems where the "
-            "current commander has construction sites, and use Inara data primarily "
+            "current commander has construction sites and use Inara data primarily "
             "for other systems. When false, Inara data is preferred wherever it is "
             "available."
         ),
@@ -100,7 +99,7 @@ class CurrentCarrierResponse(BaseModel):
     docked_at_carrier: bool = Field(
         description="True if the commander is currently docked at a fleet carrier."
     )
-    carrier: Optional[CarrierIdentity] = Field(
+    carrier: CarrierIdentity | None = Field(
         default=None,
         description=(
             "Identity of the carrier the commander is currently docked at, if any. "
@@ -112,7 +111,7 @@ class CurrentCarrierResponse(BaseModel):
 class CarrierStateResponse(BaseModel):
     """Response model for a reconstructed carrier state snapshot."""
 
-    carrier: Optional[CarrierState] = Field(
+    carrier: CarrierState | None = Field(
         default=None,
         description=(
             "Current reconstructed state of the carrier (cargo + orders). "
@@ -124,11 +123,11 @@ class CarrierStateResponse(BaseModel):
 class MyCarriersResponse(BaseModel):
     """Response model listing the commander's own and squadron carriers."""
 
-    own_carriers: List[CarrierIdentity] = Field(
+    own_carriers: list[CarrierIdentity] = Field(
         default_factory=list,
         description="Fleet carriers owned by the current commander.",
     )
-    squadron_carriers: List[CarrierIdentity] = Field(
+    squadron_carriers: list[CarrierIdentity] = Field(
         default_factory=list,
         description="Fleet carriers belonging to the commander's squadron.",
     )

@@ -1,8 +1,8 @@
 """Colonisation-specific data models"""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional
+
 from pydantic import BaseModel, Field, computed_field
 
 
@@ -68,7 +68,7 @@ class ConstructionSite(BaseModel):
     )
     construction_complete: bool = Field(description="Whether construction is complete")
     construction_failed: bool = Field(description="Whether construction has failed")
-    commodities: List[Commodity] = Field(
+    commodities: list[Commodity] = Field(
         default_factory=list, description="Required commodities"
     )
     last_updated: datetime = Field(
@@ -109,7 +109,7 @@ class SystemColonisationData(BaseModel):
     """Aggregated colonisation data for a system"""
 
     system_name: str = Field(description="Star system name")
-    construction_sites: List[ConstructionSite] = Field(
+    construction_sites: list[ConstructionSite] = Field(
         default_factory=list, description="All construction sites in the system"
     )
 
@@ -151,7 +151,7 @@ class CommodityAggregate(BaseModel):
     total_provided: int = Field(
         ge=0, description="Total amount provided across all sites"
     )
-    sites_requiring: List[str] = Field(
+    sites_requiring: list[str] = Field(
         default_factory=list,
         description="List of station names requiring this commodity",
     )

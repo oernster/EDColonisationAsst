@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Startup splash window and readiness monitor for the frozen runtime.
 
 On first run the packaged runtime can take a noticeable amount of time to
@@ -20,10 +18,12 @@ monitor accepts an injectable clock so both are unit-testable without a
 Qt event loop.
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
 import threading
 import time
-from pathlib import Path
-from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QPixmap, QShowEvent
@@ -140,12 +140,12 @@ class StartupMonitor:
         self._timeout_seconds = timeout_seconds
         self._interval_ms = interval_ms
         self._monotonic = monotonic
-        self._deadline: Optional[float] = None
-        self._timer: Optional[QTimer] = None
+        self._deadline: float | None = None
+        self._timer: QTimer | None = None
         self._finished = False
         self._latest: tuple[bool, bool] = (False, False)
         self._stop_event = threading.Event()
-        self._worker: Optional[threading.Thread] = None
+        self._worker: threading.Thread | None = None
 
     @property
     def finished(self) -> bool:
@@ -226,7 +226,7 @@ class StartupSplashWindow(QWidget):
     def __init__(
         self,
         version: str,
-        icon_path: Optional[Path] = None,
+        icon_path: Path | None = None,
     ) -> None:
         super().__init__(
             None,
@@ -291,7 +291,7 @@ class StartupSplashWindow(QWidget):
         """Update the live status line."""
         self._status_label.setText(message)
 
-    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 (Qt override)
+    def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
         self._center_on_screen()
 

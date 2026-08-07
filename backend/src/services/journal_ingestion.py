@@ -15,14 +15,12 @@ helps keep file_watcher.py focused on watcher lifecycle concerns.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Optional, Set
 
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEventHandler
 
-from .journal_parser import IJournalParser
-from .system_tracker import ISystemTracker
 from ..models.colonisation import Commodity, ConstructionSite
 from ..models.journal_events import (
     ColonisationConstructionDepotEvent,
@@ -33,6 +31,8 @@ from ..models.journal_events import (
 )
 from ..repositories.colonisation_repository import IColonisationRepository
 from ..utils.logger import get_logger
+from .journal_parser import IJournalParser
+from .system_tracker import ISystemTracker
 
 logger = get_logger(__name__)
 
@@ -52,8 +52,8 @@ class JournalFileHandler(FileSystemEventHandler):
         parser: IJournalParser,
         system_tracker: ISystemTracker,
         repository: IColonisationRepository,
-        update_callback: Optional[Callable] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
+        update_callback: Callable | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         self.parser = parser
         self.system_tracker = system_tracker
@@ -61,7 +61,7 @@ class JournalFileHandler(FileSystemEventHandler):
         self.update_callback = update_callback
         # Legacy field kept for backward compatibility; we now track per-file
         # offsets for incremental processing instead.
-        self._processed_files: Set[str] = set()
+        self._processed_files: set[str] = set()
         # Incremental processing state:
         # - remember how many BYTES we have already read from each journal file
         # - keep any trailing partial line bytes (when the writer hasn't yet
@@ -127,7 +127,7 @@ class JournalFileHandler(FileSystemEventHandler):
 
         # Diagnostics
         try:
-            self.last_watchdog_event_at = datetime.now(timezone.utc).isoformat()
+            self.last_watchdog_event_at = datetime.now(UTC).isoformat()
             self.last_watchdog_event_type = "modified"
             self.last_watchdog_event_path = str(file_path)
         except Exception:
@@ -156,7 +156,7 @@ class JournalFileHandler(FileSystemEventHandler):
 
         # Diagnostics
         try:
-            self.last_watchdog_event_at = datetime.now(timezone.utc).isoformat()
+            self.last_watchdog_event_at = datetime.now(UTC).isoformat()
             self.last_watchdog_event_type = "created"
             self.last_watchdog_event_path = str(file_path)
         except Exception:
@@ -180,7 +180,7 @@ class JournalFileHandler(FileSystemEventHandler):
             # Diagnostics
             try:
                 self.last_processed_file = str(file_path)
-                self.last_processed_at = datetime.now(timezone.utc).isoformat()
+                self.last_processed_at = datetime.now(UTC).isoformat()
                 self.last_error = None
             except Exception:
                 pass
@@ -219,7 +219,15 @@ class JournalFileHandler(FileSystemEventHandler):
                     # see a partial line without a trailing newline. We MUST
                     # retain that partial and retry it on the next pass.
                     try:
-                        with open(file_path, "rb") as f:
+                        # Blocking and flagged as such; this is the
+                        # INCREMENTAL branch: it seeks to the stored byte
+                        # offset and reads only what the game has appended
+                        # since the last pass, which is a handful of lines.
+                        # The whole-file branch above goes through
+                        # parser.parse_file, which ruff cannot see and which
+                        # is the one that would actually be worth moving off
+                        # the loop if this ever becomes a problem.
+                        with open(file_path, "rb") as f:  # noqa: ASYNC230
                             f.seek(offset)
                             chunk = f.read()
                             new_offset = offset + len(chunk)
@@ -235,7 +243,13 @@ class JournalFileHandler(FileSystemEventHandler):
                             # Decode a single line; tolerate any weird bytes.
                             try:
                                 line = part.decode("utf-8", errors="replace").strip()
-                            except Exception:
+                            except Exception:  # noqa: BLE001, S112
+                                # errors="replace" already absorbs bad
+                                # bytes, so reaching here means the line
+                                # is unusable rather than merely odd. One
+                                # bad line must not abandon the rest of
+                                # the chunk; logging every one would
+                                # flood the log during a live tail.
                                 continue
                             if not line:
                                 continue
@@ -243,8 +257,12 @@ class JournalFileHandler(FileSystemEventHandler):
                                 ev = self.parser.parse_line(line)
                                 if ev is not None:
                                     events.append(ev)
-                            except Exception:
-                                # Keep processing; parser logs internally.
+                            except Exception:  # noqa: BLE001, S112
+                                # Keep processing. The parser logs the
+                                # cause itself, so logging again here
+                                # would duplicate every parse failure,
+                                # and one unparseable line must not stop
+                                # the remaining events in the chunk.
                                 continue
 
                         self._file_offsets_bytes[key] = new_offset
@@ -268,7 +286,7 @@ class JournalFileHandler(FileSystemEventHandler):
                 return
 
             # Process each event
-            updated_systems: Set[str] = set()
+            updated_systems: set[str] = set()
             depot_market_ids: set[int] = set()
 
             for event in events:
@@ -337,7 +355,7 @@ class JournalFileHandler(FileSystemEventHandler):
               or fall back to the SystemTracker's current system/station.
             - New snapshots must never *lose* progress that was previously
               observed in either:
-                • earlier depot snapshots, or
+                • earlier depot snapshots or
                 • ColonisationContribution events.
               To ensure this we merge commodity progress with any existing
               site and take the maximum observed provided_amount/required_amount
@@ -360,7 +378,8 @@ class JournalFileHandler(FileSystemEventHandler):
             )
             snapshot_commodities[name] = commodity
 
-        # Also fall back to the currently tracked system/station when event fields are missing.
+        # Also fall back to the currently tracked system/station when event
+        # fields are missing.
         try:
             current_system = self.system_tracker.get_current_system()
         except Exception:
@@ -422,7 +441,7 @@ class JournalFileHandler(FileSystemEventHandler):
 
             # Then, keep any commodities that were previously known but no longer
             # appear in the snapshot payload. This is defensive: journals should
-            # normally continue to report all commodities, but we never want to
+            # normally continue to report all commodities but we never want to
             # silently drop progress from the database.
             for name, prev in existing_by_name.items():
                 if name not in snapshot_commodities:
@@ -503,7 +522,7 @@ class JournalFileHandler(FileSystemEventHandler):
                     existing_site.station_name,
                     existing_site.system_name,
                 )
-            return  # Either updated, or already matched the latest metadata
+            return  # Either updated or already matched the latest metadata
 
         # No existing site: create placeholder from Docked data
         site = ConstructionSite(

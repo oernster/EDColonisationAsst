@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Runtime mode detection utilities.
 
@@ -11,9 +9,11 @@ It is intentionally minimal and side‑effect free so that it can be safely
 imported from anywhere in the backend.
 """
 
-import sys
+from __future__ import annotations
+
 from enum import Enum, auto
 from pathlib import Path
+import sys
 
 
 class RuntimeMode(Enum):

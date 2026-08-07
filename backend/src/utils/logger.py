@@ -2,13 +2,11 @@
 
 import logging
 import sys
-from typing import Optional
+
 from ..config import get_config
 
 
-def setup_logging(
-    level: Optional[str] = None, format_str: Optional[str] = None
-) -> None:
+def setup_logging(level: str | None = None, format_str: str | None = None) -> None:
     """
     Setup logging configuration for the application
 

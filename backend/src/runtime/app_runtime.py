@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Core runtime orchestration for the packaged and development runtimes.
 
@@ -15,19 +13,19 @@ Keeping these classes here allows runtime_entry.py to remain a thin entrypoint
 focused on single-instance enforcement and crash logging.
 """
 
+from __future__ import annotations
+
 import threading
 import time
 import webbrowser
-from typing import Optional
 
-import uvicorn
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+import uvicorn
 
-from .common import _debug_log, fastapi_app, logger
+from .common import RuntimeMode, _debug_log, fastapi_app, logger
 from .environment import RuntimeEnvironment
-from .common import RuntimeMode
 
 # Canonical application version, resolved from the top-level VERSION file.
 try:
@@ -37,7 +35,10 @@ except Exception:  # noqa: BLE001
 
 # Shared Help menu (About + Check for Updates) used by the tray UI.
 try:
-    from .help_menu import add_help_menu, resolve_about_icon  # type: ignore[import-not-found]
+    from .help_menu import (  # type: ignore[import-not-found]
+        add_help_menu,
+        resolve_about_icon,
+    )
 except Exception:  # noqa: BLE001
     from backend.src.runtime.help_menu import (  # type: ignore[import-error]
         add_help_menu,
@@ -73,8 +74,8 @@ class BackendServerController:
 
     def __init__(self, env: RuntimeEnvironment) -> None:
         self._env = env
-        self._server: Optional[uvicorn.Server] = None
-        self._thread: Optional[threading.Thread] = None
+        self._server: uvicorn.Server | None = None
+        self._thread: threading.Thread | None = None
 
     # ------------------------------- public API -----------------------------
 
@@ -190,7 +191,8 @@ class BackendServerController:
         if self._server is not None:
             logger.info("In-process uvicorn server already started.")
             _debug_log(
-                "[BackendServerController] _start_inprocess() called but server already running",
+                "[BackendServerController] _start_inprocess() called but "
+                "server already running",
             )
             return
 
@@ -385,8 +387,8 @@ class RuntimeApplication:
         self._open_browser = open_browser
         # Strong references to Qt-side startup helpers created in
         # _run_frozen(); kept on self so they outlive the local scope.
-        self._monitor: Optional[StartupMonitor] = None
-        self._splash: Optional[StartupSplashWindow] = None
+        self._monitor: StartupMonitor | None = None
+        self._splash: StartupSplashWindow | None = None
         _debug_log(
             "[RuntimeApplication] detected environment: "
             f"mode={self._env.mode}, project_root={self._env.project_root}",
@@ -412,6 +414,7 @@ class RuntimeApplication:
         exactly as before, so that developer workflows are unchanged.
         """
         from PySide6.QtCore import QTimer  # imported lazily for speed
+
         from .launcher import Launcher, QtLaunchWindow
 
         app = QApplication([])
@@ -455,7 +458,7 @@ class RuntimeApplication:
 
         # Show the splash before any heavier startup work so the user gets
         # immediate feedback. Background starts (--no-browser) stay silent.
-        splash: Optional[StartupSplashWindow] = None
+        splash: StartupSplashWindow | None = None
         if self._open_browser:
             splash = StartupSplashWindow(
                 version=__version__,
@@ -520,4 +523,4 @@ class RuntimeApplication:
         return result
 
 
-__all__ = ["BackendServerController", "TrayUIController", "RuntimeApplication"]
+__all__ = ["BackendServerController", "RuntimeApplication", "TrayUIController"]

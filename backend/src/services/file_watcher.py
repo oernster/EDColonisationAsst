@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
+import asyncio
+from collections.abc import Callable
+from datetime import UTC
 from pathlib import Path
-from typing import Callable, Optional
 
 from watchdog.observers import Observer
 
-from .journal_parser import IJournalParser
-from .system_tracker import ISystemTracker
-from .journal_ingestion import JournalFileHandler
 from ..repositories.colonisation_repository import IColonisationRepository
 from ..utils.logger import get_logger
 from ..utils.runtime import is_frozen
+from .journal_ingestion import JournalFileHandler
+from .journal_parser import IJournalParser
+from .system_tracker import ISystemTracker
 
 logger = get_logger(__name__)
 
@@ -56,15 +57,15 @@ class FileWatcher(IFileWatcher):
         parser: IJournalParser,
         system_tracker: ISystemTracker,
         repository: IColonisationRepository,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         self.parser = parser
         self.system_tracker = system_tracker
         self.repository = repository
-        self._observer: Optional[Observer] = None
-        self._handler: Optional[JournalFileHandler] = None
-        self._update_callback: Optional[Callable] = None
-        self._directory: Optional[Path] = None
+        self._observer: Observer | None = None
+        self._handler: JournalFileHandler | None = None
+        self._update_callback: Callable | None = None
+        self._directory: Path | None = None
         self._watchdog_started_at: str | None = None
         self._watchdog_last_error: str | None = None
         # Event loop used to schedule async processing from watchdog threads.
@@ -72,11 +73,11 @@ class FileWatcher(IFileWatcher):
 
         # Fallback polling for environments where watchdog events are unreliable
         # (observed in some packaged/installed contexts).
-        self._poll_task: Optional[asyncio.Task[None]] = None
+        self._poll_task: asyncio.Task[None] | None = None
         # Smaller interval improves perceived immediacy in packaged mode where
         # watchdog may be unavailable.
         self._poll_interval_s: float = 0.25
-        self._poll_last_path: Optional[Path] = None
+        self._poll_last_path: Path | None = None
         self._poll_last_mtime: float | None = None
         self._poll_last_checked_at: str | None = None
         self._poll_last_error: str | None = None
@@ -87,7 +88,7 @@ class FileWatcher(IFileWatcher):
             return False
         # watchdog Observer exposes is_alive() on its thread-like object.
         try:
-            return bool(getattr(self._observer, "is_alive")())
+            return bool(self._observer.is_alive())
         except Exception:
             # Best-effort fallback.
             return True
@@ -97,9 +98,7 @@ class FileWatcher(IFileWatcher):
         alive = None
         try:
             alive = (
-                bool(getattr(self._observer, "is_alive")())
-                if self._observer is not None
-                else False
+                bool(self._observer.is_alive()) if self._observer is not None else False
             )
         except Exception:
             alive = None
@@ -147,7 +146,7 @@ class FileWatcher(IFileWatcher):
             "interval_s": self._poll_interval_s,
         }
 
-    def watched_directory(self) -> Optional[Path]:
+    def watched_directory(self) -> Path | None:
         """Return the current watched directory, if any."""
         return self._directory
 
@@ -180,7 +179,7 @@ class FileWatcher(IFileWatcher):
         if self._observer is not None:
             # If the previous observer thread died, treat this as a restart.
             try:
-                alive = bool(getattr(self._observer, "is_alive")())
+                alive = bool(self._observer.is_alive())
             except Exception:
                 alive = True
 
@@ -208,13 +207,13 @@ class FileWatcher(IFileWatcher):
             loop=self._loop,
         )
 
-        # Always attempt to start watchdog, but treat failures as non-fatal.
+        # Always attempt to start watchdog but treat failures as non-fatal.
         # The polling fallback can still provide live-ish updates.
         self._watchdog_last_error = None
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            self._watchdog_started_at = datetime.now(timezone.utc).isoformat()
+            self._watchdog_started_at = datetime.now(UTC).isoformat()
         except Exception:
             self._watchdog_started_at = None
 
@@ -224,31 +223,34 @@ class FileWatcher(IFileWatcher):
             self._observer.start()
 
             try:
-                alive = bool(getattr(self._observer, "is_alive")())
+                alive = bool(self._observer.is_alive())
             except Exception:
                 alive = True
 
             if alive:
                 logger.info("Started watching journal directory: %s", directory)
             else:
-                self._watchdog_last_error = "Observer thread is not alive after start(); watchdog events unavailable"
+                self._watchdog_last_error = (
+                    "Observer thread is not alive after start(); "
+                    "watchdog events unavailable"
+                )
                 logger.error(self._watchdog_last_error)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._watchdog_last_error = f"{type(exc).__name__}: {exc}"
             logger.exception(
                 "Failed to start watchdog observer: %s", self._watchdog_last_error
             )
             self._observer = None
 
-        # Process existing files, but never prevent polling from starting.
+        # Process existing files but never prevent polling from starting.
         # When process_existing is False the caller (the packaged lifespan)
         # performs the initial catch-up in the background so that starting the
         # watcher stays fast and does not block server readiness.
         try:
             if process_existing:
                 await self._process_existing_files(directory)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Error while processing existing journals: %s", exc)
+        except Exception:
+            logger.exception("Error while processing existing journals")
         finally:
             # In the packaged runtime, watchdog can fail to deliver events on some
             # systems (or deliver only directory events). As a safety net, also
@@ -264,7 +266,7 @@ class FileWatcher(IFileWatcher):
                 await self._poll_task
             except asyncio.CancelledError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("Error while stopping poller task")
             finally:
                 self._poll_task = None
@@ -284,7 +286,7 @@ class FileWatcher(IFileWatcher):
 
         logger.info("Stopped watching journal directory")
 
-    # ------------------------------------------------------------------ polling fallback
+    # --------------------------------------------------------- polling fallback
 
     def _start_polling_if_enabled(self, directory: Path) -> None:
         """Start the polling fallback task (packaged runtime only)."""
@@ -304,7 +306,7 @@ class FileWatcher(IFileWatcher):
                 self._poll_interval_s,
                 directory,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Polling is best-effort; watchdog remains the primary mechanism.
             logger.exception("Failed to start polling fallback")
 
@@ -316,9 +318,9 @@ class FileWatcher(IFileWatcher):
             try:
                 # Diagnostics: remember we are alive.
                 try:
-                    from datetime import datetime, timezone
+                    from datetime import datetime
 
-                    self._poll_last_checked_at = datetime.now(timezone.utc).isoformat()
+                    self._poll_last_checked_at = datetime.now(UTC).isoformat()
                 except Exception:
                     pass
 
@@ -328,22 +330,18 @@ class FileWatcher(IFileWatcher):
                     latest = max(journal_files, key=lambda p: p.stat().st_mtime)
                     latest_mtime = latest.stat().st_mtime
 
-                    changed = False
-                    if self._poll_last_path is None or latest != self._poll_last_path:
-                        changed = True
-                    elif self._poll_last_mtime is None:
-                        changed = True
-                    elif latest_mtime > (self._poll_last_mtime + epsilon):
-                        changed = True
+                    prev, prev_t = self._poll_last_path, self._poll_last_mtime
+                    stale = prev_t is not None and latest_mtime > prev_t + epsilon
+                    changed = prev is None or prev_t is None or latest != prev or stale
 
                     if changed and self._handler is not None:
                         self._poll_last_path = latest
                         self._poll_last_mtime = latest_mtime
                         self._poll_last_error = None
-                        await self._handler._process_file(latest)  # noqa: SLF001
+                        await self._handler._process_file(latest)
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("Polling fallback encountered an error")
                 try:
                     self._poll_last_error = (
@@ -376,4 +374,4 @@ class FileWatcher(IFileWatcher):
         for file_path in journal_files:
             logger.info("Processing journal file: %s", file_path.name)
             if self._handler is not None:
-                await self._handler._process_file(file_path)  # noqa: SLF001
+                await self._handler._process_file(file_path)

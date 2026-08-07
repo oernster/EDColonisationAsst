@@ -1,17 +1,17 @@
 """Service layer modules"""
 
-from .journal_parser import JournalParser, IJournalParser
-from .file_watcher import FileWatcher, IFileWatcher
 from .data_aggregator import DataAggregator, IDataAggregator
-from .system_tracker import SystemTracker, ISystemTracker
+from .file_watcher import FileWatcher, IFileWatcher
+from .journal_parser import IJournalParser, JournalParser
+from .system_tracker import ISystemTracker, SystemTracker
 
 __all__ = [
-    "JournalParser",
-    "IJournalParser",
-    "FileWatcher",
-    "IFileWatcher",
     "DataAggregator",
+    "FileWatcher",
     "IDataAggregator",
-    "SystemTracker",
+    "IFileWatcher",
+    "IJournalParser",
     "ISystemTracker",
+    "JournalParser",
+    "SystemTracker",
 ]

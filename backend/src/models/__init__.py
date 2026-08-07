@@ -1,27 +1,27 @@
 """Data models for the application"""
 
+from .api_models import (
+    ErrorResponse,
+    SiteResponse,
+    SystemResponse,
+)
 from .colonisation import (
     Commodity,
+    CommodityAggregate,
     CommodityStatus,
     ConstructionSite,
     SystemColonisationData,
-    CommodityAggregate,
 )
 from .journal_events import (
-    JournalEvent,
     ColonisationConstructionDepotEvent,
     ColonisationContributionEvent,
-    LocationEvent,
-    FSDJumpEvent,
     DockedEvent,
-)
-from .api_models import (
-    SystemResponse,
-    SiteResponse,
-    ErrorResponse,
+    FSDJumpEvent,
+    JournalEvent,
+    LocationEvent,
 )
 
-__all__ = [
+__all__ = [  # noqa: RUF022 - grouped by model family, not alphabetically
     # Colonisation models
     "Commodity",
     "CommodityStatus",

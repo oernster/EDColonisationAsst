@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 import os
 from pathlib import Path
-from typing import Iterable, Optional
 
 # Elite journals live under ".../Saved Games/Frontier Developments/Elite Dangerous"
 _JOURNAL_SUBPATH = Path("Saved Games") / "Frontier Developments" / "Elite Dangerous"
@@ -111,7 +111,7 @@ def _iter_linux_journal_candidates() -> Iterable[Path]:
         yield prefix / "drive_c" / "users" / "steamuser" / _JOURNAL_SUBPATH
 
 
-def find_journal_directory() -> Optional[Path]:
+def find_journal_directory() -> Path | None:
     """Best-effort auto-detection of the journal directory for the current OS."""
     if os.name == "nt":
         # Import only on Windows to avoid accidental platform-specific import issues.
@@ -158,7 +158,7 @@ def get_journal_directory() -> Path:
     )
 
 
-def get_latest_journal_file(journal_dir: Path) -> Optional[Path]:
+def get_latest_journal_file(journal_dir: Path) -> Path | None:
     """Get the latest journal file from the given directory."""
     files = get_journal_files(journal_dir)
     return files[-1] if files else None

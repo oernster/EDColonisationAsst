@@ -1,8 +1,8 @@
 """System tracker service - tracks current player system"""
 
 from abc import ABC, abstractmethod
-from typing import Optional
-from ..models.journal_events import LocationEvent, FSDJumpEvent, DockedEvent
+
+from ..models.journal_events import DockedEvent, FSDJumpEvent, LocationEvent
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -12,24 +12,20 @@ class ISystemTracker(ABC):
     """Interface for system tracking"""
 
     @abstractmethod
-    def get_current_system(self) -> Optional[str]:  # pragma: no cover
+    def get_current_system(self) -> str | None:  # pragma: no cover
         """Get the current system name"""
-        pass
 
     @abstractmethod
     def update_from_location(self, event: LocationEvent) -> None:  # pragma: no cover
         """Update current system from Location event"""
-        pass
 
     @abstractmethod
     def update_from_jump(self, event: FSDJumpEvent) -> None:  # pragma: no cover
         """Update current system from FSDJump event"""
-        pass
 
     @abstractmethod
     def update_from_docked(self, event: DockedEvent) -> None:  # pragma: no cover
         """Update current system from Docked event"""
-        pass
 
 
 class SystemTracker(ISystemTracker):
@@ -39,11 +35,11 @@ class SystemTracker(ISystemTracker):
     """
 
     def __init__(self) -> None:
-        self._current_system: Optional[str] = None
-        self._current_station: Optional[str] = None
+        self._current_system: str | None = None
+        self._current_station: str | None = None
         self._is_docked: bool = False
 
-    def get_current_system(self) -> Optional[str]:
+    def get_current_system(self) -> str | None:
         """
         Get the current system name
 
@@ -52,7 +48,7 @@ class SystemTracker(ISystemTracker):
         """
         return self._current_system
 
-    def get_current_station(self) -> Optional[str]:
+    def get_current_station(self) -> str | None:
         """
         Get the current station name if docked
 

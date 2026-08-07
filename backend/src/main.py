@@ -1,26 +1,28 @@
 """Main FastAPI application entry point"""
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
 from . import __version__
-from .config import get_config
-from .utils.logger import setup_logging, get_logger
-from .utils.runtime import is_frozen
-from .services.journal_parser import JournalParser
-from .services.file_watcher import FileWatcher
-from .services.data_aggregator import DataAggregator
-from .services.system_tracker import SystemTracker
-from .repositories.colonisation_repository import ColonisationRepository
-from .api.routes import router as colonisation_router, set_dependencies
-from .api.settings import router as settings_router
-from .api.journal import router as journal_router
 from .api.carriers import router as carriers_router
 from .api.changes import router as changes_router
+from .api.journal import router as journal_router
+from .api.routes import router as colonisation_router, set_dependencies
+from .api.settings import router as settings_router
+from .config import get_config
+from .repositories.colonisation_repository import ColonisationRepository
 from .services.change_bus import change_bus
+from .services.data_aggregator import DataAggregator
+from .services.file_watcher import FileWatcher
+from .services.journal_parser import JournalParser
+from .services.system_tracker import SystemTracker
+from .utils.logger import get_logger, setup_logging
+from .utils.runtime import is_frozen
 
 # Setup logging
 setup_logging()
@@ -117,10 +119,11 @@ async def _prime_colonisation_database_if_empty(
 
     # Reuse the same ingestion pipeline as the live FileWatcher and the
     # /api/debug/reload-journals endpoint so behaviour is consistent.
+    import asyncio
+
     from .services.file_watcher import (
         JournalFileHandler,
     )  # local import to avoid cycles
-    import asyncio
 
     handler = JournalFileHandler(
         parser=parser,
@@ -229,11 +232,11 @@ async def _sync_latest_journals_best_effort(
             # refresh hint that the next poll recovers, while letting it out
             # would fail the caller.
             pass
-    except Exception as exc:  # noqa: BLE001
+    except Exception:
         # Deliberately broad, as the docstring above says: this whole function
         # is a best-effort catch-up over game-written files and must never
         # take startup down with it. Logged with a traceback, then dropped.
-        logger.exception("Best-effort latest journal sync failed: %s", exc)
+        logger.exception("Best-effort latest journal sync failed")
 
 
 @asynccontextmanager
@@ -271,7 +274,9 @@ async def lifespan(app: FastAPI):
     try:
         file_watcher = FileWatcher(parser, system_tracker, repository, loop=loop)
     except TypeError:
-        file_watcher = FileWatcher(parser, system_tracker, repository)  # type: ignore[call-arg]
+        file_watcher = FileWatcher(  # type: ignore[call-arg]
+            parser, system_tracker, repository
+        )
 
     # Expose components via application state for other parts of the app
     app.state.repository = repository
@@ -326,7 +331,7 @@ async def lifespan(app: FastAPI):
                 await _sync_latest_journals_best_effort(
                     parser, system_tracker, repository, journal_dir, loop
                 )
-        except Exception:  # noqa: BLE001
+        except Exception:
             # Deliberately broad. This runs as a detached task, so an escaping
             # exception would be reported only as "Task exception was never
             # retrieved" on the event loop, with no traceback in the
@@ -386,7 +391,7 @@ async def lifespan(app: FastAPI):
         # Expected "directory missing" case: log clearly but do not block startup.
         logger.error("Failed to start file watcher: %s", e)
         logger.warning("Application will start but journal monitoring is disabled")
-    except Exception as e:  # noqa: BLE001
+    except Exception:
         # Deliberately broad, for the reason spelled out below: watchdog sits
         # on OS notification APIs whose failures are platform-specific and
         # open-ended. This is the one handler here where letting an
@@ -402,9 +407,10 @@ async def lifespan(app: FastAPI):
         # To keep the application usable even when journal monitoring cannot be
         # initialised, we treat any unexpected error as non-fatal: log it with
         # full details and continue starting the API without an active watcher.
-        logger.exception("Unexpected error while starting file watcher: %s", e)
+        logger.exception("Unexpected error while starting file watcher")
         logger.warning(
-            "Application will start but journal monitoring is disabled due to the error above"
+            "Application will start but journal monitoring is disabled "
+            "due to the error above"
         )
 
     try:

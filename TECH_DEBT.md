@@ -4,16 +4,16 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. `carrier_service.py` is 965 lines and the front end has three files over 500
+## 1. `carrier_service.py` is 960 lines and the front end has three files over 500
 
 | File | Lines |
 |---|---|
-| `backend/src/services/carrier_service.py` | 965 |
+| `backend/src/services/carrier_service.py` | 960 |
 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` | 752 |
 | `frontend/src/App.tsx` | 651 |
 | `frontend/src/components/SiteList/SiteList.tsx` | 598 |
-| `backend/src/services/journal_ingestion.py` | 526 |
-| `backend/src/runtime/app_runtime.py` | 523 |
+| `backend/src/services/journal_ingestion.py` | 545 |
+| `backend/src/runtime/app_runtime.py` | 526 |
 
 `carrier_service.py` is the one to take first. It is the largest non-installer source file, it has its own 793-line API test and its own 670-line coverage test; fleet-carrier state reconstruction from journal events is the most intricate logic in the project. Splitting it along the seams the tests already imply (order reconstruction, docking context, cargo and market state) would make each part reviewable.
 
@@ -27,26 +27,38 @@ These nineteen files (seven backend source, eight backend test, four front end) 
 
 The configuration gap is closed. `.flake8` sets 88 at the repository root so flake8 and black no longer disagree, the stale top-level `[tool.ruff]` keys have moved under `[tool.ruff.lint]`; the pre-commit hook now runs `ruff check --isolated` and `flake8` over `installer`, `installer_main.py` and `tests` before the suite. That surface passes both linters and the hook fails on a planted violation, so it will stay passing.
 
-What is left is the reason the step is scoped that narrowly. `backend/src` is not close to clean and widening the list is a sweep, not a flag flip. Re-measured 2026-08-07 with ruff 0.16.1, after the startup-path handlers were dealt with:
+The sweep is most of the way there. `backend/src` was at 558 findings; it is now at 80, all of one kind. Re-measured 2026-08-07 with ruff 0.16.1:
 
-| Rule | Count | What it is |
-|---|---|---|
-| UP045, UP006, UP035, UP037, UP017 | 229 | `Optional[X]`, `typing.List` and friends against a `py311` target |
-| E402 | 56 | Imports after code, mostly the runtime path juggling `sys.path` |
-| BLE001 | 55 | Broad `except Exception`, now outside the startup path |
-| I001 | 45 | Import blocks out of order |
-| S110, S112 | 29 | `try`/`except`/`pass` and `try`/`except`/`continue` |
-| E501 | 26 | Over 88 characters |
-| F401 | 24 | Unused imports |
-| everything else | 73 | RUF, PIE, ASYNC, B, TRY, FURB, SIM, PERF, PYI |
+| Rule | Was | Now | What happened |
+|---|---|---|---|
+| UP045, UP006, UP035, UP037, UP017 | 229 | 0 | `--fix` |
+| E402 | 56 | 0 | Ten files had `from __future__` above the docstring, so the docstring was a no-op statement and every import counted as "after code". Moving it below the docstring cleared all 56 and restored ten `__doc__` values that were `None`. |
+| I001, F401, E501 and the long tail | 193 | 0 | `--fix` for the import order, hand rewrapping for the 27 long lines, `__all__` for the re-export surfaces |
+| BLE001 | 55 | 53 | Still open |
+| S110, S112 | 29 | 27 | Still open |
 
-537 in total, 321 of them auto-fixable. `flake8` at 88 over the same tree reports 59.
+What is left is 80 exception handlers wanting the treatment the startup path already had: a written reason or a narrowed type where one can be demonstrated. They sit mostly in `journal_ingestion.py` (18), `tray_components.py` (14), `file_watcher.py` (10) and `runtime_entry.py` (9). `--fix` cannot touch them and a blanket `# noqa` would defeat the point, so this is the one part of the sweep that is judgement per site rather than a flag.
 
-Two things make this one job rather than seven. The 229 typing findings are mechanical and safe under `--fix`. The E402 and F401 counts include the deliberate re-exports in `launcher.py`, which want `__all__` or a targeted `# noqa` with a reason rather than deletion, so the auto-fixer cannot be trusted to run unattended over the whole tree.
+`flake8` at 88 over the same tree reports 0. The lint step widens to `backend/src` when the 80 are done, not before.
 
-The remaining 55 BLE001 are the same kind of work already done on the startup path, in `file_watcher.py`, `runtime_entry.py`, `tray_components.py`, `journal_ingestion.py` and `app_runtime.py`. Each wants a written reason or a narrowed type, decided per handler, so `--fix` cannot touch them and a blanket `# noqa` would defeat the point.
+**Do not run `ruff check --fix` unattended over this tree.** It deleted the re-export block in `runtime/common.py` and broke the runtime with `cannot import name RuntimeMode`. `common.py` and `launcher.py` now carry `__all__` to say the names are intentional, which is the durable fix; `--fix` still needs its diff read.
 
 `frontend/` has no linter wired at all and is not counted above.
+
+`file_watcher.py` sits at 377 lines, four below the danger band. The next edit that adds five lines takes it in; the rule then asks for 350 rather than 380.
+
+## 3. The US spelling of the colonisation events is documented but not implemented
+
+`journal_parser.py` said it three times over: `RELEVANT_EVENTS` is commented "accept both US and UK spellings", the dispatch reaches for the parsers through set literals shaped to hold more than one name each; `_parse_construction_depot`'s docstring lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats it handles.
+
+None of it is there. The set held `"ColonisationContribution"` twice, which is how it went unnoticed: a set deduplicates, so the second entry was invisible at runtime and the slot that should have carried the z-spelling was silently consumed. `Coloniz` does not appear anywhere in `backend/src` or `backend/tests`. Any journal line carrying `ColonizationConstructionDepot` or `ColonizationContribution` is dropped by the `event_type not in RELEVANT_EVENTS` guard before any parser sees it.
+
+The duplicate is removed, which is a no-op at runtime and is as far as this should go without a decision. **Needs a ruling**, because both directions change something:
+
+- Implement it: add both z-spellings to `RELEVANT_EVENTS` and to the two dispatch sets. That makes the parser start accepting events it currently drops, which is a behaviour change and wants a test with a real US-spelled journal line.
+- Delete the claim: strip the three mentions so nothing promises a capability the parser does not have.
+
+I would implement it, because the game writes what it writes and dropping an event silently is the worse failure. It needs your call on whether Frontier ever emits the z-spelling; if they never have, deleting the claim is the honest and cheaper answer.
 
 ---
 

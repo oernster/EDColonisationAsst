@@ -1,9 +1,11 @@
 """API routes for application settings"""
 
-import yaml
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Request
-from ..config import get_config, AppConfig, get_config_paths
+
+from fastapi import APIRouter, Request
+import yaml
+
+from ..config import get_config, get_config_paths
 from ..models.api_models import AppSettings
 from ..services.change_bus import change_bus
 
@@ -25,12 +27,23 @@ async def get_app_settings():
 
 
 @router.post("", response_model=AppSettings)
-async def update_app_settings(settings: AppSettings, request: Request = None):  # type: ignore[assignment]
+async def update_app_settings(
+    settings: AppSettings,
+    request: Request = None,  # type: ignore[assignment]
+):
     """Update application settings.
 
     - Non-sensitive config (e.g. journal path) is stored in backend/config.yaml
     - Sensitive commander/Inara config is stored in backend/commander.yaml
     """
+    # The six file operations below are blocking, which ASYNC230 flags because
+    # this is an async endpoint and a blocking read parks the event loop. They
+    # are suppressed rather than moved to a thread deliberately: config.yaml
+    # and commander.yaml are two local files of a few hundred bytes each,
+    # written only when the user presses Save on the settings page. The cost of
+    # an asyncio.to_thread hop per call is larger than the block it removes,
+    # and the extra indirection would sit on the path that persists the user's
+    # credentials. Revisit if either file ever grows or moves off local disk.
     # Resolve config paths in a runtime-aware way so that in the packaged
     # executable we always read/write from a per-user writable directory
     # instead of the (potentially read-only) install location.
@@ -39,10 +52,10 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
     # Update non-sensitive config
     if not config_path.exists():
         # Create a default config if it doesn't exist
-        with open(config_path, "w", encoding="utf-8") as f:
+        with open(config_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             yaml.dump({"journal": {}}, f)
 
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
         config_data = yaml.safe_load(f) or {}
 
     if "journal" not in config_data:
@@ -50,16 +63,16 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
 
     config_data["journal"]["directory"] = settings.journal_directory
 
-    with open(config_path, "w", encoding="utf-8") as f:
+    with open(config_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
         yaml.dump(config_data, f, default_flow_style=False)
 
     # Update sensitive commander/Inara config
     if not commander_path.exists():
         # Create a default commander config if it doesn't exist
-        with open(commander_path, "w", encoding="utf-8") as f:
+        with open(commander_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             yaml.dump({"inara": {}}, f)
 
-    with open(commander_path, "r", encoding="utf-8") as f:
+    with open(commander_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
         commander_data = yaml.safe_load(f) or {}
 
     if "inara" not in commander_data:
@@ -71,7 +84,7 @@ async def update_app_settings(settings: AppSettings, request: Request = None):  
         "prefer_local_for_commander_systems"
     ] = settings.prefer_local_for_commander_systems
 
-    with open(commander_path, "w", encoding="utf-8") as f:
+    with open(commander_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
         yaml.dump(commander_data, f, default_flow_style=False)
 
     # Update in-memory config so the running app sees the changes

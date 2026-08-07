@@ -1,21 +1,22 @@
 """Journal file parser service"""
 
-import json
 from abc import ABC, abstractmethod
 from datetime import datetime
+import json
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any, ClassVar
+
 from ..models.journal_events import (
-    JournalEvent,
-    ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
-    LocationEvent,
-    FSDJumpEvent,
-    DockedEvent,
-    CommanderEvent,
     CarrierLocationEvent,
     CarrierStatsEvent,
     CarrierTradeOrderEvent,
+    ColonisationConstructionDepotEvent,
+    ColonisationContributionEvent,
+    CommanderEvent,
+    DockedEvent,
+    FSDJumpEvent,
+    JournalEvent,
+    LocationEvent,
 )
 from ..utils.logger import get_logger
 
@@ -26,14 +27,12 @@ class IJournalParser(ABC):
     """Interface for journal file parser"""
 
     @abstractmethod
-    def parse_file(self, file_path: Path) -> List[JournalEvent]:
+    def parse_file(self, file_path: Path) -> list[JournalEvent]:
         """Parse a journal file and return list of events"""
-        pass
 
     @abstractmethod
-    def parse_line(self, line: str) -> Optional[JournalEvent]:
+    def parse_line(self, line: str) -> JournalEvent | None:
         """Parse a single line from journal file"""
-        pass
 
 
 class JournalParser(IJournalParser):
@@ -43,11 +42,9 @@ class JournalParser(IJournalParser):
     """
 
     # Event types we care about
-    RELEVANT_EVENTS = {
+    RELEVANT_EVENTS: ClassVar[set[str]] = {
         # Colonisation-related events (accept both US and UK spellings)
         "ColonisationConstructionDepot",
-        "ColonisationConstructionDepot",
-        "ColonisationContribution",
         "ColonisationContribution",
         # Location / movement / docking
         "Location",
@@ -60,7 +57,7 @@ class JournalParser(IJournalParser):
         "CarrierTradeOrder",
     }
 
-    def parse_file(self, file_path: Path) -> List[JournalEvent]:
+    def parse_file(self, file_path: Path) -> list[JournalEvent]:
         """
         Parse a journal file and return list of relevant events
 
@@ -70,7 +67,7 @@ class JournalParser(IJournalParser):
         Returns:
             List of parsed journal events
         """
-        events: List[JournalEvent] = []
+        events: list[JournalEvent] = []
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -96,7 +93,7 @@ class JournalParser(IJournalParser):
             logger.error(f"Failed to parse file {file_path}: {e}")
             return []
 
-    def parse_line(self, line: str) -> Optional[JournalEvent]:
+    def parse_line(self, line: str) -> JournalEvent | None:
         """
         Parse a single line from journal file
 
@@ -115,15 +112,14 @@ class JournalParser(IJournalParser):
 
             # Parse timestamp
             timestamp_str = data.get("timestamp", "")
-            timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+            timestamp = datetime.fromisoformat(timestamp_str)
 
             # Route to appropriate parser
             if event_type in {
                 "ColonisationConstructionDepot",
-                "ColonisationConstructionDepot",
             }:
                 return self._parse_construction_depot(data, timestamp)
-            elif event_type in {"ColonisationContribution", "ColonisationContribution"}:
+            elif event_type in {"ColonisationContribution"}:
                 return self._parse_contribution(data, timestamp)
             elif event_type == "Location":
                 return self._parse_location(data, timestamp)
@@ -151,7 +147,7 @@ class JournalParser(IJournalParser):
 
     def _parse_construction_depot(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         timestamp: datetime,
     ) -> ColonisationConstructionDepotEvent:
         """Parse ColonisationConstructionDepot event.
@@ -182,8 +178,10 @@ class JournalParser(IJournalParser):
         system_address = data.get("SystemAddress", 0)
 
         # Normalise commodities/resources payload.
-        # Older journals used: "Commodities": [{Name, Name_Localised, Total, Delivered, Payment}]
-        # Newer journals use:  "ResourcesRequired": [{Name, Name_Localised, RequiredAmount, ProvidedAmount, Payment}]
+        # Older journals used: "Commodities":
+        #   [{Name, Name_Localised, Total, Delivered, Payment}]
+        # Newer journals use: "ResourcesRequired":
+        #   [{Name, Name_Localised, RequiredAmount, ProvidedAmount, Payment}]
         commodities: list[dict[str, Any]] = []
 
         if "Commodities" in data and isinstance(data["Commodities"], list):
@@ -221,7 +219,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_contribution(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> ColonisationContributionEvent:
         """
         Parse ColonisationContribution / ColonisationContribution event.
@@ -312,7 +310,7 @@ class JournalParser(IJournalParser):
         raise ValueError("Unsupported ColonisationContribution schema")
 
     def _parse_location(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> LocationEvent:
         """Parse Location event"""
         return LocationEvent(
@@ -329,7 +327,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_fsd_jump(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> FSDJumpEvent:
         """Parse FSDJump event"""
         return FSDJumpEvent(
@@ -344,7 +342,7 @@ class JournalParser(IJournalParser):
             raw_data=data,
         )
 
-    def _parse_docked(self, data: Dict[str, Any], timestamp: datetime) -> DockedEvent:
+    def _parse_docked(self, data: dict[str, Any], timestamp: datetime) -> DockedEvent:
         """Parse Docked event"""
         return DockedEvent(
             timestamp=timestamp,
@@ -362,7 +360,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_commander(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> CommanderEvent:
         """Parse Commander event"""
         return CommanderEvent(
@@ -374,7 +372,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_carrier_location(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> CarrierLocationEvent:
         """Parse CarrierLocation event.
 
@@ -400,7 +398,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_carrier_stats(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> CarrierStatsEvent:
         """Parse CarrierStats event.
 
@@ -428,7 +426,7 @@ class JournalParser(IJournalParser):
         )
 
     def _parse_carrier_trade_order(
-        self, data: Dict[str, Any], timestamp: datetime
+        self, data: dict[str, Any], timestamp: datetime
     ) -> CarrierTradeOrderEvent:
         """Parse CarrierTradeOrder event.
 

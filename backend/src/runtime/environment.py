@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Runtime environment description for the packaged and development runtimes.
 
@@ -16,9 +14,11 @@ while the bulk of the environment logic is shared with
 [`runtime.app_runtime`](backend/src/runtime/app_runtime.py:1) and its helpers.
 """
 
-import sys
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 
 from .common import RuntimeMode, get_runtime_mode
 
@@ -75,7 +75,7 @@ class RuntimeEnvironment:
             return self.project_root
 
     @classmethod
-    def detect(cls) -> "RuntimeEnvironment":
+    def detect(cls) -> RuntimeEnvironment:
         """
         Detect the current runtime environment, including a sensible project root.
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Launcher UI and orchestration components.
 
 This module contains the bulk of the GUI launcher implementation that was
@@ -18,16 +16,17 @@ Public API re-exported by [`launcher`](backend/src/launcher.py:1):
 - `Launcher`
 """
 
-import os
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -37,7 +36,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 BACKEND_PORT = 8000
@@ -73,12 +71,12 @@ class LaunchView:
 
 
 class QtLaunchWindow(QMainWindow, LaunchView):
-    """Simple launcher window with icon, title, status label, and progress bar."""
+    """Simple launcher window with icon, title, status label and progress bar."""
 
-    def __init__(self, project_root: Path, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, project_root: Path, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._project_root = project_root
-        self._frontend_url: Optional[str] = None
+        self._frontend_url: str | None = None
 
         self.setWindowTitle(f"{APP_NAME} Launcher")
         # Taller window to comfortably fit a larger app icon and primary button.
@@ -132,7 +130,7 @@ class QtLaunchWindow(QMainWindow, LaunchView):
         self._progress.setFormat("%p%")
         self._progress.setTextVisible(True)
 
-        # "Open UI" button (enabled when ready) – make it visually prominent.
+        # "Open UI" button (enabled when ready): make it visually prominent.
         self._open_button = QPushButton("Open Web UI", self)
         self._open_button.setEnabled(False)
         self._open_button.setMinimumHeight(40)
@@ -216,7 +214,7 @@ class Launcher:
 
     # Step construction ------------------------------------------------
 
-    def _build_steps(self) -> List[InitStep]:
+    def _build_steps(self) -> list[InitStep]:
         """
         Define the ordered initialisation steps for the launcher.
 
@@ -281,13 +279,15 @@ class Launcher:
             # If the venv python is missing entirely, subsequent steps are
             # unlikely to succeed, so this is still considered fatal.
             raise RuntimeError(
-                "Virtual environment python.exe is missing; cannot install backend deps.",
+                "Virtual environment python.exe is missing; "
+                "cannot install backend deps.",
             )
 
         requirements = self._backend_dir / "requirements.txt"
         if not requirements.exists():
             self._append_log(
-                "[launcher] backend/requirements.txt not found; skipping backend deps install.",
+                "[launcher] backend/requirements.txt not found; "
+                "skipping backend deps install.",
             )
             return
 
@@ -382,12 +382,13 @@ class Launcher:
             time.sleep(1.0)
 
         self._append_log(
-            "[launcher] Timeout waiting for backend/frontend readiness; continuing anyway.",
+            "[launcher] Timeout waiting for backend/frontend readiness; "
+            "continuing anyway.",
         )
 
     # Helpers -----------------------------------------------------------
 
-    def _run_subprocess(self, cmd: List[str], cwd: Path, label: str) -> None:
+    def _run_subprocess(self, cmd: list[str], cwd: Path, label: str) -> None:
         """Run a subprocess synchronously, raising on error and logging output."""
         self._append_log(f"[launcher] Running ({label}): {' '.join(cmd)} (cwd={cwd})")
         try:

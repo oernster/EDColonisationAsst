@@ -18,10 +18,10 @@ reboots.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
+import os
 from pathlib import Path
-from typing import IO, Optional, ClassVar
+from typing import IO, ClassVar, Self
 
 
 class ApplicationInstanceLockError(Exception):
@@ -49,8 +49,8 @@ class ApplicationInstanceLock:
 
     app_id: str = "edca"
 
-    _file_handle: Optional[IO[str]] = None
-    _lock_path: Optional[Path] = None
+    _file_handle: IO[str] | None = None
+    _lock_path: Path | None = None
 
     # Tracks lock paths held within the current process to avoid re-entrantly
     # acquiring the same OS-level lock multiple times in one interpreter. This
@@ -155,7 +155,7 @@ class ApplicationInstanceLock:
 
     # ------------------------------------------------------------------ context manager
 
-    def __enter__(self) -> "ApplicationInstanceLock":
+    def __enter__(self) -> Self:
         acquired = self.acquire()
         if not acquired:
             raise ApplicationInstanceLockError(
@@ -163,7 +163,7 @@ class ApplicationInstanceLock:
             )
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: D401
+    def __exit__(self, exc_type, exc, tb) -> None:
         """Release the lock when leaving a context manager scope."""
         self.release()
 

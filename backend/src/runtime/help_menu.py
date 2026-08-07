@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Shared Help menu and About dialog for the EDCA tray UIs.
 
 This module is used by both tray controllers:
@@ -22,9 +20,11 @@ The application version is never hardcoded here; it is resolved from the
 top-level VERSION file via the package `__version__`.
 """
 
-import webbrowser
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+import webbrowser
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap
@@ -100,7 +100,7 @@ _CAFFEINE_CREDIT = (
 )
 
 
-def resolve_about_icon(root: Path) -> Optional[Path]:
+def resolve_about_icon(root: Path) -> Path | None:
     """Return the best icon file under ``root`` for dialog display, if any."""
     for name in _ICON_FILE_CANDIDATES:
         candidate = root / name
@@ -138,8 +138,8 @@ class AboutDialog(QDialog):
     def __init__(
         self,
         version: str,
-        icon_path: Optional[Path] = None,
-        parent: Optional[QWidget] = None,
+        icon_path: Path | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"About {APP_NAME}")
@@ -188,9 +188,9 @@ def open_releases_page() -> None:
 
 def add_help_menu(
     menu: Any,
-    icon_path: Optional[Path] = None,
-    parent: Optional[QWidget] = None,
-    version: Optional[str] = None,
+    icon_path: Path | None = None,
+    parent: QWidget | None = None,
+    version: str | None = None,
 ) -> Any:
     """Append a Help submenu (About, Check for Updates) to ``menu``.
 
@@ -221,9 +221,9 @@ def add_help_menu(
 __all__ = [
     "APP_AUTHOR",
     "APP_NAME",
-    "AboutDialog",
     "COPYRIGHT_YEAR",
     "RELEASES_URL",
+    "AboutDialog",
     "add_help_menu",
     "build_about_html",
     "open_releases_page",

@@ -8,7 +8,6 @@ latest Elite: Dangerous journal file; no additional persistence is used.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException
 
@@ -18,12 +17,12 @@ from ..models.api_models import (
     MyCarriersResponse,
 )
 from ..models.journal_events import JournalEvent
-from ..services.journal_parser import JournalParser
 from ..services.carrier_service import (
     build_current_carrier_response,
     build_current_carrier_state_response,
     build_my_carriers_response,
 )
+from ..services.journal_parser import JournalParser
 from ..utils.journal import get_journal_directory, get_journal_files
 from ..utils.logger import get_logger
 
@@ -32,9 +31,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/carriers", tags=["carriers"])
 
 
-def _load_recent_journal_events() -> (
-    Tuple[List[JournalEvent], Optional[Path], Optional[str]]
-):
+def _load_recent_journal_events() -> tuple[list[JournalEvent], Path | None, str | None]:
     """Parse recent journal files and return all relevant events.
 
     Fleet carrier related events are not guaranteed to appear in the *latest*
@@ -52,13 +49,13 @@ def _load_recent_journal_events() -> (
     except FileNotFoundError:
         logger.warning("Journal directory not found while querying carrier state.")
         return [], None, None
-    except Exception as exc:  # noqa: BLE001
+    except Exception:
         # Deliberately broad, below an HTTP boundary. The missing-directory
         # case is handled above as the expected one, so anything reaching here
         # is unanticipated. An empty result renders as "no carrier data"
         # rather than failing the whole request. The traceback goes to the log
         # so the cause stays recoverable.
-        logger.exception("Unexpected error resolving journal directory: %s", exc)
+        logger.exception("Unexpected error resolving journal directory")
         return [], None, None
 
     if not all_files:
@@ -73,7 +70,7 @@ def _load_recent_journal_events() -> (
     files_to_parse = all_files[-MAX_RECENT_FILES:]
 
     parser = JournalParser()
-    events: List[JournalEvent] = []
+    events: list[JournalEvent] = []
     for file_path in files_to_parse:
         events.extend(parser.parse_file(file_path))
 

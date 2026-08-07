@@ -2,25 +2,23 @@
 
 from pathlib import Path
 import platform
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from ..config import get_config
 from ..models.api_models import (
-    SystemResponse,
-    SiteResponse,
-    SiteListResponse,
-    SystemListResponse,
     CommodityAggregateResponse,
-    ErrorResponse,
     HealthResponse,
+    SiteListResponse,
+    SiteResponse,
+    SystemListResponse,
+    SystemResponse,
 )
 from ..repositories.colonisation_repository import IColonisationRepository
+from ..services.change_bus import change_bus
 from ..services.data_aggregator import IDataAggregator
 from ..services.system_tracker import ISystemTracker
 from ..utils.logger import get_logger
-from ..services.change_bus import change_bus
 
 logger = get_logger(__name__)
 
@@ -28,9 +26,9 @@ router = APIRouter(prefix="/api", tags=["colonisation"])
 
 
 # Dependency injection - these will be set by main.py
-_repository: Optional[IColonisationRepository] = None
-_aggregator: Optional[IDataAggregator] = None
-_system_tracker: Optional[ISystemTracker] = None
+_repository: IColonisationRepository | None = None
+_aggregator: IDataAggregator | None = None
+_system_tracker: ISystemTracker | None = None
 
 
 def set_dependencies(
@@ -51,7 +49,7 @@ async def health_check() -> HealthResponse:
     config = get_config()
     journal_dir = Path(config.journal.directory)
 
-    from .. import __version__, __build_id__
+    from .. import __build_id__, __version__
 
     return HealthResponse(
         status="healthy",
@@ -101,7 +99,7 @@ async def get_watcher_status() -> dict:
         else {"running": False}
     )
 
-    handler = getattr(watcher, "_handler", None) if watcher else None  # noqa: SLF001
+    handler = getattr(watcher, "_handler", None) if watcher else None
 
     handler_diag = None
     if handler is not None:
@@ -243,7 +241,10 @@ async def get_site(market_id: int) -> SiteResponse:
 
 @router.get("/sites", response_model=SiteListResponse)
 async def get_all_sites() -> SiteListResponse:
-    """Get all construction sites, categorized by status, aggregated from all sources."""
+    """Get all construction sites, categorized by status.
+
+    Aggregated from all sources.
+    """
     if _repository is None or _aggregator is None:
         raise HTTPException(status_code=500, detail="Dependencies not initialized")
 
@@ -284,8 +285,9 @@ async def reload_journals() -> dict:
         instead of creating 'Unknown System' records.
     """
     from pathlib import Path
-    from ..services.journal_parser import JournalParser
+
     from ..config import get_config
+    from ..services.journal_parser import JournalParser
 
     if _repository is None:
         raise HTTPException(status_code=500, detail="Repository not initialized")
@@ -306,9 +308,9 @@ async def reload_journals() -> dict:
     total_events = 0
 
     # Import here to avoid circulars at module import time
+    from ..models.journal_events import ColonisationConstructionDepotEvent
     from ..services.file_watcher import JournalFileHandler
     from ..services.system_tracker import SystemTracker
-    from ..models.journal_events import ColonisationConstructionDepotEvent
 
     # Use a single tracker/handler so system context is preserved across files
     tracker = SystemTracker()

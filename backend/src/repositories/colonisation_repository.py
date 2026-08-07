@@ -1,14 +1,14 @@
 """Colonisation data repository"""
 
+from abc import ABC, abstractmethod
 import asyncio
+from datetime import UTC, datetime
 import json
 import os
-import sqlite3
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
-from datetime import datetime, UTC
 from pathlib import Path
-from ..models.colonisation import ConstructionSite, Commodity
+import sqlite3
+
+from ..models.colonisation import Commodity, ConstructionSite
 from ..utils.logger import get_logger
 from ..utils.runtime import is_frozen
 
@@ -72,8 +72,7 @@ def _normalise_commodity_key(name: str) -> str:
         key = key[1:-1]
 
     # Strip a trailing "_name" suffix if present.
-    if key.endswith("_name"):
-        key = key[: -len("_name")]
+    key = key.removesuffix("_name")
 
     return key
 
@@ -92,44 +91,36 @@ class IColonisationRepository(ABC):
     @abstractmethod
     async def add_construction_site(self, site: ConstructionSite) -> None:
         """Add or update construction site data"""
-        pass
 
     @abstractmethod
-    async def get_site_by_market_id(self, market_id: int) -> Optional[ConstructionSite]:
+    async def get_site_by_market_id(self, market_id: int) -> ConstructionSite | None:
         """Get construction site by market ID"""
-        pass
 
     @abstractmethod
-    async def get_sites_by_system(self, system_name: str) -> List[ConstructionSite]:
+    async def get_sites_by_system(self, system_name: str) -> list[ConstructionSite]:
         """Get all construction sites in a system"""
-        pass
 
     @abstractmethod
-    async def get_all_systems(self) -> List[str]:
+    async def get_all_systems(self) -> list[str]:
         """Get list of all known systems with construction"""
-        pass
 
     @abstractmethod
-    async def get_all_sites(self) -> List[ConstructionSite]:
+    async def get_all_sites(self) -> list[ConstructionSite]:
         """Get all construction sites from the database"""
-        pass
 
     @abstractmethod
-    async def get_stats(self) -> Dict[str, int]:
+    async def get_stats(self) -> dict[str, int]:
         """Get basic statistics about stored construction sites"""
-        pass
 
     @abstractmethod
     async def update_commodity(
         self, market_id: int, commodity_name: str, provided_amount: int
     ) -> None:
         """Update commodity provided amount for a site"""
-        pass
 
     @abstractmethod
     async def clear_all(self) -> None:
         """Clear all data (mainly for testing)"""
-        pass
 
 
 class ColonisationRepository(IColonisationRepository):
@@ -183,12 +174,12 @@ class ColonisationRepository(IColonisationRepository):
             )
             conn.commit()
 
-    def _get_schema_version(self) -> Optional[int]:
+    def _get_schema_version(self) -> int | None:
         """
         Read the current schema version from the metadata table, if present.
 
         Returns:
-            The stored integer schema version, or None if missing/invalid.
+            The stored integer schema version, None if missing or invalid.
         """
         try:
             with self._get_db_connection() as conn:
@@ -202,7 +193,8 @@ class ColonisationRepository(IColonisationRepository):
                 return int(row[0])
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "Failed to read db_schema_version from metadata; treating as unknown: %s",
+                "Failed to read db_schema_version from metadata; "
+                "treating as unknown: %s",
                 exc,
             )
             return None
@@ -302,7 +294,7 @@ class ColonisationRepository(IColonisationRepository):
                 site.model_dump(),
             )
 
-    async def get_site_by_market_id(self, market_id: int) -> Optional[ConstructionSite]:
+    async def get_site_by_market_id(self, market_id: int) -> ConstructionSite | None:
         async with self._lock:
             with self._get_db_connection() as conn:
                 conn.row_factory = sqlite3.Row
@@ -313,42 +305,45 @@ class ColonisationRepository(IColonisationRepository):
                 row = cursor.fetchone()
                 return self._row_to_site(row) if row else None
 
-    async def get_sites_by_system(self, system_name: str) -> List[ConstructionSite]:
+    async def get_sites_by_system(self, system_name: str) -> list[ConstructionSite]:
         async with self._lock:
             with self._get_db_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT * FROM construction_sites WHERE system_name = ? ORDER BY station_name",
+                    "SELECT * FROM construction_sites "
+                    "WHERE system_name = ? ORDER BY station_name",
                     (system_name,),
                 )
                 rows = cursor.fetchall()
                 return [self._row_to_site(row) for row in rows if row]
 
-    async def get_all_systems(self) -> List[str]:
+    async def get_all_systems(self) -> list[str]:
         async with self._lock:
             with self._get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT DISTINCT system_name FROM construction_sites ORDER BY system_name"
+                    "SELECT DISTINCT system_name FROM construction_sites "
+                    "ORDER BY system_name"
                 )
                 rows = cursor.fetchall()
                 systems = [row[0] for row in rows]
                 logger.info(f"REPOSITORY: Returning {len(systems)} systems: {systems}")
                 return systems
 
-    async def get_all_sites(self) -> List[ConstructionSite]:
+    async def get_all_sites(self) -> list[ConstructionSite]:
         async with self._lock:
             with self._get_db_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT * FROM construction_sites ORDER BY system_name, station_name"
+                    "SELECT * FROM construction_sites "
+                    "ORDER BY system_name, station_name"
                 )
                 rows = cursor.fetchall()
                 return [self._row_to_site(row) for row in rows if row]
 
-    async def get_stats(self) -> Dict[str, int]:
+    async def get_stats(self) -> dict[str, int]:
         """
         Get basic statistics about stored construction sites.
 
@@ -450,7 +445,7 @@ class ColonisationRepository(IColonisationRepository):
                 conn.commit()
             logger.info("Cleared all colonisation data")
 
-    def _row_to_site(self, row: sqlite3.Row) -> Optional[ConstructionSite]:
+    def _row_to_site(self, row: sqlite3.Row) -> ConstructionSite | None:
         if not row:
             return None
         commodities_data = json.loads(row["commodities"])

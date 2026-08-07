@@ -1,13 +1,10 @@
 """Service for fetching data from the Inara.cz API"""
 
-import os
 import asyncio
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 
-import httpx
-
-from ..config import get_config, InaraConfig
+from ..config import InaraConfig, get_config
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,10 +17,10 @@ INARA_API_URL = "https://inara.cz/inapi/v1/"
 _MIN_CALL_INTERVAL_SECONDS = 35.0  # minimum delay between any two Inara calls
 _CACHE_TTL = timedelta(minutes=15)
 
-_last_call_at: Optional[datetime] = None
-_ban_until: Optional[datetime] = None
+_last_call_at: datetime | None = None
+_ban_until: datetime | None = None
 _rate_limit_lock = asyncio.Lock()
-_system_cache: Dict[str, Tuple[datetime, List[Dict[str, Any]]]] = {}
+_system_cache: dict[str, tuple[datetime, list[dict[str, Any]]]] = {}
 
 
 class InaraService:
@@ -38,7 +35,7 @@ class InaraService:
 
     async def get_system_colonisation_data(
         self, system_name: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch colonisation-related data for a specific system from Inara.
 

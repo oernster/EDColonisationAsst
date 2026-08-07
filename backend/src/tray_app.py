@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Tray controller entrypoint for Elite: Dangerous Colonisation Assistant.
 
 This module is now a thin entrypoint that focuses on:
@@ -14,6 +12,8 @@ This module is now a thin entrypoint that focuses on:
 The heavy-weight tray logic (process spawning, logging, Exit handling) lives
 in the runtime submodule to keep this entrypoint small and focused.
 """
+
+from __future__ import annotations
 
 import sys
 
@@ -35,9 +35,13 @@ except Exception:  # noqa: BLE001
 
 # Import the tray controller implementation from the runtime package.
 try:
-    from .runtime.tray_components import TrayController  # type: ignore[import-not-found]
+    from .runtime.tray_components import (
+        TrayController,  # type: ignore[import-not-found]
+    )
 except Exception:  # noqa: BLE001
-    from backend.src.runtime.tray_components import TrayController  # type: ignore[import-error]
+    from backend.src.runtime.tray_components import (
+        TrayController,  # type: ignore[import-error]
+    )
 
 
 def main() -> int:

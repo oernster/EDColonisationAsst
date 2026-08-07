@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Runtime entrypoint for the Elite: Dangerous Colonisation Assistant.
 
@@ -30,6 +28,8 @@ The actual EXE build step will continue to target this module, e.g.:
 
     python -m nuitka --onefile --enable-plugin=pyside6 backend/src/runtime_entry.py
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 import sys
@@ -96,9 +96,13 @@ except Exception:  # noqa: BLE001
 # backend.src.runtime.app_runtime so that this module can remain small and
 # focused on process-level concerns.
 try:
-    from .runtime.app_runtime import RuntimeApplication  # type: ignore[import-not-found]
+    from .runtime.app_runtime import (
+        RuntimeApplication,  # type: ignore[import-not-found]
+    )
 except Exception:  # noqa: BLE001
-    from backend.src.runtime.app_runtime import RuntimeApplication  # type: ignore[import-error]
+    from backend.src.runtime.app_runtime import (
+        RuntimeApplication,  # type: ignore[import-error]
+    )
 
 
 # --------------------------------------------------------------------------- entrypoint

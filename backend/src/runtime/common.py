@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Common runtime utilities shared by the packaged EXE and launcher/tray stack.
 
 This module centralises:
@@ -17,10 +15,10 @@ imported early by both [`runtime_entry`](backend/src/runtime_entry.py:1) and
 the supporting runtime modules without creating circular imports.
 """
 
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-from fastapi import FastAPI
+from pathlib import Path
+import sys
 
 # Import FastAPI app and runtime utilities. In normal (package) execution the
 # relative imports work (backend.src.runtime.common). In the frozen Nuitka
@@ -70,7 +68,7 @@ except Exception as exc:  # pragma: no cover - catastrophic import failure
     _debug_log(
         f"[runtime.common] FATAL importing FastAPI app or runtime utilities: {exc!r}"
     )
-    # Re-raise so Nuitka/console still see the failure, but we at least have
+    # Re-raise so Nuitka/console still see the failure; we at least have
     # EDColonisationAsst-runtime.log with the cause.
     raise
 
@@ -78,3 +76,22 @@ except Exception as exc:  # pragma: no cover - catastrophic import failure
 # same configuration and logger hierarchy.
 setup_logging()
 logger = get_logger(__name__)
+
+# This module is the runtime stack's single import surface: app_runtime,
+# runtime_entry, tray_components and splash all reach these names through
+# here rather than through backend.src.main and backend.src.utils.runtime
+# directly, which is what keeps the dual relative/absolute import dance in
+# one place for the frozen build.
+#
+# __all__ is what says so. Without it these read as unused imports and an
+# unattended `ruff check --fix` deletes them, which is not hypothetical: it
+# happened: it broke the runtime with "cannot import name RuntimeMode".
+__all__ = [
+    "RuntimeMode",
+    "_debug_log",
+    "fastapi_app",
+    "get_logger",
+    "get_runtime_mode",
+    "logger",
+    "setup_logging",
+]

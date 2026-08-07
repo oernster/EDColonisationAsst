@@ -1,17 +1,18 @@
 """Data aggregation service"""
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any
 from collections import defaultdict
+from typing import Any
+
+from ..config import get_config
 from ..models.colonisation import (
+    CommodityAggregate,
     ConstructionSite,
     SystemColonisationData,
-    CommodityAggregate,
 )
 from ..repositories.colonisation_repository import IColonisationRepository
-from .inara_service import InaraService, get_inara_service
-from ..config import get_config
 from ..utils.logger import get_logger
+from .inara_service import InaraService, get_inara_service
 
 logger = get_logger(__name__)
 
@@ -24,14 +25,12 @@ class IDataAggregator(ABC):
         self, system_name: str
     ) -> SystemColonisationData:
         """Aggregate all construction sites in a system"""
-        pass
 
     @abstractmethod
     async def aggregate_commodities(  # pragma: no cover
-        self, sites: List[ConstructionSite]
-    ) -> List[CommodityAggregate]:
+        self, sites: list[ConstructionSite]
+    ) -> list[CommodityAggregate]:
         """Aggregate commodities across multiple sites"""
-        pass
 
 
 class DataAggregator(IDataAggregator):
@@ -43,7 +42,7 @@ class DataAggregator(IDataAggregator):
       - INCOMPLETE sites come from LOCAL JOURNAL data.
       - COMPLETED sites may come from INARA (or local if available).
     Local data is never downgraded by Inara; Inara can only:
-      - mark a local site as completed, or
+      - mark a local site as completed or
       - add a completed site that is missing locally.
     """
 
@@ -135,12 +134,12 @@ class DataAggregator(IDataAggregator):
             )
 
         # Start with all local sites
-        merged_sites: Dict[int, ConstructionSite] = {
+        merged_sites: dict[int, ConstructionSite] = {
             site.market_id: site for site in local_sites
         }
 
         # Index Inara sites by market_id
-        inara_by_id: Dict[int, ConstructionSite] = {
+        inara_by_id: dict[int, ConstructionSite] = {
             site.market_id: site for site in inara_sites
         }
 
@@ -153,7 +152,8 @@ class DataAggregator(IDataAggregator):
                 and not local_site.construction_complete
             ):
                 logger.info(
-                    "Marking site %s in %s (market_id=%s) as completed from Inara data.",
+                    "Marking site %s in %s (market_id=%s) as completed "
+                    "from Inara data.",
                     local_site.station_name,
                     local_site.system_name,
                     local_site.market_id,
@@ -200,8 +200,8 @@ class DataAggregator(IDataAggregator):
         )
 
     async def aggregate_commodities(
-        self, sites: List[ConstructionSite]
-    ) -> List[CommodityAggregate]:
+        self, sites: list[ConstructionSite]
+    ) -> list[CommodityAggregate]:
         """
         Aggregate commodities across multiple sites
 
@@ -213,7 +213,7 @@ class DataAggregator(IDataAggregator):
         """
         # Dictionary to accumulate commodity data
         # Key: commodity name, Value: aggregation data
-        commodity_data: Dict[str, Dict] = defaultdict(
+        commodity_data: dict[str, dict] = defaultdict(
             lambda: {
                 "name": "",
                 "name_localised": "",
@@ -246,9 +246,9 @@ class DataAggregator(IDataAggregator):
                 data["payments"].append(commodity.payment)
 
         # Convert to CommodityAggregate objects
-        aggregates: List[CommodityAggregate] = []
+        aggregates: list[CommodityAggregate] = []
 
-        for commodity_name, data in commodity_data.items():
+        for data in commodity_data.values():
             # Calculate average payment
             avg_payment = (
                 sum(data["payments"]) / len(data["payments"])
@@ -272,7 +272,7 @@ class DataAggregator(IDataAggregator):
 
         return aggregates
 
-    async def get_system_summary(self, system_name: str) -> Dict[str, any]:
+    async def get_system_summary(self, system_name: str) -> dict[str, any]:
         """
         Get a summary of colonisation progress in a system
 
@@ -308,12 +308,12 @@ class DataAggregator(IDataAggregator):
         }
 
     def _transform_inara_data(
-        self, inara_site_data: Dict[str, Any]
+        self, inara_site_data: dict[str, Any]
     ) -> ConstructionSite:
         """
         Transforms Inara API data into a ConstructionSite model.
         """
-        from ..models.colonisation import DataSource, Commodity
+        from ..models.colonisation import Commodity, DataSource
 
         commodities = []
         for comm in inara_site_data.get("commodities", []):

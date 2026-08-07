@@ -3,7 +3,6 @@
 import ctypes
 import os
 from pathlib import Path
-from typing import Optional
 
 # Known folder IDs
 FOLDERID_SavedGames = "{4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4}"
@@ -20,7 +19,7 @@ class GUID(ctypes.Structure):
     ]
 
 
-def get_saved_games_path() -> Optional[Path]:
+def get_saved_games_path() -> Path | None:
     """
     Get the path to the user's Saved Games folder on Windows.
 
@@ -32,7 +31,7 @@ def get_saved_games_path() -> Optional[Path]:
     # Prefer the WinAPI if available (tests monkeypatch ctypes.windll on non-Windows).
     windll = getattr(ctypes, "windll", None)
     if windll is not None:
-        ptr: Optional[ctypes.c_wchar_p] = None
+        ptr: ctypes.c_wchar_p | None = None
         try:
             ptr = ctypes.c_wchar_p()
 

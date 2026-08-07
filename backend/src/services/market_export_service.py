@@ -1,7 +1,7 @@
 """Helpers for Elite Dangerous market export files (Market.json).
 
 Elite writes several "companion" JSON exports into the journal directory,
-including Market.json, Cargo.json, and Status.json.
+including Market.json, Cargo.json and Status.json.
 
 For Fleet Carriers, Market.json is often the *only* authoritative source for
 the currently configured market orders (especially buy orders) during a docked
@@ -13,35 +13,34 @@ This module intentionally uses only the Python standard library.
 
 from __future__ import annotations
 
-import json
-import re
 from dataclasses import dataclass
 from datetime import datetime
+import json
 from pathlib import Path
-from typing import Any, Iterable, Optional
+import re
 
 
-def _parse_ts(ts: str) -> Optional[datetime]:
+def _parse_ts(ts: str) -> datetime | None:
     """Parse ED timestamps like '2026-05-01T11:25:25Z' into an aware datetime."""
     if not ts:
         return None
     try:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return datetime.fromisoformat(ts)
     except Exception:
         return None
 
 
-def _as_int(val: object) -> Optional[int]:
+def _as_int(val: object) -> int | None:
     if isinstance(val, bool):
         return None
     if isinstance(val, int):
         return val
     if isinstance(val, float):
-        return int(round(val))
+        return round(val)
     return None
 
 
-def _as_str(val: object) -> Optional[str]:
+def _as_str(val: object) -> str | None:
     return val if isinstance(val, str) else None
 
 
@@ -66,8 +65,7 @@ def normalise_market_item_name(raw_name: str) -> str:
 
     # Defensive fallback.
     lowered = name.lower().strip("$;")
-    if lowered.endswith("_name"):
-        lowered = lowered[: -len("_name")]
+    lowered = lowered.removesuffix("_name")
     return lowered
 
 
@@ -92,7 +90,7 @@ class MarketExportSnapshot:
     items: tuple[MarketExportItem, ...]
 
 
-def load_market_export(journal_dir: Path) -> Optional[MarketExportSnapshot]:
+def load_market_export(journal_dir: Path) -> MarketExportSnapshot | None:
     """Load Market.json from the journal directory, if present and valid."""
     path = journal_dir / "Market.json"
     if not path.exists() or not path.is_file():

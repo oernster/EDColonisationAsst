@@ -23,9 +23,9 @@ submodule to keep this entrypoint small and focused.
 
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 import webbrowser
-from pathlib import Path
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
@@ -57,22 +57,37 @@ try:
         FRONTEND_PORT,
         PROGRESS_MAX,
         InitStep,
+        Launcher,
         LaunchView,
         QtLaunchWindow,
-        Launcher,
     )
 except ImportError:
     # Same direct-execution fallback as the import above.
     from backend.src.runtime.launcher_components import (  # type: ignore[import-error]
-        APP_NAME,
         BACKEND_PORT,
-        FRONTEND_PORT,
-        PROGRESS_MAX,
-        InitStep,
-        LaunchView,
-        QtLaunchWindow,
         Launcher,
+        QtLaunchWindow,
     )
+
+
+# These names are imported for re-export: launcher.py is the module the
+# packaged runtime and the tests reach the launcher stack through; the
+# dual relative/absolute import above is what makes that work in both the
+# source tree and the frozen build. __all__ is what marks them intentional;
+# without it they read as unused imports and `ruff check --fix` deletes
+# them, which is not hypothetical (it broke runtime/common.py exactly that
+# way during this sweep).
+__all__ = [
+    "APP_NAME",
+    "BACKEND_PORT",
+    "FRONTEND_PORT",
+    "PROGRESS_MAX",
+    "InitStep",
+    "LaunchView",
+    "Launcher",
+    "QtLaunchWindow",
+    "main",
+]
 
 
 def _detect_project_root() -> Path:

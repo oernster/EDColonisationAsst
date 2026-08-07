@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 """Tray controller components for the EDCA runtime stack.
 
 This module contains the core tray logic that was previously defined in
 [`tray_app.py`](backend/src/tray_app.py:1):
 
-- [`ProcessGroup`](backend/src/runtime/tray_components.py:29) – thin wrapper
+- [`ProcessGroup`](backend/src/runtime/tray_components.py:29): thin wrapper
   around a child `subprocess.Popen` with graceful termination semantics.
-- [`TrayController`](backend/src/runtime/tray_components.py:62) – the Qt
+- [`TrayController`](backend/src/runtime/tray_components.py:62): the Qt
   system tray controller responsible for starting and stopping the backend
   and frontend processes and wiring up the tray icon and Exit action.
 
@@ -19,11 +17,12 @@ entrypoint that focuses on:
 - Creating the `QApplication` and instantiating `TrayController`.
 """
 
+from __future__ import annotations
+
 import os
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
-from typing import Optional
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
@@ -32,7 +31,10 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 # module works both as part of the backend.src package and when executed
 # with backend/ on sys.path.
 try:
-    from .help_menu import add_help_menu, resolve_about_icon  # type: ignore[import-not-found]
+    from .help_menu import (  # type: ignore[import-not-found]
+        add_help_menu,
+        resolve_about_icon,
+    )
 except Exception:  # noqa: BLE001
     from backend.src.runtime.help_menu import (  # type: ignore[import-error]
         add_help_menu,
@@ -89,8 +91,8 @@ class TrayController:
     def __init__(self, app: QApplication) -> None:
         self._app = app
         self._tray = QSystemTrayIcon()
-        self._backend: Optional[ProcessGroup] = None
-        self._frontend: Optional[ProcessGroup] = None
+        self._backend: ProcessGroup | None = None
+        self._frontend: ProcessGroup | None = None
 
         # Resolve install / project root based on this file location.
         # Expected layout (both dev and installed):
@@ -173,7 +175,7 @@ class TrayController:
         self._backend = self._start_backend()
         self._frontend = self._start_frontend()
 
-    def _start_backend(self) -> Optional[ProcessGroup]:
+    def _start_backend(self) -> ProcessGroup | None:
         """Start the FastAPI backend (uvicorn) in the background."""
         backend_dir = self._root / "backend"
         venv_python = backend_dir / "venv" / "Scripts" / "python.exe"
@@ -201,7 +203,7 @@ class TrayController:
         )
         return self._spawn_process(cmd, cwd=self._root, name="backend")
 
-    def _start_frontend(self) -> Optional[ProcessGroup]:
+    def _start_frontend(self) -> ProcessGroup | None:
         """Start the frontend (Vite dev server) in the background."""
         frontend_dir = self._root / "frontend"
 
@@ -232,7 +234,7 @@ class TrayController:
         cmd: list[str],
         cwd: Path,
         name: str,
-    ) -> Optional[ProcessGroup]:
+    ) -> ProcessGroup | None:
         """
         Spawn a child process with no visible console window on Windows.
 

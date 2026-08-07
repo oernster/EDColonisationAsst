@@ -6,7 +6,6 @@ from fastapi import APIRouter, Query
 
 from ..services.change_bus import change_bus
 
-
 router = APIRouter(prefix="/api/changes", tags=["changes"])
 
 

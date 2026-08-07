@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import timedelta
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from ..models.api_models import (
     CarrierStateResponse,
@@ -86,7 +85,7 @@ def _prettify_commodity_name(raw_name: str, localised: str | None = None) -> str
     if key in overrides:
         return overrides[key]
 
-    # Title-case the name, but keep small connector words (and, of, in, the,
+    # Title-case the name but keep small connector words (and, of, in, the,
     # etc.) lower-case unless they are the first word.
     words = name.split()
     if not words:
@@ -136,8 +135,7 @@ def _normalise_carrier_commodity_key(name: str) -> str:
         key = key[1:-1]
 
     # Strip a trailing "_name" suffix if present.
-    if key.endswith("_name"):
-        key = key[: -len("_name")]
+    key = key.removesuffix("_name")
 
     # Normalise separators and whitespace.
     key = key.replace("_", " ")
@@ -151,7 +149,7 @@ def _normalise_carrier_commodity_key(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def find_latest_docked_carrier(events: List[JournalEvent]) -> Optional[DockedEvent]:
+def find_latest_docked_carrier(events: list[JournalEvent]) -> DockedEvent | None:
     """Return the most recent DockedEvent at a Fleet carrier, if any."""
     for event in reversed(events):
         if isinstance(event, DockedEvent) and event.station_type == "FleetCarrier":
@@ -160,9 +158,9 @@ def find_latest_docked_carrier(events: List[JournalEvent]) -> Optional[DockedEve
 
 
 def find_latest_carrier_stats_for_id(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     carrier_id: int,
-) -> Optional[CarrierStatsEvent]:
+) -> CarrierStatsEvent | None:
     """Return the latest CarrierStatsEvent for the given carrier id, if any."""
     for event in reversed(events):
         if isinstance(event, CarrierStatsEvent) and event.carrier_id == carrier_id:
@@ -171,9 +169,9 @@ def find_latest_carrier_stats_for_id(
 
 
 def find_latest_carrier_stats_for_market_id(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     market_id: int,
-) -> Optional[CarrierStatsEvent]:
+) -> CarrierStatsEvent | None:
     """Return the latest CarrierStatsEvent for the given carrier market id.
 
     CarrierStats uses CarrierID, which is usually the same as Docked.MarketID,
@@ -192,9 +190,9 @@ def find_latest_carrier_stats_for_market_id(
 
 
 def find_latest_carrier_stats_for_callsign(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     callsign: str,
-) -> Optional[CarrierStatsEvent]:
+) -> CarrierStatsEvent | None:
     """Return the latest CarrierStatsEvent matching the given callsign.
 
     Some users report Fleet carrier ids differing between Docked.MarketID and
@@ -218,9 +216,9 @@ def find_latest_carrier_stats_for_callsign(
 
 
 def find_latest_carrier_location_for_id(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     carrier_id: int,
-) -> Optional[CarrierLocationEvent]:
+) -> CarrierLocationEvent | None:
     """Return the latest CarrierLocationEvent for the given carrier id, if any."""
     for event in reversed(events):
         if isinstance(event, CarrierLocationEvent) and event.carrier_id == carrier_id:
@@ -235,8 +233,8 @@ def find_latest_carrier_location_for_id(
 
 def build_identity_from_journal(
     docked_event: DockedEvent,
-    stats: Optional[CarrierStatsEvent],
-    location: Optional[CarrierLocationEvent],
+    stats: CarrierStatsEvent | None,
+    location: CarrierLocationEvent | None,
 ) -> CarrierIdentity:
     """Construct a CarrierIdentity from journal events.
 
@@ -247,8 +245,9 @@ def build_identity_from_journal(
       squadron carrier from a personal carrier with squadron docking
       access, so we do *not* infer CarrierRole.SQUADRON here.
     """
-    # Fleet carriers expose both a Docked.MarketID and CarrierStats/CarrierTradeOrder.CarrierID.
-    # In most journals these match, but some users report mismatches. Prefer:
+    # Fleet carriers expose both a Docked.MarketID and
+    # CarrierStats/CarrierTradeOrder.CarrierID.
+    # In most journals these match but some users report mismatches. Prefer:
     #   1) CarrierStats.MarketID when present,
     #   2) CarrierStats.CarrierID,
     #   3) Docked.MarketID.
@@ -277,8 +276,8 @@ def build_identity_from_journal(
         role = CarrierRole.OWN
 
     # Docking access and services, when available.
-    docking_access: Optional[str] = None
-    services: Optional[list[str]] = None
+    docking_access: str | None = None
+    services: list[str] | None = None
 
     # Start with any activated crew roles from CarrierStats.Crew, which
     # represent the installed/active carrier services (e.g. Exploration,
@@ -346,10 +345,12 @@ def build_identity_from_journal(
 
 
 def build_orders_for_carrier(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     carrier_id: int,
-) -> Tuple[List[CarrierCargoItem], List[CarrierOrder], List[CarrierOrder]]:
-    """Build cargo, buy and sell orders for a given carrier from CarrierTradeOrder events.
+) -> tuple[list[CarrierCargoItem], list[CarrierOrder], list[CarrierOrder]]:
+    """Build cargo, buy and sell orders for one carrier.
+
+    Built from that carrier's CarrierTradeOrder events.
 
     The journal events look like (examples from your logs):
 
@@ -403,7 +404,7 @@ def build_orders_for_carrier(
     sell_orders_by_commodity: dict[str, CarrierOrder] = {}
 
     # Aggregate cargo stock per commodity based on SELL orders. This does not
-    # represent the full physical cargo hold, but it provides a useful view of
+    # represent the full physical cargo hold but it provides a useful view of
     # "stock assigned to the market" for each commodity.
     cargo_by_commodity: dict[str, dict[str, object]] = {}
 
@@ -441,7 +442,7 @@ def build_orders_for_carrier(
             if isinstance(val, int):
                 return val
             if isinstance(val, float):
-                return int(round(val))
+                return round(val)
             return None
 
         sale_int = _as_int(sale_value)
@@ -461,7 +462,7 @@ def build_orders_for_carrier(
             continue
 
         # Determine order type
-        order_type: Optional[CarrierOrderType] = None
+        order_type: CarrierOrderType | None = None
         if event.sale_order > 0:
             order_type = CarrierOrderType.SELL
         elif event.purchase_order > 0:
@@ -479,7 +480,7 @@ def build_orders_for_carrier(
 
         # Remaining amount (Outstanding) is optional in journal output.
         # When not provided we keep it as the configured size for display
-        # purposes, but we do NOT use it to infer cargo stock.
+        # purposes; we do NOT use it to infer cargo stock.
         remaining_amount = (
             event.outstanding if event.outstanding >= 0 else original_amount
         )
@@ -498,7 +499,7 @@ def build_orders_for_carrier(
 
         # If we could not infer a sensible stock value, keep None so that the
         # API surface can distinguish "unknown" from an explicit zero.
-        order_stock: Optional[int]
+        order_stock: int | None
         if order_type == CarrierOrderType.SELL and derived_stock is not None:
             order_stock = max(derived_stock, 0)
         elif event.stock >= 0:
@@ -561,7 +562,7 @@ def build_orders_for_carrier(
             sell_orders_by_commodity.pop(commodity_key, None)
 
     # Convert cargo map into CarrierCargoItem list
-    cargo_items: List[CarrierCargoItem] = []
+    cargo_items: list[CarrierCargoItem] = []
     for data in cargo_by_commodity.values():
         cargo_items.append(
             CarrierCargoItem(
@@ -587,7 +588,7 @@ def build_orders_for_carrier(
 
 
 def build_current_carrier_response(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
 ) -> CurrentCarrierResponse:
     """Construct CurrentCarrierResponse from a sequence of journal events."""
     if not events:
@@ -605,15 +606,15 @@ def build_current_carrier_response(
 
 
 def build_current_carrier_state_response(
-    events: List[JournalEvent],
+    events: list[JournalEvent],
     *,
     journal_dir: Path | None = None,
-) -> Optional[CarrierStateResponse]:
+) -> CarrierStateResponse | None:
     """Construct CarrierStateResponse for the currently docked carrier.
 
     Returns:
         CarrierStateResponse if a Fleet carrier docking context can be
-        determined from the events, or None if the commander is not docked
+        determined from the events, None if the commander is not docked
         at a Fleet carrier.
     """
     if not events:
@@ -642,7 +643,7 @@ def build_current_carrier_state_response(
     # CarrierTradeOrder events are typically emitted in bursts that represent a
     # *snapshot* of the carrier market configuration. Some sessions may only
     # emit deltas. To reduce stale/phantom orders persisting forever, we try to
-    # detect a recent snapshot burst and, when present, treat it as authoritative.
+    # detect a recent snapshot burst and treat it as authoritative when present.
     # Prefer orders from the current docking context.
     events_since_docked = [
         e
@@ -659,15 +660,9 @@ def build_current_carrier_state_response(
     trade_orders_scope: str = "none"
 
     # Use the newest journal timestamp as a proxy for "now" so tests remain
-    # deterministic, and so we can detect stale trade-order data when the
+    # deterministic; so we can detect stale trade-order data when the
     # user is actively playing but trade orders have not been emitted recently.
     journal_now = max((e.timestamp for e in events), default=docked_carrier.timestamp)
-
-    trade_events: list[CarrierTradeOrderEvent] = [
-        e
-        for e in events
-        if isinstance(e, CarrierTradeOrderEvent) and e.carrier_id == carrier_trade_id
-    ]
 
     selected_trade_events: list[JournalEvent]
     latest_trade_ts = None
@@ -835,10 +830,10 @@ def build_current_carrier_state_response(
                 snapshot_time = snap.timestamp
 
     # Derive cargo and capacity metrics from CarrierStats.SpaceUsage when present.
-    total_cargo_tonnage: Optional[int] = None
-    total_capacity_tonnage: Optional[int] = None
-    free_space_tonnage: Optional[int] = None
-    space_usage_model: Optional[CarrierSpaceUsage] = None
+    total_cargo_tonnage: int | None = None
+    total_capacity_tonnage: int | None = None
+    free_space_tonnage: int | None = None
+    space_usage_model: CarrierSpaceUsage | None = None
 
     if stats is not None:
         try:
@@ -853,17 +848,17 @@ def build_current_carrier_state_response(
             cargo_reserved = space_usage.get("CargoSpaceReserved")
 
             if isinstance(cargo_tonnage, (int, float)):
-                total_cargo_tonnage = int(round(cargo_tonnage))
+                total_cargo_tonnage = round(cargo_tonnage)
             if isinstance(total_capacity, (int, float)):
-                total_capacity_tonnage = int(round(total_capacity))
+                total_capacity_tonnage = round(total_capacity)
             if isinstance(free_space, (int, float)):
-                free_space_tonnage = int(round(free_space))
+                free_space_tonnage = round(free_space)
 
-            def _as_int(val: object) -> Optional[int]:
+            def _as_int(val: object) -> int | None:
                 if isinstance(val, int):
                     return val
                 if isinstance(val, float):
-                    return int(round(val))
+                    return round(val)
                 return None
 
             # Preserve a raw SpaceUsage breakdown for frontend calculations.
@@ -875,7 +870,7 @@ def build_current_carrier_state_response(
                 cargo_space_reserved=_as_int(cargo_reserved),
                 free_space=_as_int(free_space),
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "Failed to derive cargo/capacity metrics from CarrierStats",
                 exc_info=True,
@@ -896,7 +891,7 @@ def build_current_carrier_state_response(
     return CarrierStateResponse(carrier=state)
 
 
-def build_my_carriers_response(events: List[JournalEvent]) -> MyCarriersResponse:
+def build_my_carriers_response(events: list[JournalEvent]) -> MyCarriersResponse:
     """Build MyCarriersResponse listing the commander's Fleet carriers.
 
     This mirrors the behaviour of the original /api/carriers/mine logic:
@@ -923,8 +918,8 @@ def build_my_carriers_response(events: List[JournalEvent]) -> MyCarriersResponse
         elif isinstance(event, DockedEvent) and event.station_type == "FleetCarrier":
             latest_docked_by_market_id[event.market_id] = event
 
-    own_carriers: List[CarrierIdentity] = []
-    squadron_carriers: List[CarrierIdentity] = []
+    own_carriers: list[CarrierIdentity] = []
+    squadron_carriers: list[CarrierIdentity] = []
 
     seen_ids: set[int] = set()
     for event in events:

@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, HTTPException
 
+from ..models.journal_events import DockedEvent, FSDJumpEvent, LocationEvent
 from ..services.journal_parser import JournalParser
-from ..models.journal_events import LocationEvent, FSDJumpEvent, DockedEvent
-from ..utils.logger import get_logger
 from ..utils.journal import get_journal_directory, get_latest_journal_file
+from ..utils.logger import get_logger
 
 router = APIRouter(prefix="/api/journal", tags=["journal"])
 logger = get_logger(__name__)
@@ -24,7 +24,8 @@ async def get_journal_status():
         parser = JournalParser()
         events = parser.parse_file(latest_file)
 
-        # Find the latest location, FSD jump or docked event to determine the current system
+        # Find the latest location, FSD jump or docked event to determine
+        # the current system
         current_system = None
         for event in reversed(events):
             if isinstance(event, (LocationEvent, FSDJumpEvent, DockedEvent)):
@@ -33,8 +34,8 @@ async def get_journal_status():
 
         return {"current_system": current_system}
 
-    except HTTPException as e:
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:  # noqa: BLE001
         # Deliberately broad; correct at an HTTP boundary, because everything
         # not already an HTTPException is by definition unanticipated, so

@@ -37,7 +37,7 @@ import sys
 from collections import deque
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -49,6 +49,51 @@ ICO_FILE = PROJECT_ROOT / "EDColonisationAsst.ico"
 # cannot leave the site showing the previous icon.
 SITE_ICON = PROJECT_ROOT / "docs" / "assets" / "edca-icon.png"
 SITE_ICON_SIZE = 256
+
+# The card social platforms unfurl for a link to the site. It is the badge on
+# the site's own background rather than a cropped screenshot of the running
+# application: a screenshot is unreadable at the size these are shown and goes
+# stale every time the interface changes, whereas the badge already carries the
+# product name and cannot drift.
+#
+# The badge is pasted at whatever size the master arrives at and is never
+# enlarged to fill more of the card, for the reason the module docstring gives:
+# this artwork is fine chrome lettering and an upscale turns it to grey mush.
+# A bigger master is therefore the only way to make the badge bigger here.
+SOCIAL_CARD = PROJECT_ROOT / "docs" / "assets" / "social-card.png"
+
+# 1200x630 is what the og:image tags on every page of the site declare, and the
+# 1.91:1 ratio the platforms crop to.
+SOCIAL_CARD_SIZE = (1200, 630)
+
+# Straight from docs/assets/site.css, so the card and the page it links to are
+# the same object: --bg, --accent and --muted.
+SOCIAL_BACKGROUND = (0x0F, 0x10, 0x13)
+SOCIAL_ACCENT = (0xEE, 0x6B, 0x1C)
+SOCIAL_STRAPLINE_COLOUR = (0x95, 0x95, 0x9F)
+
+# The site draws a fading accent hairline across the top of every page
+# (body::before). The card carries the same one.
+SOCIAL_RULE_HEIGHT = 3
+
+# One line, and deliberately not the product name: the badge says that already.
+SOCIAL_STRAPLINE = "What still needs hauling, and where to."
+SOCIAL_STRAPLINE_SIZE = 34
+
+# The gap between the badge and the strapline, and between the strapline and
+# the bottom edge. The badge is then centred in whatever height is left, so the
+# layout holds if the master is replaced with a larger one.
+SOCIAL_STRAPLINE_GAP = 46
+SOCIAL_BOTTOM_MARGIN = 64
+
+# Segoe UI is the site's first named sans after system-ui, so the card matches
+# what a Windows reader sees on the page itself.
+SOCIAL_FONT_CANDIDATES = (
+    Path("C:/Windows/Fonts/segoeui.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+)
+
+HALF = 2
 
 # A pixel this dark or darker, reachable from the border, is background.
 BACKGROUND_MAX = 8
@@ -66,6 +111,7 @@ OPAQUE = 255
 # and the Apps list all resolve to different ones of these.
 ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
+RGB = "RGB"
 RGBA = "RGBA"
 PREMULTIPLIED = "RGBa"
 TRANSPARENT = (0, 0, 0, 0)
@@ -210,6 +256,60 @@ def write_ico(image: Image.Image) -> None:
     )
 
 
+def _strapline_font() -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+    """Return the card's text font, falling back to Pillow's own."""
+    for candidate in SOCIAL_FONT_CANDIDATES:
+        if candidate.is_file():
+            return ImageFont.truetype(str(candidate), SOCIAL_STRAPLINE_SIZE)
+    return ImageFont.load_default()
+
+
+def _accent_hairline(card: Image.Image) -> None:
+    """Draw the site's fading accent rule across the top of the card."""
+    draw = ImageDraw.Draw(card)
+    midpoint = card.width / HALF
+    for x in range(card.width):
+        # Background at both edges, full accent in the middle, which is what
+        # the CSS gradient on the page does.
+        coverage = 1 - abs(x - midpoint) / midpoint
+        blended = tuple(
+            round(background + (accent - background) * coverage)
+            for background, accent in zip(SOCIAL_BACKGROUND, SOCIAL_ACCENT, strict=True)
+        )
+        draw.line(((x, 0), (x, SOCIAL_RULE_HEIGHT - 1)), fill=blended)
+
+
+def write_social_card(badge: Image.Image) -> None:
+    """Write the link-preview card: the badge on the site's own background."""
+    card = Image.new(RGB, SOCIAL_CARD_SIZE, SOCIAL_BACKGROUND)
+    _accent_hairline(card)
+
+    draw = ImageDraw.Draw(card)
+    font = _strapline_font()
+    left, top, right, bottom = draw.textbbox((0, 0), SOCIAL_STRAPLINE, font=font)
+    strapline_y = card.height - SOCIAL_BOTTOM_MARGIN - (bottom - top)
+
+    # The badge is centred in whatever height is left above the strapline. A
+    # master too tall for that space is scaled DOWN to fit, which costs nothing;
+    # one that is smaller is left exactly as drawn rather than enlarged.
+    available = strapline_y - SOCIAL_STRAPLINE_GAP
+    if badge.height > available:
+        badge = _scaled(badge, available)
+
+    card.paste(
+        badge,
+        ((card.width - badge.width) // HALF, (available - badge.height) // HALF),
+        badge,
+    )
+    draw.text(
+        ((card.width - (right - left)) // HALF - left, strapline_y - top),
+        SOCIAL_STRAPLINE,
+        font=font,
+        fill=SOCIAL_STRAPLINE_COLOUR,
+    )
+    card.save(SOCIAL_CARD, format="PNG", optimize=True)
+
+
 def main() -> int:
     """Prepare the master and regenerate the icon. Returns an exit code."""
     if not MASTER_PNG.exists():
@@ -241,6 +341,13 @@ def main() -> int:
     if SITE_ICON.parent.is_dir():
         _scaled(master, SITE_ICON_SIZE).save(SITE_ICON, format="PNG", optimize=True)
         print(f"Wrote {SITE_ICON.relative_to(PROJECT_ROOT)} at {SITE_ICON_SIZE}px")
+
+        write_social_card(master)
+        card_width, card_height = SOCIAL_CARD_SIZE
+        print(
+            f"Wrote {SOCIAL_CARD.relative_to(PROJECT_ROOT)} "
+            f"at {card_width}x{card_height} with the badge at {master.width}px"
+        )
 
     return 0
 

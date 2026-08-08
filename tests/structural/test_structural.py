@@ -76,13 +76,12 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. app_runtime.py is the one to take next: it is the
-        # largest remaining file here and the seams are already implied by its
-        # own tests.
-        "backend/src/runtime/app_runtime.py",
+        # Backend source. main.py is the one to take next: it is the largest
+        # remaining file here; it is also a composition root that has
+        # accumulated startup work belonging to the pieces it wires together.
+        "backend/src/main.py",
         "backend/src/services/journal_parser.py",
         "backend/src/repositories/colonisation_repository.py",
-        "backend/src/main.py",
         "backend/src/runtime/launcher_components.py",
         # Front end. useKeepAwake.ts shows the project already knows how to
         # move state out of a component and into a hook.

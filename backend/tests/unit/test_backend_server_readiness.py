@@ -1,10 +1,10 @@
-from __future__ import annotations
-
-"""Tests for the backend readiness probes in src.runtime.app_runtime.
+"""Tests for the backend readiness probes in src.runtime.backend_server.
 
 Covers the non-blocking single probe used by the startup splash monitor and
 the blocking wait_until_ready() wrapper that now delegates to it.
 """
+
+from __future__ import annotations
 
 import urllib.error
 import urllib.request
@@ -13,14 +13,14 @@ from typing import Any, List
 
 import pytest
 
-import src.runtime.app_runtime as app_runtime_mod
+import src.runtime.backend_server as backend_server_mod
 from src.runtime.common import RuntimeMode
 from src.runtime.environment import RuntimeEnvironment
 
 
-def make_controller(tmp_path: Path) -> app_runtime_mod.BackendServerController:
+def make_controller(tmp_path: Path) -> backend_server_mod.BackendServerController:
     env = RuntimeEnvironment(mode=RuntimeMode.DEV, project_root=tmp_path)
-    return app_runtime_mod.BackendServerController(env)
+    return backend_server_mod.BackendServerController(env)
 
 
 class DummyResponse:
@@ -95,7 +95,7 @@ def test_wait_until_ready_times_out_when_probe_never_passes(
         except StopIteration:
             return start + 61.0
 
-    monkeypatch.setattr(app_runtime_mod.time, "time", fake_time)
-    monkeypatch.setattr(app_runtime_mod.time, "sleep", lambda _secs: None)
+    monkeypatch.setattr(backend_server_mod.time, "time", fake_time)
+    monkeypatch.setattr(backend_server_mod.time, "sleep", lambda _secs: None)
 
     assert controller.wait_until_ready(timeout=60.0) is False

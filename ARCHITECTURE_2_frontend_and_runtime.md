@@ -255,11 +255,11 @@ In DEV mode, this is the simplest way to start both backend and frontend with he
 
 ### 2.5 Packaged runtime (frozen EXE)
 
-For Windows installers and similar packaged distributions, the main entrypoint is [`runtime_entry.py`](backend/src/runtime_entry.py:1) and the orchestration is in [`app_runtime.py`](backend/src/runtime/app_runtime.py:1).
+For Windows installers and similar packaged distributions, the main entrypoint is [`runtime_entry.py`](backend/src/runtime_entry.py:1) and the orchestration is in [`app_runtime.py`](backend/src/runtime/app_runtime.py:1). The two controllers it drives live in modules of their own and are re-exported from `app_runtime`, which stays the runtime stack's public surface.
 
 Key classes:
 
-- `BackendServerController`: starts/stops an in‑process `uvicorn.Server` hosting `fastapi_app`:
+- `BackendServerController` ([`backend_server.py`](backend/src/runtime/backend_server.py:1)): starts/stops an in‑process `uvicorn.Server` hosting `fastapi_app`:
 
   - Uses a custom `_QuietUvicornConfig` that disables uvicorn’s own logging configuration (to avoid conflicts in certain frozen environments).
   - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the EXE.
@@ -272,7 +272,7 @@ Key classes:
   - The browser is opened only when both endpoints actually respond; on timeout the splash reports the problem and closes while the tray stays available.
   - Silent starts (`--no-browser`, used for login autostart) show no splash and open no browser.
 
-- `TrayUIController`: simple Qt system tray UI in frozen mode:
+- `TrayUIController` ([`tray_ui.py`](backend/src/runtime/tray_ui.py:1)): simple Qt system tray UI in frozen mode, distinct from the dev tray in `tray_components.py`:
 
   - Sets EDCA icon and tooltip.
   - Offers:

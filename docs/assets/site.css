@@ -1,0 +1,304 @@
+:root {
+  --bg: #0f1013;
+  --surface: #1c1d22;
+  --edge: #33343c;
+  --accent: #ee6b1c;
+  --accent-soft: #f4995a;
+  --positive: #57c97a;
+  --text: #e4e4e9;
+  --muted: #95959f;
+  --mono: 'Consolas', 'Cascadia Code', ui-monospace, 'SF Mono', monospace;
+  --sans: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  z-index: 10;
+}
+a { color: var(--accent-soft); text-decoration: none; }
+a:hover { color: var(--accent); }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+header.hero { text-align: center; padding: 88px 0 60px; }
+.hero img.logo { width: 96px; height: 96px; border-radius: 18px; }
+.hero h1 {
+  font-family: var(--mono);
+  font-size: clamp(44px, 9vw, 76px);
+  font-weight: 700;
+  color: var(--accent);
+  margin: 16px 0 4px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 26px rgba(238, 107, 28, 0.38);
+}
+.hero .tagline {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 15px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  margin: 0 0 24px;
+}
+.hero p.pitch {
+  max-width: 680px;
+  margin: 0 auto 32px;
+  font-size: 19px;
+  color: var(--text);
+}
+.cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 13px 28px;
+  border-radius: 24px;
+  font-weight: 700;
+  font-size: 15px;
+  border: 1px solid var(--edge);
+}
+.btn.primary { background: var(--accent); color: #14110d; border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-soft); color: #14110d; }
+.btn.ghost { background: var(--surface); color: var(--text); }
+.btn.ghost:hover { background: var(--edge); }
+.platform-note {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+section { padding: 40px 0; }
+h2 {
+  font-family: var(--mono);
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 10px;
+  margin-bottom: 28px;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 22px;
+}
+.card .icon { font-size: 24px; }
+.card h3 { margin: 10px 0 6px; font-size: 17px; color: var(--text); font-family: var(--mono); }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.shot { text-align: center; }
+.shot img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+}
+.shot .caption { margin: 14px 0 36px; font-size: 14px; color: var(--muted); }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; counter-reset: step; }
+.step { background: var(--surface); border: 1px solid var(--edge); border-radius: 12px; padding: 20px; }
+.step .n { font-family: var(--mono); color: var(--accent); font-weight: 700; font-size: 14px; letter-spacing: 2px; }
+.step h3 { margin: 8px 0 6px; font-size: 16px; color: var(--text); }
+.step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+.req { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.req .card p { color: var(--text); }
+.req .card span { color: var(--muted); }
+
+.faq { display: grid; gap: 14px; }
+.faq .card h3 { font-family: var(--sans); font-size: 16px; margin: 0 0 8px; color: var(--accent-soft); }
+.faq .card p { color: var(--text); }
+
+.eyebrow {
+  font-family: var(--mono);
+  color: var(--accent);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 10px;
+  margin-bottom: 28px;
+}
+h2.section-title {
+  font-family: var(--sans);
+  color: var(--text);
+  font-size: 30px;
+  letter-spacing: normal;
+  text-transform: none;
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin: 0 0 10px;
+}
+.section-sub {
+  color: var(--muted);
+  max-width: 640px;
+  margin: 0 0 18px;
+  font-size: 16px;
+}
+.dl-version {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--accent-soft);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  padding: 4px 14px;
+}
+.downloads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+  max-width: 380px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dl-card {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dl-card .ico { font-size: 30px; }
+.dl-card h3 { margin: 4px 0 0; font-size: 18px; color: var(--text); }
+.dl-card .req { display: block; color: var(--muted); font-size: 13px; margin: 0; }
+.dl-card .btn { margin: 14px auto 4px; }
+.dl-card .meta {
+  color: var(--muted);
+  font-size: 12.5px;
+  min-height: 1.2em;
+  margin: 0;
+}
+.dl-card .how { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.dl-links {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  margin: 18px 0 0;
+}
+
+footer {
+  border-top: 1px solid var(--edge);
+  margin-top: 32px;
+  padding: 32px 0 56px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+footer .mono { font-family: var(--mono); }
+
+/* ---------------------------------------------------------------------------
+   Multi-page navigation.
+
+   The site was one long page. It is now several, so two things have to work
+   that did not exist before: a bar that says where you are and what else there
+   is, and a link at the foot of each page that carries the reader on to the
+   next step rather than leaving them at a dead end.
+   --------------------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  background: rgba(15, 16, 19, 0.94);
+  border-bottom: 1px solid var(--edge);
+  backdrop-filter: blur(6px);
+}
+.topbar .wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+.topbar .brand img { width: 28px; height: 28px; border-radius: 7px; }
+.topbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.topbar nav a {
+  color: var(--muted);
+  font-size: 14px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+.topbar nav a:hover { color: var(--text); }
+.topbar nav a[aria-current="page"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.topbar .spacer { margin-left: auto; }
+
+/* The lead-in at the top of an inner page, in place of the full hero. */
+.page-head { padding: 56px 0 8px; }
+.page-head h1 {
+  font-family: var(--mono);
+  color: var(--accent);
+  font-size: clamp(28px, 5vw, 40px);
+  margin: 0 0 12px;
+  letter-spacing: 1px;
+}
+.page-head p {
+  max-width: 720px;
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+/* The guided path: one obvious next step at the foot of every page. */
+.next-step {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 48px 0 8px;
+  padding: 22px 26px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+}
+.next-step .label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+}
+.next-step strong { font-size: 17px; color: var(--text); }
+.next-step p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }

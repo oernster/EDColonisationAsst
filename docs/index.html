@@ -6,347 +6,68 @@
 <title>EDCA - Elite Dangerous Colonisation Assistant</title>
 <meta name="description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
 <link rel="icon" href="assets/edca-icon.png">
+<link rel="stylesheet" href="assets/site.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDCA">
 <meta property="og:title" content="EDCA - Elite Dangerous Colonisation Assistant">
-<meta property="og:description" content="Track colonisation construction sites and fleet carrier logistics from your Elite Dangerous journal. Local-first and browser-based, for Windows. Free and open source.">
+<meta property="og:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
 <meta property="og:url" content="https://ernster.dev/EDColonisationAsst/">
 <meta property="og:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:type" content="image/png">
-<meta property="og:image:alt" content="The EDCA dashboard showing a system shopping list of colonisation commodities">
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="EDCA - Elite Dangerous Colonisation Assistant">
-<meta name="twitter:description" content="Track colonisation construction sites and fleet carrier logistics from your Elite Dangerous journal. Local-first, Windows, free and open source.">
+<meta name="twitter:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
 <meta name="twitter:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
-<meta name="twitter:image:alt" content="The EDCA dashboard showing a system shopping list of colonisation commodities">
 <link rel="canonical" href="https://ernster.dev/EDColonisationAsst/">
 <meta name="author" content="Oliver Ernster">
-<meta name="application-name" content="EDCA">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#0f1013">
-<meta name="keywords" content="Elite Dangerous, EDCA, Elite Dangerous Colonisation Assistant, colonisation, fleet carrier, construction sites, system shopping list, Trailblazer, commodities, journal, HUD, Odyssey, Horizons, in-game tool, dashboard, Windows, local, free, open source, Elite Dangerous tools">
-<style>
-  :root {
-    --bg: #0f1013;
-    --surface: #1c1d22;
-    --edge: #33343c;
-    --accent: #ee6b1c;
-    --accent-soft: #f4995a;
-    --positive: #57c97a;
-    --text: #e4e4e9;
-    --muted: #95959f;
-    --mono: 'Consolas', 'Cascadia Code', ui-monospace, 'SF Mono', monospace;
-    --sans: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    line-height: 1.6;
-  }
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    z-index: 10;
-  }
-  a { color: var(--accent-soft); text-decoration: none; }
-  a:hover { color: var(--accent); }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-
-  header.hero { text-align: center; padding: 88px 0 60px; }
-  .hero img.logo { width: 96px; height: 96px; border-radius: 18px; }
-  .hero h1 {
-    font-family: var(--mono);
-    font-size: clamp(44px, 9vw, 76px);
-    font-weight: 700;
-    color: var(--accent);
-    margin: 16px 0 4px;
-    letter-spacing: 2px;
-    text-shadow: 0 0 26px rgba(238, 107, 28, 0.38);
-  }
-  .hero .tagline {
-    font-family: var(--mono);
-    color: var(--muted);
-    font-size: 15px;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    margin: 0 0 24px;
-  }
-  .hero p.pitch {
-    max-width: 680px;
-    margin: 0 auto 32px;
-    font-size: 19px;
-    color: var(--text);
-  }
-  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    display: inline-block;
-    padding: 13px 28px;
-    border-radius: 24px;
-    font-weight: 700;
-    font-size: 15px;
-    border: 1px solid var(--edge);
-  }
-  .btn.primary { background: var(--accent); color: #14110d; border-color: var(--accent); }
-  .btn.primary:hover { background: var(--accent-soft); color: #14110d; }
-  .btn.ghost { background: var(--surface); color: var(--text); }
-  .btn.ghost:hover { background: var(--edge); }
-  .platform-note {
-    margin-top: 18px;
-    font-size: 13px;
-    color: var(--muted);
-    letter-spacing: 0.5px;
-  }
-
-  section { padding: 40px 0; }
-  h2 {
-    font-family: var(--mono);
-    color: var(--accent);
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--edge);
-    padding-bottom: 10px;
-    margin-bottom: 28px;
-  }
-
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 18px;
-  }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--edge);
-    border-radius: 12px;
-    padding: 22px;
-  }
-  .card .icon { font-size: 24px; }
-  .card h3 { margin: 10px 0 6px; font-size: 17px; color: var(--text); font-family: var(--mono); }
-  .card p { margin: 0; color: var(--muted); font-size: 15px; }
-
-  .shot { text-align: center; }
-  .shot img {
-    max-width: 100%;
-    height: auto;
-    border: 1px solid var(--edge);
-    border-radius: 12px;
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
-  }
-  .shot .caption { margin: 14px 0 36px; font-size: 14px; color: var(--muted); }
-
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; counter-reset: step; }
-  .step { background: var(--surface); border: 1px solid var(--edge); border-radius: 12px; padding: 20px; }
-  .step .n { font-family: var(--mono); color: var(--accent); font-weight: 700; font-size: 14px; letter-spacing: 2px; }
-  .step h3 { margin: 8px 0 6px; font-size: 16px; color: var(--text); }
-  .step p { margin: 0; color: var(--muted); font-size: 14px; }
-
-  .req { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-  .req .card p { color: var(--text); }
-  .req .card span { color: var(--muted); }
-
-  .faq { display: grid; gap: 14px; }
-  .faq .card h3 { font-family: var(--sans); font-size: 16px; margin: 0 0 8px; color: var(--accent-soft); }
-  .faq .card p { color: var(--text); }
-
-  .eyebrow {
-    font-family: var(--mono);
-    color: var(--accent);
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--edge);
-    padding-bottom: 10px;
-    margin-bottom: 28px;
-  }
-  h2.section-title {
-    font-family: var(--sans);
-    color: var(--text);
-    font-size: 30px;
-    letter-spacing: normal;
-    text-transform: none;
-    border-bottom: 0;
-    padding-bottom: 0;
-    margin: 0 0 10px;
-  }
-  .section-sub {
-    color: var(--muted);
-    max-width: 640px;
-    margin: 0 0 18px;
-    font-size: 16px;
-  }
-  .dl-version {
-    display: block;
-    width: fit-content;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 4px;
-    font-size: 14px;
-    color: var(--accent-soft);
-    border: 1px solid var(--edge);
-    border-radius: 999px;
-    padding: 4px 14px;
-  }
-  .downloads {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
-    margin-top: 28px;
-    max-width: 380px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .dl-card {
-    background: var(--surface);
-    border: 1px solid var(--edge);
-    border-radius: 12px;
-    padding: 24px 20px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .dl-card .ico { font-size: 30px; }
-  .dl-card h3 { margin: 4px 0 0; font-size: 18px; color: var(--text); }
-  .dl-card .req { display: block; color: var(--muted); font-size: 13px; margin: 0; }
-  .dl-card .btn { margin: 14px auto 4px; }
-  .dl-card .meta {
-    color: var(--muted);
-    font-size: 12.5px;
-    min-height: 1.2em;
-    margin: 0;
-  }
-  .dl-card .how { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
-  .dl-links {
-    text-align: center;
-    color: var(--muted);
-    font-size: 14px;
-    margin: 18px 0 0;
-  }
-
-  footer {
-    border-top: 1px solid var(--edge);
-    margin-top: 32px;
-    padding: 32px 0 56px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 14px;
-  }
-  footer .mono { font-family: var(--mono); }
-</style>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "SoftwareApplication",
-      "@id": "https://ernster.dev/EDColonisationAsst/#app",
-      "name": "Elite Dangerous Colonisation Assistant",
-      "alternateName": "EDCA",
-      "applicationCategory": "GameApplication",
-      "applicationSubCategory": "Elite Dangerous colonisation and fleet carrier tool",
-      "operatingSystem": "Windows 10, Windows 11",
-      "url": "https://ernster.dev/EDColonisationAsst/",
-      "downloadUrl": "https://github.com/oernster/EDColonisationAsst/releases/latest",
-      "image": "https://ernster.dev/EDColonisationAsst/assets/social-card.png",
-      "screenshot": "https://ernster.dev/EDColonisationAsst/assets/screenshot-systems.png",
-      "inLanguage": "en-GB",
-      "description": "A free, local, browser-based HUD that tracks Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from the player's journal.",
-      "keywords": "Elite Dangerous, colonisation, fleet carrier, construction sites, system shopping list, Trailblazer, journal, HUD, local-first, free, open source",
-      "featureList": [
-        "Journal-driven tracking of colonisation construction sites",
-        "Per-system shopping list of commodities still needed, with progress",
-        "Per-commodity fleet carrier hold, market orders and capacity in one view",
-        "Fleet carrier fuel, jump range, balances, tax rates and crew roster",
-        "Booked carrier jumps shown with a live countdown to departure",
-        "Per-system station and base-landing tracking",
-        "Browser HUD accessible from a tablet over the local network",
-        "Updates itself as you fly, with no page to reload",
-        "Local-first with no cloud, no account and no telemetry"
-      ],
-      "author": {
-        "@type": "Person",
-        "name": "Oliver Ernster",
-        "url": "https://github.com/oernster"
-      },
-      "publisher": {
-        "@type": "Person",
-        "name": "Oliver Ernster",
-        "url": "https://github.com/oernster"
-      },
-      "license": "https://www.gnu.org/licenses/lgpl-3.0.html",
-      "isAccessibleForFree": true,
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
-    },
-    {
-      "@type": "WebSite",
-      "@id": "https://ernster.dev/EDColonisationAsst/#website",
-      "url": "https://ernster.dev/EDColonisationAsst/",
-      "name": "EDCA",
-      "description": "Elite Dangerous Colonisation Assistant: colonisation and fleet carrier tracking from your journal.",
-      "inLanguage": "en-GB",
-      "publisher": { "@type": "Person", "name": "Oliver Ernster", "url": "https://github.com/oernster" }
-    },
-    {
-      "@type": "FAQPage",
-      "@id": "https://ernster.dev/EDColonisationAsst/#faq",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is EDCA?",
-          "acceptedAnswer": { "@type": "Answer", "text": "EDCA (Elite Dangerous Colonisation Assistant) is a free, local, browser-based HUD that tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal." }
-        },
-        {
-          "@type": "Question",
-          "name": "Does EDCA need an account or send my data anywhere?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. It runs entirely on your machine, reads your local journal and has no accounts, no cloud and no telemetry." }
-        },
-        {
-          "@type": "Question",
-          "name": "Which platforms does EDCA support?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Windows. EDCA ships as a Windows installer you download from the Releases page." }
-        },
-        {
-          "@type": "Question",
-          "name": "What does EDCA track?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Per-system colonisation construction sites and their aggregated commodity shopping lists, station state, and your fleet carrier's hold, market orders, capacity, fuel and jump range, balances and crew. It also tracks where each carrier is, including a jump you have booked but not yet made." }
-        },
-        {
-          "@type": "Question",
-          "name": "Why does the first launch take longer?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Because it reads every journal already on your machine once, to rebuild the colonisation history you have flown so far rather than starting you from empty. The splash names the file it is reading and how much is left. It happens on the first run only." }
-        },
-        {
-          "@type": "Question",
-          "name": "Can I use EDCA on a tablet?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. EDCA serves a browser HUD on your local network, so you can open it on a tablet or phone on the same Wi-Fi and mount it beside your cockpit, with a keep-screen-awake option." }
-        },
-        {
-          "@type": "Question",
-          "name": "Does EDCA support squadron or multiplayer colonisation?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. Elite Dangerous journals are local to each player, so EDCA tracks your own contributions only." }
-        },
-        {
-          "@type": "Question",
-          "name": "How do I update or uninstall EDCA?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Run the same installer over your existing installation and it upgrades in one pass, offering to close EDCA first if it is running. To remove it, use Apps and features in Windows, which clears the install folder, the shortcuts and the sign-in entry." }
-        }
-      ]
-    }
-  ]
+  "@type": "SoftwareApplication",
+  "name": "EDCA - Elite Dangerous Colonisation Assistant",
+  "operatingSystem": "Windows 10, Windows 11",
+  "applicationCategory": "GameApplication",
+  "url": "https://ernster.dev/EDColonisationAsst/",
+  "image": "https://ernster.dev/EDColonisationAsst/assets/social-card.png",
+  "featureList": [
+    "Journal-driven tracking of colonisation construction sites",
+    "Per-system shopping list of commodities still needed, with progress",
+    "Per-commodity fleet carrier hold, market orders and capacity in one view",
+    "Fleet carrier fuel, jump range, balances, tax rates and crew roster",
+    "Carrier balance movements over time",
+    "Booked carrier jumps shown with a live countdown to departure",
+    "Browser HUD accessible from a tablet over the local network",
+    "Updates itself as you fly, with no page to reload",
+    "Local-first with no cloud, no account and no telemetry"
+  ],
+  "author": { "@type": "Person", "name": "Oliver Ernster", "url": "https://github.com/oernster" },
+  "license": "https://www.gnu.org/licenses/lgpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
 }
 </script>
 </head>
 <body>
+  <div class="topbar">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/edca-icon.png" alt="">EDCA</a>
+      <nav>
+      <a href="./" aria-current="page">Home</a>
+      <a href="colonisation.html">Colonisation</a>
+      <a href="carriers.html">Fleet carriers</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="faq.html">Questions</a>
+      <a href="why.html">Why it exists</a>
+    </nav>
+      <span class="spacer"></span>
+      <a href="https://github.com/oernster/EDColonisationAsst">GitHub</a>
+    </div>
+  </div>
+
   <div class="wrap">
 
     <header class="hero">
@@ -361,45 +82,40 @@
       </p>
       <div class="cta">
         <a class="btn primary" href="#download">Download</a>
-        <a class="btn ghost" href="#how">How it works</a>
-        <a class="btn ghost" href="why.html">Why it exists</a>
+        <a class="btn ghost" href="colonisation.html">Take the tour</a>
         <a class="btn ghost" href="https://github.com/oernster/EDColonisationAsst">View on GitHub</a>
       </div>
       <p class="platform-note">Windows &middot; opens in your browser automatically; reachable from a tablet on your local network at &lt;your-PC-IP&gt;:47021/app</p>
     </header>
 
-    <section id="features">
-      <h2>What it does</h2>
+    <section>
+      <h2>Where to start</h2>
+      <div class="features">
+        <div class="card">
+          <div class="icon">&#128230;</div>
+          <h3><a href="colonisation.html">Colonisation</a></h3>
+          <p>The per-system shopping list of everything still needed across your construction sites, and the completed ones you can stop thinking about.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128752;</div>
+          <h3><a href="carriers.html">Fleet carriers</a></h3>
+          <p>What your carrier holds, what it is offering, what it runs on and where it is heading, whether or not you are standing on it.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9881;</div>
+          <h3><a href="how-it-works.html">How it works</a></h3>
+          <p>Install, launch, play. What happens on the first run, what it needs, and how to put it on a tablet beside the cockpit.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What it is</h2>
       <div class="features">
         <div class="card">
           <div class="icon">&#128211;</div>
           <h3>Journal-driven, automatic</h3>
           <p>EDCA reads your Elite Dangerous journal as you play and pushes what changed straight to the page. Deliver a load and the numbers move while you are still at the pad, with nothing to refresh and nothing to type in.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128230;</div>
-          <h3>System shopping lists</h3>
-          <p>Every commodity still needed across all construction sites in a system, aggregated into one list with progress, average payment and where each is needed. Watch it go green on full delivery.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128752;</div>
-          <h3>Fleet carrier logistics</h3>
-          <p>What your carrier is actually holding, commodity by commodity, alongside its buy and sell orders plus its capacity breakdown. The hold is a real inventory rather than a list of what you happen to have on sale; it also says how current it is.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#9981;</div>
-          <h3>Carrier status at a glance</h3>
-          <p>Tritium in the tank, current and maximum jump range, the balance against the reserve, the tax your services charge visitors and who is crewing each one. Anything your journal has not reported is left out rather than shown as a zero, so an empty gauge always means empty.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128640;</div>
-          <h3>Never merely "last seen"</h3>
-          <p>A carrier is never docked anywhere: it holds station in a system, or it has a jump booked and is about to leave. Book one and EDCA names the destination and counts down to departure, then clears itself the moment the carrier arrives.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128506;</div>
-          <h3>Systems and stations</h3>
-          <p>Per-system station state, your visits and base landings, tracked from local data as you explore and build out a colony.</p>
         </div>
         <div class="card">
           <div class="icon">&#128241;</div>
@@ -414,90 +130,6 @@
       </div>
     </section>
 
-    <section id="screenshots">
-      <h2>The HUD</h2>
-      <div class="shot">
-        <img src="assets/screenshot-systems.png" loading="lazy" alt="The EDCA system view: a per-system shopping list aggregating the colonisation commodities still needed across construction sites, each with progress, average payment and the sites that need it">
-        <p class="caption">System view: the shopping list of commodities still needed across a system's construction sites.</p>
-        <img src="assets/screenshot-carrier.png" loading="lazy" alt="The EDCA fleet carrier view showing the per-commodity carrier hold, market buy and sell orders and capacity usage">
-        <p class="caption">Fleet carrier view: the hold, market orders and capacity, rebuilt from your journal.</p>
-      </div>
-    </section>
-
-    <section id="how">
-      <h2>How it works</h2>
-      <div class="steps">
-        <div class="step">
-          <div class="n">STEP 1</div>
-          <h3>Install</h3>
-          <p>Download and run the installer from the Releases page; there is nothing to configure.</p>
-        </div>
-        <div class="step">
-          <div class="n">STEP 2</div>
-          <h3>Launch</h3>
-          <p>EDCA starts a local web server and opens your browser for you. There is nothing to sign in to. The first launch pauses to read the journals already on your machine, and says so while it does, naming the file it is on and how much is left. Later launches skip straight past it.</p>
-        </div>
-        <div class="step">
-          <div class="n">STEP 3</div>
-          <h3>Play</h3>
-          <p>It reads your journal straight away and keeps the colonisation and carrier views current as you fly.</p>
-        </div>
-        <div class="step">
-          <div class="n">STEP 4</div>
-          <h3>Go cockpit</h3>
-          <p>Open EDCA on a tablet using your PC's network IP on the same Wi-Fi and mount it beside the cockpit.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="requirements">
-      <h2>Requirements</h2>
-      <div class="req">
-        <div class="card"><p>Elite Dangerous on PC</p><span>with Horizons and Odyssey (the Trailblazer colonisation update)</span></div>
-        <div class="card"><p>Any modern browser</p><span>Chrome, Edge, Firefox or Safari</span></div>
-        <div class="card"><p>Windows 10 or 11</p><span>EDCA ships as a Windows installer from the Releases page</span></div>
-        <div class="card"><p>Optional second screen</p><span>a tablet beside the cockpit for immersion</span></div>
-      </div>
-    </section>
-
-    <section id="faq">
-      <h2>Common questions</h2>
-      <div class="faq">
-        <div class="card">
-          <h3>What is EDCA?</h3>
-          <p>EDCA (Elite Dangerous Colonisation Assistant) is a free, local, browser-based HUD that tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal.</p>
-        </div>
-        <div class="card">
-          <h3>Does EDCA need an account or send my data anywhere?</h3>
-          <p>No. It runs entirely on your machine, reads your local journal and has no accounts, no cloud and no telemetry.</p>
-        </div>
-        <div class="card">
-          <h3>Which platforms does EDCA support?</h3>
-          <p>Windows. EDCA ships as a Windows installer you download from the Releases page.</p>
-        </div>
-        <div class="card">
-          <h3>What does EDCA track?</h3>
-          <p>Per-system colonisation construction sites and their aggregated commodity shopping lists, station state, and your fleet carrier's hold, market orders, capacity, fuel and jump range, balances and crew. It also tracks where each carrier is, including a jump you have booked but not yet made.</p>
-        </div>
-        <div class="card">
-          <h3>Why does the first launch take longer?</h3>
-          <p>Because it reads every journal already on your machine once, to rebuild the colonisation history you have flown so far rather than starting you from empty. The splash names the file it is reading and how much is left, so it is a wait you can watch rather than guess at. It happens on the first run only.</p>
-        </div>
-        <div class="card">
-          <h3>Can I use EDCA on a tablet?</h3>
-          <p>Yes. EDCA serves a browser HUD on your local network, so you can open it on a tablet or phone on the same Wi-Fi and mount it beside your cockpit, with a keep-screen-awake option.</p>
-        </div>
-        <div class="card">
-          <h3>Does EDCA support squadron or multiplayer colonisation?</h3>
-          <p>No. Elite Dangerous journals are local to each player, so EDCA tracks your own contributions only.</p>
-        </div>
-        <div class="card">
-          <h3>How do I update or uninstall EDCA?</h3>
-          <p>Run the same installer over your existing installation: it works out that this is an upgrade and does it in one pass, offering to close EDCA first if it is running. To remove it, use Apps &amp; features in Windows, which clears the install folder, the shortcuts and the sign-in entry.</p>
-        </div>
-      </div>
-    </section>
-
     <section id="download">
       <div class="eyebrow">Get EDCA</div>
       <h2 class="section-title">Download EDCA</h2>
@@ -507,7 +139,7 @@
       <span class="dl-version" id="dl-version">Latest release</span>
       <div class="downloads">
         <div class="dl-card">
-          <div class="ico">🪟</div>
+          <div class="ico">&#129323;</div>
           <h3>Windows</h3>
           <p class="req">Windows 10 or 11, 64-bit</p>
           <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest/download/EDColonisationAsstInstaller.exe">
@@ -518,13 +150,22 @@
         </div>
       </div>
       <p class="dl-links">
-        <a id="dl-whats-new" href="https://github.com/oernster/EDColonisationAsst/releases/latest">What's new in this release</a>
+        <a id="dl-whats-new" href="https://github.com/oernster/EDColonisationAsst/releases/latest">What is new in this release</a>
         &nbsp;&middot;&nbsp;
         <a href="https://github.com/oernster/EDColonisationAsst/releases">All releases</a>
         &nbsp;&middot;&nbsp;
         <a href="https://github.com/oernster/EDColonisationAsst">Source on GitHub</a>
       </p>
     </section>
+
+    <a class="next-step" href="colonisation.html">
+      <span>
+        <span class="label">Next</span>
+        <strong>See what it tracks</strong>
+        <p>Start with colonisation: the shopping list that tells you what to haul next.</p>
+      </span>
+      <span class="btn ghost">Continue</span>
+    </a>
 
     <footer>
       <p class="mono">EDCA &middot; Elite Dangerous Colonisation Assistant</p>

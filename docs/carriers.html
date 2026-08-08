@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet carriers - EDCA</title>
+<meta name="description" content="What your fleet carrier holds, what it is offering, what it runs on and where it is heading, rebuilt from your Elite Dangerous journal.">
+<link rel="icon" href="assets/edca-icon.png">
+<link rel="stylesheet" href="assets/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EDCA">
+<meta property="og:title" content="Fleet carriers - EDCA">
+<meta property="og:description" content="What your fleet carrier holds, what it is offering, what it runs on and where it is heading, rebuilt from your Elite Dangerous journal.">
+<meta property="og:url" content="https://ernster.dev/EDColonisationAsst/carriers.html">
+<meta property="og:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_GB">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fleet carriers - EDCA">
+<meta name="twitter:description" content="What your fleet carrier holds, what it is offering, what it runs on and where it is heading, rebuilt from your Elite Dangerous journal.">
+<meta name="twitter:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
+<link rel="canonical" href="https://ernster.dev/EDColonisationAsst/carriers.html">
+<meta name="author" content="Oliver Ernster">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0f1013">
+</head>
+<body>
+  <div class="topbar">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/edca-icon.png" alt="">EDCA</a>
+      <nav>
+      <a href="./">Home</a>
+      <a href="colonisation.html">Colonisation</a>
+      <a href="carriers.html" aria-current="page">Fleet carriers</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="faq.html">Questions</a>
+      <a href="why.html">Why it exists</a>
+    </nav>
+      <span class="spacer"></span>
+      <a href="https://github.com/oernster/EDColonisationAsst">GitHub</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <h1>Fleet carriers</h1>
+      <p>A carrier is never docked anywhere. It holds station in a star system, or it has a jump booked and is about to leave. And what it is carrying does not depend on where you are standing, so EDCA shows it whether or not you are aboard.</p>
+    </header>
+
+    <section>
+      <h2>The hold</h2>
+      <p class="section-sub">What the carrier is actually holding, commodity by commodity. The hold is a real inventory rather than a list of what you happen to have on sale, and it says how current it is: the game rewrites the market export only when you dock and open the commodity market, so EDCA carries it forward with your own trades and tells you when the two disagree.</p>
+      <div class="shot">
+        <img src="assets/screenshot-carrier-cargo.png" loading="lazy" alt="The EDCA fleet carrier cargo view showing 6,274 tonnes of tritium in the hold, free space after all buy orders, and a green chip confirming the breakdown matches the carrier's own total">
+        <p class="caption">The hold, with free space after outstanding buy orders and a note of when the breakdown was read.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The market</h2>
+      <p class="section-sub">Buy and sell orders as the carrier is currently offering them, drawn from the trade orders in your journal rather than from whatever was configured months ago. A cancelled order stops being advertised.</p>
+      <div class="shot">
+        <img src="assets/screenshot-carrier-market.png" loading="lazy" alt="The EDCA fleet carrier market view, showing the carrier identity, its services and the market tab reporting that no trade orders are currently active">
+        <p class="caption">The market tab, saying plainly when there are no active orders rather than showing stale ones.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Status</h2>
+      <p class="section-sub">What the carrier runs on and what it is worth. Anything your journal has not reported is left out rather than shown as a zero, so an empty gauge always means empty.</p>
+      <div class="features">
+        <div class="card">
+          <div class="icon">&#9981;</div>
+          <h3>Fuel and range</h3>
+          <p>Tritium in the tank, with the current jump range against the maximum, so you know whether the next jump is on before you book it.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128176;</div>
+          <h3>Finance</h3>
+          <p>Balance, available funds and the reserve, plus the tax your refuel, repair and restock services charge visitors.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128200;</div>
+          <h3>Balance over time</h3>
+          <p>Every movement in the balance, with the window it was observed over. No cause is attached to any of them, because the journal records no upkeep event and nothing in it separates upkeep from a tritium purchase or from trade income.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128101;</div>
+          <h3>Crew</h3>
+          <p>Who is running each service, which services are hired, which are switched off and which were never bought.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <img src="assets/screenshot-carrier-status.png" loading="lazy" alt="The EDCA fleet carrier status view showing fuel and jump range, the carrier balance with its reserve and tax rates, and a list of balance movements over time with signed amounts">
+        <p class="caption">Fuel, finances and the balance history in one place.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where it is, and where it is going</h2>
+      <p class="section-sub">Book a jump and EDCA names the destination and counts down to departure, because a booked jump does not move the carrier: it sits exactly where it is until its departure time. Once it arrives, the countdown clears itself. Cancel the jump and it goes back to holding station.</p>
+      <p class="section-sub">The same distinction runs through the whole view. Whether you are aboard is a fact about you, said once and never confused with the carrier's own state.</p>
+    </section>
+
+    <a class="next-step" href="how-it-works.html">
+      <span>
+        <span class="label">Next</span>
+        <strong>Getting it running</strong>
+        <p>Install, first launch, and putting it on a tablet beside the cockpit.</p>
+      </span>
+      <span class="btn ghost">Continue</span>
+    </a>
+
+    <footer>
+      <p class="mono">EDCA &middot; Elite Dangerous Colonisation Assistant</p>
+      <p>
+        Built by Oliver Ernster &middot; released under the GNU Lesser General Public Licence v3.0 (LGPL-3.0)
+        &middot; <a href="https://github.com/oernster/EDColonisationAsst">github.com/oernster/EDColonisationAsst</a>
+      </p>
+      <p>Elite Dangerous is a trademark of Frontier Developments plc. EDCA is an unofficial, fan-made tool and is not affiliated with Frontier Developments.</p>
+    </footer>
+
+  </div>
+</body>
+</html>

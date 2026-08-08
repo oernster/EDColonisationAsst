@@ -3,127 +3,51 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Why EDCA exists: colonisation without the spreadsheet</title>
-<meta name="description" content="Why EDCA was built: colonisation build-outs in Elite Dangerous mean tracking dozens of commodities across construction sites and players fall back to spreadsheets. EDCA rebuilds the whole picture from your journal, locally.">
+<title>Why EDCA exists - EDCA</title>
+<meta name="description" content="The problem EDCA was built to solve, and what it deliberately does not do.">
 <link rel="icon" href="assets/edca-icon.png">
+<link rel="stylesheet" href="assets/site.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDCA">
-<meta property="og:title" content="Why EDCA exists: colonisation without the spreadsheet">
-<meta property="og:description" content="Colonisation build-outs in Elite Dangerous mean tracking dozens of commodities across construction sites and players fall back to spreadsheets. EDCA rebuilds the whole picture from your journal, locally.">
+<meta property="og:title" content="Why EDCA exists - EDCA">
+<meta property="og:description" content="The problem EDCA was built to solve, and what it deliberately does not do.">
 <meta property="og:url" content="https://ernster.dev/EDColonisationAsst/why.html">
 <meta property="og:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="The EDCA dashboard showing a system shopping list of colonisation commodities">
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Why EDCA exists">
-<meta name="twitter:description" content="Colonisation build-outs mean tracking dozens of commodities across construction sites. EDCA rebuilds the whole picture from your journal, locally.">
+<meta name="twitter:title" content="Why EDCA exists - EDCA">
+<meta name="twitter:description" content="The problem EDCA was built to solve, and what it deliberately does not do.">
 <meta name="twitter:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
 <link rel="canonical" href="https://ernster.dev/EDColonisationAsst/why.html">
 <meta name="author" content="Oliver Ernster">
 <meta name="robots" content="index, follow">
 <meta name="theme-color" content="#0f1013">
-<style>
-  :root {
-    --bg: #0f1013;
-    --surface: #1c1d22;
-    --edge: #33343c;
-    --accent: #ee6b1c;
-    --accent-soft: #f4995a;
-    --text: #e4e4e9;
-    --muted: #95959f;
-    --mono: 'Consolas', 'Cascadia Code', ui-monospace, 'SF Mono', monospace;
-    --sans: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    line-height: 1.6;
-  }
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    z-index: 10;
-  }
-  a { color: var(--accent-soft); text-decoration: none; }
-  a:hover { color: var(--accent); }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-  header.mini {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 28px 0 8px;
-  }
-  header.mini img { width: 44px; height: 44px; border-radius: 10px; }
-  header.mini .name {
-    font-family: var(--mono);
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 1px;
-  }
-  section { padding: 40px 0; }
-  h2 {
-    font-family: var(--mono);
-    color: var(--accent);
-    font-size: 13px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--edge);
-    padding-bottom: 10px;
-    margin-bottom: 28px;
-  }
-  .prose h1 {
-    font-family: var(--sans);
-    font-size: clamp(28px, 4vw, 36px);
-    color: var(--text);
-    margin: 0 0 18px;
-  }
-  .prose p {
-    color: var(--muted);
-    max-width: 780px;
-    font-size: 16.5px;
-    margin: 0 0 18px;
-  }
-  .cta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 30px; }
-  .btn {
-    display: inline-block;
-    padding: 13px 28px;
-    border-radius: 24px;
-    font-weight: 700;
-    font-size: 15px;
-    border: 1px solid var(--edge);
-  }
-  .btn.primary { background: var(--accent); color: #14110d; border-color: var(--accent); }
-  .btn.primary:hover { background: var(--accent-soft); color: #14110d; }
-  .btn.ghost { background: var(--surface); color: var(--text); }
-  .btn.ghost:hover { background: var(--edge); }
-  footer {
-    border-top: 1px solid var(--edge);
-    margin-top: 32px;
-    padding: 32px 0 56px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 14px;
-  }
-  footer .mono { font-family: var(--mono); }
-</style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="topbar">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/edca-icon.png" alt="">EDCA</a>
+      <nav>
+      <a href="./">Home</a>
+      <a href="colonisation.html">Colonisation</a>
+      <a href="carriers.html">Fleet carriers</a>
+      <a href="how-it-works.html">How it works</a>
+      <a href="faq.html">Questions</a>
+      <a href="why.html" aria-current="page">Why it exists</a>
+    </nav>
+      <span class="spacer"></span>
+      <a href="https://github.com/oernster/EDColonisationAsst">GitHub</a>
+    </div>
+  </div>
 
-    <header class="mini">
-      <a href="./"><img src="assets/edca-icon.png" alt="EDCA icon"></a>
-      <a href="./"><span class="name">EDCA</span></a>
+  <div class="wrap">
+    <header class="page-head">
+      <h1>Why it exists</h1>
+      <p>Colonisation is a logistics problem wearing a spaceship. This is what that costs in practice, and what EDCA does about it.</p>
     </header>
+
 
     <section class="prose" id="exists">
       <h2>The reasoning</h2>
@@ -154,6 +78,16 @@
         <a class="btn ghost" href="./">Back to overview</a>
       </div>
     </section>
+
+    
+    <a class="next-step" href="./#download">
+      <span>
+        <span class="label">Next</span>
+        <strong>Download EDCA</strong>
+        <p>Free and open source, Windows, nothing to configure.</p>
+      </span>
+      <span class="btn ghost">Continue</span>
+    </a>
 
     <footer>
       <p class="mono">EDCA &middot; Elite Dangerous Colonisation Assistant</p>

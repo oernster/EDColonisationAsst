@@ -16,6 +16,7 @@ libraries are used anywhere (hand-written fakes plus monkeypatch only).
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -34,7 +35,6 @@ from tests.unit._test_coverage_repository_support import (
     create_db_with_metadata,
     make_site,
 )
-
 
 # ---------------------------------------------------------------------------
 # resolve_db_file: dev and frozen resolution
@@ -172,6 +172,95 @@ def test_reset_tolerates_generic_unlink_failure(tmp_path: Path) -> None:
     database.initialise()
 
     assert database.read_schema_version() == CURRENT_DB_SCHEMA_VERSION
+
+
+# ---------------------------------------------------------------------------
+# The shared connection
+# ---------------------------------------------------------------------------
+
+
+def test_connect_returns_one_shared_connection(tmp_path: Path) -> None:
+    """Every caller gets the same connection.
+
+    Opening one per query cost 8,379 opens over a real journal folder and was
+    most of a 137 s first-run backfill.
+    """
+    database = ColonisationDatabase(tmp_path / "colonisation.db")
+    database.initialise()
+
+    assert database.connect() is database.connect()
+
+
+def test_close_releases_the_connection_and_connect_reopens(tmp_path: Path) -> None:
+    """close() ends the shared connection; the next connect() opens a new one."""
+    database = ColonisationDatabase(tmp_path / "colonisation.db")
+    database.initialise()
+
+    first = database.connect()
+    database.close()
+
+    with pytest.raises(Exception):
+        first.execute("SELECT 1")
+
+    assert database.connect() is not first
+
+
+def test_close_is_a_no_op_when_nothing_is_open(tmp_path: Path) -> None:
+    database = ColonisationDatabase(tmp_path / "colonisation.db")
+
+    database.close()  # must not raise
+
+
+def test_connection_uses_wal_and_relaxed_synchronous(tmp_path: Path) -> None:
+    """The pragmas that removed the per-commit fsync are actually in effect."""
+    database = ColonisationDatabase(tmp_path / "colonisation.db")
+    database.initialise()
+
+    conn = database.connect()
+
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    # synchronous is reported as an integer; NORMAL is 1.
+    assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1
+
+
+def test_outdated_database_file_is_really_deleted(tmp_path: Path) -> None:
+    """The reset must delete the file, not just restamp the one already there.
+
+    The sibling tests above assert only that the version reads back as current,
+    which a database that was never deleted would also satisfy: the rebuild
+    uses CREATE TABLE IF NOT EXISTS and upserts the version. Windows refuses to
+    unlink a file with an open handle, so once the connection became shared and
+    long-lived this was the way a reset could silently keep stale rows.
+    """
+    db_file = tmp_path / "colonisation.db"
+    # Seeded directly rather than through create_db_with_metadata, then closed
+    # explicitly: `with sqlite3.connect(...)` commits without closing, so a
+    # leaked handle here would fail the unlink for the test's own reason and
+    # say nothing about the code under test.
+    seed = sqlite3.connect(db_file)
+    try:
+        seed.execute(
+            "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        seed.execute(
+            "INSERT INTO metadata (key, value) VALUES ('db_schema_version', '999')"
+        )
+        seed.execute("CREATE TABLE construction_sites (market_id INTEGER PRIMARY KEY)")
+        seed.execute("INSERT INTO construction_sites (market_id) VALUES (4242)")
+        seed.commit()
+    finally:
+        seed.close()
+
+    database = ColonisationDatabase(db_file)
+    database.initialise()
+
+    assert database.read_schema_version() == CURRENT_DB_SCHEMA_VERSION
+    rows = (
+        database.connect()
+        .execute("SELECT COUNT(*) FROM construction_sites")
+        .fetchone()[0]
+    )
+    assert rows == 0
 
 
 async def test_mkdir_failure_is_logged_but_connection_proceeds(

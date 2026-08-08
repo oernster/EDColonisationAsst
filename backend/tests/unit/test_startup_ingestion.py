@@ -201,6 +201,44 @@ async def test_prime_processes_every_journal_oldest_first(
     assert built[0].processed == created
 
 
+async def test_prime_hands_the_event_loop_back_between_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Other tasks must get to run while the backfill is walking history.
+
+    Nothing inside the per-file work suspends, so without an explicit yield the
+    whole import runs as one uninterrupted block and the server cannot answer
+    /api/health for its duration. Measured at 137 s against a real journal
+    folder before the import was made affordable; the yield is what stops even
+    the remaining seconds from being one solid stall.
+    """
+    built = install_handler(monkeypatch)
+    install_journal_dir(monkeypatch, tmp_path)
+    write_journals(
+        tmp_path, ["Journal.one.log", "Journal.two.log", "Journal.three.log"]
+    )
+
+    observed: list[int] = []
+    stop = asyncio.Event()
+
+    async def bystander() -> None:
+        """Stands in for the readiness probe: counts the slices it gets."""
+        while not stop.is_set():
+            observed.append(len(built[0].processed) if built else 0)
+            await asyncio.sleep(0)
+
+    watcher = asyncio.create_task(bystander())
+    await asyncio.sleep(0)
+
+    await prime_colonisation_database_if_empty(FakeRepository(), object(), object())
+    stop.set()
+    await watcher
+
+    # It ran during the import, not merely before or after it.
+    assert len(observed) > 1
+    assert max(observed) > 0
+
+
 async def test_prime_continues_past_a_file_that_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

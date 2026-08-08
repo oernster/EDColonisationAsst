@@ -18,12 +18,14 @@ so the merge rules that stop a stale snapshot regressing progress apply
 identically here.
 
 Detached from the lifespan is NOT detached from the event loop; the
-first-run path is not free: measured against a real 72-file, 67 MB journal
-folder it takes 137 s and blocks the loop for 137 of them in one unbroken
-stall, so `/api/health` cannot be answered for the duration and the startup
-splash sits there. The cost is not parsing (0.3 s); it is one SQLite commit
-per depot event, roughly 4,000 of them, each on its own new connection. See
-TECH_DEBT.md.
+first-run path used to prove it: against a real 72-file, 67 MB journal folder
+it took 137 s and held the loop for every one of them in a single unbroken
+stall, so `/api/health` went unanswered and the startup splash sat there. The
+cost was never parsing (0.3 s of it); it was one SQLite commit per depot
+event, roughly 4,000 of them, each on a connection of its own. Two changes
+fixed it, both worth keeping: colonisation_db shares one connection and runs
+in WAL, which took the import to 3 s; the loop below then hands control back
+between files so that what remains is not one uninterrupted block.
 
 `lifespan` in backend/src/main.py owns the choice between them.
 """
@@ -148,6 +150,11 @@ async def prime_colonisation_database_if_empty(
 
     processed_files = 0
     for journal_file in journal_files:
+        # Hand the loop back between files. Every await inside _process_file
+        # resolves without suspending, so without this the whole import runs as
+        # one uninterrupted block and the server cannot answer /api/health for
+        # its duration, however fast the import itself becomes.
+        await asyncio.sleep(0)
         try:
             await handler._process_file(journal_file)
             processed_files += 1

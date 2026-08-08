@@ -5,20 +5,26 @@ writes the colonisation database. Two concerns were lifted out of it once it
 passed the module cap, both chosen because neither takes part in a query's
 transaction:
 
-- colonisation_db: where the file is, what schema version it holds and how a
+- colonisation_db: where the file is, what schema version it holds and how the
   connection is opened. All of it runs once, in `__init__`, before any lock.
 - colonisation_mapping: rebuilding a `ConstructionSite` from a row and
   normalising a commodity key. Both are pure.
 
 Concurrency, which did not move and must not:
 
-- `self._lock` is a non-reentrant `asyncio.Lock`. Every method that opens a
-  connection takes it. Every method that calls one of those must NOT take it
-  as well or it deadlocks, which is why `get_stats` and `update_commodity` are
+- `self._lock` is a non-reentrant `asyncio.Lock`. Every method that runs a
+  query takes it. Every method that calls one of those must NOT take it as
+  well or it deadlocks, which is why `get_stats` and `update_commodity` are
   the two without it: they are composed of the others.
-- Each connection is opened inside its own `with` block, so one transaction
-  never spans two methods. `update_commodity` is therefore a read and a write
-  in two separate transactions, not one; the comment on it records why.
+- Every method wraps its query in its own `with conn:` block, so one
+  transaction never spans two methods. `update_commodity` is therefore a read
+  and a write in two separate transactions, not one; the comment on it records
+  why. The connection underneath is shared and long-lived, which changes none
+  of that: `with conn:` is a transaction scope, not a connection scope. See
+  colonisation_db for why it is shared and what that measured.
+- Rows arrive as `sqlite3.Row` because the shared connection sets that once.
+  No method sets its own row_factory: on a shared connection that would leak
+  into every later query.
 """
 
 from __future__ import annotations
@@ -133,7 +139,6 @@ class ColonisationRepository(IColonisationRepository):
     async def get_site_by_market_id(self, market_id: int) -> ConstructionSite | None:
         async with self._lock:
             with self._get_db_connection() as conn:
-                conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT * FROM construction_sites WHERE market_id = ?", (market_id,)
@@ -144,7 +149,6 @@ class ColonisationRepository(IColonisationRepository):
     async def get_sites_by_system(self, system_name: str) -> list[ConstructionSite]:
         async with self._lock:
             with self._get_db_connection() as conn:
-                conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT * FROM construction_sites "
@@ -170,7 +174,6 @@ class ColonisationRepository(IColonisationRepository):
     async def get_all_sites(self) -> list[ConstructionSite]:
         async with self._lock:
             with self._get_db_connection() as conn:
-                conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT * FROM construction_sites "

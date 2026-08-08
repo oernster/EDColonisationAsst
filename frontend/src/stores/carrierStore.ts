@@ -80,21 +80,9 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
 
       const info = await api.getCurrentCarrier();
 
-      // If not docked at a carrier, clear the "current" state but retain the
-      // last known carrier snapshot so that recent trading data remains
-      // visible in the UI.
-      if (!info.docked_at_carrier || !info.carrier) {
-        set((prev) => ({
-          currentCarrierInfo: info,
-          currentCarrierState: null,
-          // Preserve lastKnownCarrierState; we only update it when we have a
-          // fresh non-null state from /carriers/current/state.
-          lastKnownCarrierState: prev.lastKnownCarrierState,
-          currentCarrierLoading: false,
-        }));
-        return;
-      }
-
+      // Fetched whether or not the commander is aboard. Where the commander
+      // stands does not change what their carrier is holding, and the state
+      // says for itself whether they are on it.
       const state = await api.getCurrentCarrierState();
 
       set((prev) => ({
@@ -132,17 +120,8 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
     try {
       const info = await api.getCurrentCarrier();
 
-      // If not docked at a carrier, do not clear the current snapshot during
-      // background refresh; just update the info.
-      if (!info.docked_at_carrier || !info.carrier) {
-        set((prev) => ({
-          currentCarrierInfo: info,
-          currentCarrierState: prev.currentCarrierState,
-          lastKnownCarrierState: prev.lastKnownCarrierState,
-        }));
-        return;
-      }
-
+      // As above: the carrier's own state is worth refreshing wherever the
+      // commander happens to be standing.
       const state = await api.getCurrentCarrierState();
 
       set((prev) => ({

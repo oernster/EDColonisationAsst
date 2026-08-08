@@ -15,6 +15,7 @@ from src.models.journal_events import (
     DockedEvent,
     FSDJumpEvent,
     LocationEvent,
+    UndockedEvent,
 )
 
 
@@ -178,6 +179,35 @@ def test_parse_commander_event(parser):
     assert isinstance(event, CommanderEvent)
     assert event.name == "CMDR Test"
     assert event.fid == "ABC123"
+
+
+def test_parse_undocked_event(parser):
+    """Leaving a pad, which is what ends a docking."""
+    line = (
+        '{ "timestamp":"2026-08-06T00:31:12Z", "event":"Undocked", '
+        '"StationName":"X7J-BQG", "StationType":"FleetCarrier", '
+        '"MarketID":3700569600 }'
+    )
+
+    event = parser.parse_line(line)
+
+    assert event is not None
+    assert isinstance(event, UndockedEvent)
+    assert event.station_name == "X7J-BQG"
+    assert event.station_type == "FleetCarrier"
+    assert event.market_id == 3700569600
+
+
+def test_parse_undocked_event_without_details(parser):
+    """Older journals attach less to it; the fact of it is what matters."""
+    line = '{"timestamp":"2026-08-06T00:31:12Z","event":"Undocked"}'
+
+    event = parser.parse_line(line)
+
+    assert event is not None
+    assert isinstance(event, UndockedEvent)
+    assert event.station_name is None
+    assert event.market_id is None
 
 
 def test_parse_carrier_jump_request_event(parser):

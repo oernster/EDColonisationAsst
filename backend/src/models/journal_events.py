@@ -88,6 +88,19 @@ class DockedEvent(JournalEvent):
     station_economies: list[dict[str, Any]] = Field(description="Station economies")
 
 
+class UndockedEvent(JournalEvent):
+    """Undocked event - leaving a station or a carrier's pad.
+
+    Only the fact of it matters here. Whatever the commander was docked at,
+    this ends it, which is what stops a carrier reporting the commander as
+    still aboard hours after they left.
+    """
+
+    station_name: str | None = Field(default=None, description="Station departed")
+    station_type: str | None = Field(default=None, description="Station type departed")
+    market_id: int | None = Field(default=None, description="Market ID departed")
+
+
 class CommanderEvent(JournalEvent):
     """Commander event - commander information"""
 

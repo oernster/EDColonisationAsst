@@ -142,7 +142,10 @@ export const FleetCarriersPanel = () => {
           loading={currentCarrierLoading}
         />
 
-        {dockedIdentity && currentCarrierState && (
+        {/* Driven by the carrier's own state, not by where the commander is
+            standing: a carrier holds what it holds whether or not you are on
+            it, and the header above says whether you are. */}
+        {currentCarrierState && (
           <>
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
               <Tabs

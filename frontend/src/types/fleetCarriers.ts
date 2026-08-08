@@ -194,6 +194,13 @@ export interface CarrierState {
     | 'none'
     | null;
   /**
+   * Whether the commander is standing on this carrier right now. False does
+   * not make the state wrong, only older: it was rebuilt from the last time
+   * they were aboard. This describes the COMMANDER, never the carrier, which
+   * is never docked anywhere.
+   */
+  commander_aboard?: boolean;
+  /**
    * Fuel, jump range, balances and crew, read from the same CarrierStats
    * event as the space usage. Null when no CarrierStats has been seen.
    */

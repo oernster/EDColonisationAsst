@@ -118,11 +118,41 @@ describe('FleetCarriersPanel', () => {
     setStore({})
   })
 
-  it('says you are not docked when there is no docked carrier', () => {
+  it('says nothing is known when no carrier has been seen at all', () => {
     render(<FleetCarriersPanel />)
 
-    expect(screen.getByText(/not currently docked at a fleet carrier/i)).toBeTruthy()
+    expect(screen.getByText(/No fleet carrier has been seen/i)).toBeTruthy()
     expect(screen.getByText(/No own or squadron carriers were found/i)).toBeTruthy()
+  })
+
+  it('still shows the carrier when the commander is not aboard it', () => {
+    // The bug this guards: being docked at a station on the other side of the
+    // bubble does not stop the carrier holding what it holds, and the panel
+    // used to hide everything unless the commander was standing on it.
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: false, carrier: null },
+      currentCarrierState: { ...CARRIER_STATE, commander_aboard: false },
+      myCarriers: NO_CARRIERS,
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.getByText('MIDNIGHT ELOQUENCE')).toBeTruthy()
+    expect(screen.getByText(/You are not aboard/i)).toBeTruthy()
+    // The detail tabs are driven by the carrier's state, not by the commander.
+    expect(screen.getByRole('tab', { name: 'Status' })).toBeTruthy()
+  })
+
+  it('does not claim you are aboard when you are', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: { ...CARRIER_STATE, commander_aboard: true },
+      myCarriers: NO_CARRIERS,
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.queryByText(/You are not aboard/i)).toBeNull()
   })
 
   it('shows the docked carrier name, callsign and chips', () => {

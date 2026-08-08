@@ -42,6 +42,7 @@ from ..utils.logger import get_logger
 # them. __all__ is what says these re-exports are intentional; without it
 # they read as unused imports and an auto-fixer deletes them.
 from .carrier_events import (
+    find_current_carrier_docking,
     find_latest_carrier_location_for_id,
     find_latest_carrier_stats_for_callsign,
     find_latest_carrier_stats_for_id,
@@ -71,6 +72,7 @@ __all__ = [
     "build_my_carriers_response",
     "build_orders_for_carrier",
     "derive_carrier_transit",
+    "find_current_carrier_docking",
     "find_latest_carrier_location_for_id",
     "find_latest_carrier_stats_for_callsign",
     "find_latest_carrier_stats_for_id",
@@ -123,7 +125,7 @@ def build_current_carrier_response(
     if not events:
         return CurrentCarrierResponse(docked_at_carrier=False, carrier=None)
 
-    docked_carrier = find_latest_docked_carrier(events)
+    docked_carrier = find_current_carrier_docking(events)
     if docked_carrier is None:
         return CurrentCarrierResponse(docked_at_carrier=False, carrier=None)
 
@@ -158,7 +160,14 @@ def build_current_carrier_state_response(
     if not events:
         return None
 
-    docked_carrier = find_latest_docked_carrier(events)
+    # Where the COMMANDER is does not change what the carrier is holding, so a
+    # commander docked elsewhere still gets their carrier's state, rebuilt from
+    # the last time they were aboard. `commander_aboard` below is what says
+    # which of the two this is, and the UI labels it accordingly.
+    docked_carrier = find_current_carrier_docking(events)
+    commander_aboard = docked_carrier is not None
+    if docked_carrier is None:
+        docked_carrier = find_latest_docked_carrier(events)
     if docked_carrier is None:
         return None
 
@@ -299,6 +308,7 @@ def build_current_carrier_state_response(
         sell_orders=sell_orders,
         trade_orders_scope=trade_orders_scope,
         status=derive_carrier_status(stats),
+        commander_aboard=commander_aboard,
         snapshot_time=snapshot_time,
     )
     return CarrierStateResponse(carrier=state)

@@ -138,12 +138,20 @@ async def test_carriers_scan_recent_files_for_most_recent_trade_orders(
             "Price": 51294,
         },
     ]
+    # Deliberately an event that says nothing about where the COMMANDER is.
+    # This test is about scanning back through files for trade orders, so the
+    # newer file only needs to exist and carry something. An FSDJump would no
+    # longer be neutral: jumping to another system means the commander is not
+    # on the carrier any more, which is now reported as such. See
+    # test_carrier_docking for that behaviour on its own.
     newer_events = [
         {
             "timestamp": "2025-12-16T01:02:03Z",
-            "event": "FSDJump",
-            "StarSystem": "Other System",
-            "SystemAddress": 999,
+            "event": "CarrierStats",
+            "CarrierID": 3700569600,
+            "CarrierType": "FleetCarrier",
+            "Callsign": "X7J-BQG",
+            "Name": "MIDNIGHT ELOQUENCE",
         }
     ]
 

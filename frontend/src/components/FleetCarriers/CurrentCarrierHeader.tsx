@@ -8,25 +8,33 @@ import {
 } from './carrierServices';
 
 interface CurrentCarrierHeaderProps {
-  /** The carrier the commander is docked at, or null when docked elsewhere. */
+  /** The carrier the commander is standing on, or null when they are not. */
   dockedIdentity: CarrierIdentity | null;
   carrierState: CarrierState | null;
   loading: boolean;
 }
 
 /**
- * The top of the "Current carrier" card: who you are docked at and the few
- * facts worth reading at a glance.
+ * The top of the "Current carrier" card: which carrier, where it is, and the
+ * few facts worth reading at a glance.
  *
- * Three states, in the order they occur: loading, not docked, docked. Only
- * the last shows chips, because the others have nothing to put in them.
+ * It describes the CARRIER, which is never docked anywhere: it holds station
+ * in a star system, or it has a jump booked. Whether the commander happens to
+ * be aboard is a separate fact, said once in a caption, and it does not decide
+ * whether the carrier is shown. Being docked at a station on the other side of
+ * the bubble does not stop your carrier holding six thousand tonnes.
  */
 export const CurrentCarrierHeader = ({
   dockedIdentity,
   carrierState,
   loading,
 }: CurrentCarrierHeaderProps) => {
-  const services = visibleServicesSorted(dockedIdentity?.services ?? []);
+  // The carrier to describe. Falling back to the state's own identity is what
+  // lets the panel keep showing your carrier while you are docked somewhere
+  // else entirely, which is most of the time.
+  const identity = dockedIdentity ?? carrierState?.identity ?? null;
+  const aboard = carrierState?.commander_aboard ?? false;
+  const services = visibleServicesSorted(identity?.services ?? []);
 
   return (
     <Box
@@ -48,25 +56,33 @@ export const CurrentCarrierHeader = ({
             Loading carrier information...
           </Typography>
         )}
-        {!dockedIdentity && !loading && (
+        {!identity && !loading && (
           <Typography variant="body2" color="text.secondary">
-            You are not currently docked at a fleet carrier. Dock at your own or squadron carrier
-            to see its details here.
+            No fleet carrier has been seen in your journals yet. Once your carrier
+            reports in, its state appears here whether or not you are aboard.
           </Typography>
         )}
-        {!loading && dockedIdentity && (
+        {!loading && identity && (
           <Typography variant="body1">
-            {dockedIdentity.name}{' '}
-            {dockedIdentity.callsign && (
+            {identity.name}{' '}
+            {identity.callsign && (
               <Typography
                 component="span"
                 variant="body2"
                 color="text.secondary"
                 sx={{ ml: 1 }}
               >
-                ({dockedIdentity.callsign})
+                ({identity.callsign})
               </Typography>
             )}
+          </Typography>
+        )}
+        {!loading && identity && !aboard && (
+          /* About the COMMANDER, not the carrier. The carrier is wherever it
+             is; this only says the reading was taken when you were last on
+             board, so nothing here claims to be live. */
+          <Typography variant="caption" color="text.secondary">
+            You are not aboard. Showing this carrier as of the last time you were.
           </Typography>
         )}
       </Box>
@@ -74,29 +90,29 @@ export const CurrentCarrierHeader = ({
       {/* Manual refresh removed: state should update automatically via
           journal/Market.json updates + backend change-bus long-poll. */}
 
-      {dockedIdentity && (
+      {identity && (
         <>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            {dockedIdentity.docking_access && (
+            {identity.docking_access && (
               <Chip
-                label={`Access: ${formatDockingAccess(dockedIdentity.docking_access)}`}
+                label={`Access: ${formatDockingAccess(identity.docking_access)}`}
                 variant="outlined"
                 size="small"
               />
             )}
-            {dockedIdentity.last_seen_system && (
+            {identity.last_seen_system && (
               /* A carrier is never "docked" and is never merely "last seen":
                  it is parked in a star system or in transit between two. The
                  system named here is where it is. */
               <Chip
-                label={`Current star system: ${dockedIdentity.last_seen_system}`}
+                label={`Current star system: ${identity.last_seen_system}`}
                 variant="outlined"
                 size="small"
               />
             )}
             {/* Sits beside the system rather than replacing it: a booked jump
                 does not move the carrier, it leaves at its departure time. */}
-            <CarrierTransitChip transit={dockedIdentity.transit} />
+            <CarrierTransitChip transit={identity.transit} />
             {carrierState?.total_cargo_tonnage != null && (
               <Chip
                 label={`Cargo: ${carrierState.total_cargo_tonnage.toLocaleString()} t`}

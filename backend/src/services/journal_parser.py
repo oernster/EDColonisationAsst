@@ -41,6 +41,7 @@ from .commander_event_parser import (
     parse_docked,
     parse_fsd_jump,
     parse_location,
+    parse_undocked,
 )
 from .market_event_parser import parse_market_transaction
 
@@ -55,6 +56,7 @@ _EVENT_PARSERS: dict[str, EventParser] = {
     "Location": parse_location,
     "FSDJump": parse_fsd_jump,
     "Docked": parse_docked,
+    "Undocked": parse_undocked,
     "Commander": parse_commander,
     "CarrierLocation": parse_carrier_location,
     "CarrierStats": parse_carrier_stats,
@@ -94,6 +96,7 @@ class JournalParser(IJournalParser):
         "Location",
         "FSDJump",
         "Docked",
+        "Undocked",
         "Commander",
         # Fleet carrier events (location + basic stats + trade orders)
         "CarrierLocation",

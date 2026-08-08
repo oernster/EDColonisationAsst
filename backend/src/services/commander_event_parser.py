@@ -21,6 +21,7 @@ from ..models.journal_events import (
     DockedEvent,
     FSDJumpEvent,
     LocationEvent,
+    UndockedEvent,
 )
 
 
@@ -69,6 +70,22 @@ def parse_docked(data: dict[str, Any], timestamp: datetime) -> DockedEvent:
         station_government=data.get("StationGovernment"),
         station_economy=data.get("StationEconomy"),
         station_economies=data.get("StationEconomies", []),
+        raw_data=data,
+    )
+
+
+def parse_undocked(data: dict[str, Any], timestamp: datetime) -> UndockedEvent:
+    """Parse Undocked event.
+
+    Every field is optional. The event's value here is that it happened at
+    all, and older journals are inconsistent about what they attach to it.
+    """
+    return UndockedEvent(
+        timestamp=timestamp,
+        event=data["event"],
+        station_name=data.get("StationName"),
+        station_type=data.get("StationType"),
+        market_id=data.get("MarketID"),
         raw_data=data,
     )
 

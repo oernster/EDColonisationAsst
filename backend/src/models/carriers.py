@@ -304,6 +304,15 @@ class CarrierState(BaseModel):
             "snapshot) or 'none'."
         ),
     )
+    commander_aboard: bool = Field(
+        default=False,
+        description=(
+            "Whether the commander is standing on this carrier right now. "
+            "False does not make the state below wrong, only older: it was "
+            "rebuilt from the last time they were aboard. This describes the "
+            "COMMANDER, never the carrier, which is never docked anywhere."
+        ),
+    )
     status: CarrierStatus | None = Field(
         default=None,
         description=(

@@ -84,8 +84,11 @@ export const CurrentCarrierHeader = ({
               />
             )}
             {dockedIdentity.last_seen_system && (
+              /* A carrier is never "docked" and is never merely "last seen":
+                 it is parked in a star system or in transit between two. The
+                 system named here is where it is. */
               <Chip
-                label={`Last seen: ${dockedIdentity.last_seen_system}`}
+                label={`Current star system: ${dockedIdentity.last_seen_system}`}
                 variant="outlined"
                 size="small"
               />

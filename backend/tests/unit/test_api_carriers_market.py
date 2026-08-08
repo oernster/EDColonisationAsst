@@ -101,6 +101,101 @@ async def test_carriers_state_falls_back_to_market_json_when_no_trade_orders_sin
 
 
 @pytest.mark.asyncio
+async def test_a_cancelled_sell_order_is_not_resurrected_by_an_older_export(
+    tmp_path: Path, monkeypatch: Callable
+):
+    """A cancel that postdates the export must win, however old it is.
+
+    Taken from the field. The commander cancelled a Tritium sell order 28
+    seconds after Market.json was written, then did not dock at the carrier
+    again for months. The staleness guard dropped the cancel from the journal
+    events; the export from moments BEFORE it was then treated as
+    authoritative, so the app kept offering an order that no longer existed.
+
+    A cancellation does not go stale: nothing reinstates an order except a new
+    one; an older snapshot is never the newer account.
+    """
+    journal_dir = tmp_path / "journals"
+
+    events = [
+        {
+            "timestamp": "2026-06-21T17:40:00Z",
+            "event": "Docked",
+            "StationName": "X7J-BQG",
+            "StationType": "FleetCarrier",
+            "StarSystem": "Fong Wang",
+            "SystemAddress": 2278253693331,
+            "MarketID": 3700569600,
+            "StationFaction": {"Name": "FleetCarrier"},
+            "StationGovernment": "$government_Carrier;",
+            "StationEconomy": "$economy_Carrier;",
+            "StationEconomies": [{"Name": "$economy_Carrier;", "Proportion": 1.0}],
+        },
+        {
+            "timestamp": "2026-06-21T17:45:00Z",
+            "event": "CarrierTradeOrder",
+            "CarrierID": 3700569600,
+            "CarrierType": "FleetCarrier",
+            "BlackMarket": False,
+            "Commodity": "tritium",
+            "SaleOrder": 6354,
+            "Price": 2565,
+        },
+        {
+            "timestamp": "2026-06-21T17:51:58Z",
+            "event": "CarrierTradeOrder",
+            "CarrierID": 3700569600,
+            "CarrierType": "FleetCarrier",
+            "BlackMarket": False,
+            "Commodity": "tritium",
+            "CancelTrade": True,
+        },
+        # Later activity, so the cancel falls outside the staleness window.
+        {
+            "timestamp": "2026-08-08T09:00:00Z",
+            "event": "FSDJump",
+            "StarSystem": "Shinrarta Dezhra",
+            "SystemAddress": 3932277478106,
+        },
+    ]
+
+    journal_file = _write_journal_file(journal_dir, events)
+    # Written 28 seconds BEFORE the cancel, still advertising the stock.
+    _write_market_export(
+        journal_dir,
+        market_id=3700569600,
+        timestamp="2026-06-21T17:51:30Z",
+        items=[
+            {
+                "id": 113,
+                "Name": "$tritium_name;",
+                "Name_Localised": "Tritium",
+                "BuyPrice": 2565,
+                "SellPrice": 0,
+                "Demand": 0,
+                "Stock": 6354,
+                "Category": "$MARKET_category_chemicals;",
+                "Category_Localised": "Chemicals",
+            },
+        ],
+    )
+
+    monkeypatch.setattr(carriers_api, "get_journal_directory", lambda: journal_dir)
+    monkeypatch.setattr(carriers_api, "get_journal_files", lambda _dir: [journal_file])
+
+    app = FastAPI()
+    app.include_router(carriers_router)
+
+    async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        resp_state = await client.get("/api/carriers/current/state")
+        assert resp_state.status_code == 200
+        carrier_state = resp_state.json()["carrier"]
+        assert carrier_state is not None
+
+        assert carrier_state["sell_orders"] == []
+
+
+@pytest.mark.asyncio
 async def test_carriers_current_state_clears_sold_out_cargo(
     tmp_path: Path, monkeypatch: Callable
 ):

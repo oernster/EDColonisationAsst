@@ -218,6 +218,10 @@ def build_current_carrier_state_response(
         journal_dir=journal_dir,
         docked_carrier=docked_carrier,
         latest_trade_ts=latest_trade_ts,
+        # Passed whole, deliberately NOT the staleness-filtered list: a cancel
+        # dropped for being old still has to override an export written before
+        # it; otherwise the order it cancelled comes back.
+        trade_events=trade_events_since_docked,
     )
     cargo = merged.cargo
     buy_orders = merged.buy_orders

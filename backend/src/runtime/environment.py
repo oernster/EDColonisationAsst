@@ -23,7 +23,10 @@ import sys
 from .common import RuntimeMode, get_runtime_mode
 
 try:
-    from ..constants import DEFAULT_BACKEND_PORT  # type: ignore[import-not-found]
+    from ..constants import (  # type: ignore[import-not-found]
+        BACKEND_PORT_CANDIDATES,
+        DEFAULT_BACKEND_PORT,
+    )
     from ..utils.ports import (  # type: ignore[import-not-found]
         choose_port,
         read_recorded_port,
@@ -33,6 +36,7 @@ except ImportError:
     # which the frozen Nuitka build does. That is an ImportError; anything else
     # raised while importing is a real defect and should surface.
     from backend.src.constants import (  # type: ignore[import-error]
+        BACKEND_PORT_CANDIDATES,
         DEFAULT_BACKEND_PORT,
     )
     from backend.src.utils.ports import (  # type: ignore[import-error]
@@ -97,6 +101,7 @@ def resolve_backend_port(recorded_file: Path) -> int:
         configured_backend_host(),
         preferred,
         recorded=read_recorded_port(recorded_file),
+        candidates=BACKEND_PORT_CANDIDATES,
     )
     return chosen if chosen is not None else preferred
 

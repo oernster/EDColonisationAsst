@@ -20,6 +20,7 @@ kernel will not hand out a port it has reserved.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import errno
 from pathlib import Path
 import socket
@@ -95,7 +96,12 @@ def os_assigned_port(host: str) -> int | None:
             return None
 
 
-def choose_port(host: str, preferred: int, recorded: int | None = None) -> int | None:
+def choose_port(
+    host: str,
+    preferred: int,
+    recorded: int | None = None,
+    candidates: Sequence[int] = (),
+) -> int | None:
     """Pick the port the backend should serve on; None if none can be had.
 
     Preference order, with the reason for each step:
@@ -104,8 +110,10 @@ def choose_port(host: str, preferred: int, recorded: int | None = None) -> int |
        already serving on it. Reusing it keeps the address stable across runs,
        and an in-use recorded port is this application's own instance.
     2. The configured port, when it can be bound.
-    3. Whatever the operating system will give, which is the only option a
-       reservation cannot take away.
+    3. Each remaining candidate in turn. A known address is worth more than a
+       random one: it keeps the web UI somewhere a bookmark can still find.
+    4. Whatever the operating system will give, which is the only option a
+       reservation cannot take away, at the cost of an address that moves.
 
     A recorded port that is RESERVED is stepped over rather than reused: that
     is the machine having changed its reservations since the last run.
@@ -115,8 +123,11 @@ def choose_port(host: str, preferred: int, recorded: int | None = None) -> int |
         if category in (PORT_FREE, PORT_IN_USE):
             return recorded
 
-    if probe_port(host, preferred) == PORT_FREE:
-        return preferred
+    # dict.fromkeys keeps the order while dropping a preferred port that the
+    # candidate list also contains, so it is never probed twice.
+    for candidate in dict.fromkeys((preferred, *candidates)):
+        if probe_port(host, candidate) == PORT_FREE:
+            return candidate
 
     return os_assigned_port(host)
 

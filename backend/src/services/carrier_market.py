@@ -7,6 +7,7 @@ and return a frozen result rather than mutating the caller's locals.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,8 +17,13 @@ from ..models.carriers import (
     CarrierOrder,
     CarrierSpaceUsage,
 )
-from ..models.journal_events import CarrierStatsEvent, DockedEvent
+from ..models.journal_events import (
+    CarrierStatsEvent,
+    CarrierTradeOrderEvent,
+    DockedEvent,
+)
 from ..utils.logger import get_logger
+from .carrier_naming import _normalise_carrier_commodity_key
 from .market_export_service import MarketExportSnapshot, load_market_export
 
 logger = get_logger(__name__)
@@ -47,6 +53,39 @@ class SpaceUsageMetrics:
     space_usage: CarrierSpaceUsage | None = None
 
 
+def cancelled_since(
+    snapshot_time: datetime | None,
+    trade_events: Sequence[CarrierTradeOrderEvent],
+) -> set[str]:
+    """Commodities whose latest word is a cancel newer than the snapshot.
+
+    The Market.json export is a photograph; a cancellation taken after it
+    was developed is not visible in it. Those commodities must be dropped from
+    the export rather than carried forward: it is how a sell order the
+    commander had cancelled kept being advertised months later.
+
+    Only a cancellation counts. A commodity whose latest event is an order is
+    left alone, because there the export and the journal agree.
+    """
+    latest: dict[str, tuple[datetime, bool]] = {}
+    for event in trade_events:
+        key = _normalise_carrier_commodity_key(event.commodity or "")
+        if not key:
+            continue
+        seen = latest.get(key)
+        if seen is None or event.timestamp >= seen[0]:
+            latest[key] = (
+                event.timestamp,
+                bool((event.raw_data or {}).get("CancelTrade")),
+            )
+
+    return {
+        key
+        for key, (stamp, was_cancel) in latest.items()
+        if was_cancel and (snapshot_time is None or stamp > snapshot_time)
+    }
+
+
 def merge_market_export(
     *,
     cargo: list[CarrierCargoItem],
@@ -57,6 +96,7 @@ def merge_market_export(
     journal_dir: Path | None,
     docked_carrier: DockedEvent,
     latest_trade_ts: datetime | None,
+    trade_events: Sequence[CarrierTradeOrderEvent] = (),
 ) -> MarketMergeResult:
     """Fill gaps in the journal-derived orders from the Market.json snapshot."""
     # Market.json snapshot merge
@@ -112,9 +152,16 @@ def merge_market_export(
             sell_from_market_by_key: dict[str, CarrierOrder] = {}
             cargo_from_market_by_key: dict[str, CarrierCargoItem] = {}
 
+            cancelled = cancelled_since(snap.timestamp, trade_events)
+
             for it in snap.items:
                 display = it.name_localised or it.commodity_key
                 key = it.commodity_key
+
+                if _normalise_carrier_commodity_key(key) in cancelled:
+                    # The commander cancelled this after the export was
+                    # written, so the export is simply out of date about it.
+                    continue
 
                 if it.demand > 0:
                     price = it.sell_price if it.sell_price > 0 else it.buy_price
@@ -154,17 +201,23 @@ def merge_market_export(
                 (o.commodity_name or "").lower(): o for o in (sell_orders or [])
             }
 
-            # If the market snapshot is newer than the newest CarrierTradeOrder
-            # line we saw, treat it as authoritative (replace lists). Otherwise,
-            # treat it as a supplemental snapshot and only FILL missing
-            # commodities to avoid phantom deletions.
-            market_is_newer = (
-                snap.timestamp is not None
-                and latest_trade_ts is not None
-                and snap.timestamp >= latest_trade_ts
+            # The snapshot may replace the journal-derived orders only when it
+            # is the newer account. Otherwise it is supplemental and may FILL
+            # missing commodities, never overwrite.
+            #
+            # The scope must NOT force a replacement here. It used to; that
+            # resurrected cancelled orders: a CarrierTradeOrder cancel that is
+            # older than the staleness window gets dropped from the journal
+            # events, then the export from moments BEFORE the cancel was
+            # treated as authoritative. Observed in the field as a sell order
+            # the commander had cancelled 28 seconds after the export was
+            # written, still being offered months later. A cancellation does
+            # not go stale: nothing reinstates an order except a new one.
+            market_is_newer = snap.timestamp is not None and (
+                latest_trade_ts is None or snap.timestamp >= latest_trade_ts
             )
 
-            if market_is_newer or trade_orders_scope in ("none", "stale"):
+            if market_is_newer:
                 buy_orders = list(buy_from_market_by_key.values())
                 sell_orders = list(sell_from_market_by_key.values())
                 cargo = list(cargo_from_market_by_key.values())

@@ -11,8 +11,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from backend.src.models.carriers import CarrierCargoItem
-from backend.src.models.journal_events import MarketTransactionEvent
+from backend.src.models.journal_events import (
+    CarrierTradeOrderEvent,
+    MarketTransactionEvent,
+)
 from backend.src.services.carrier_hold import derive_carrier_hold
+from backend.src.services.carrier_market import cancelled_since
 from backend.src.services.market_export_service import (
     MarketExportItem,
     MarketExportSnapshot,
@@ -20,6 +24,84 @@ from backend.src.services.market_export_service import (
 
 CARRIER_MARKET_ID = 3700569600
 ANCHOR = datetime(2026, 6, 21, 17, 51, 30, tzinfo=UTC)
+
+
+def _order(
+    commodity: str,
+    stamp: datetime,
+    *,
+    cancel: bool = False,
+) -> CarrierTradeOrderEvent:
+    """A CarrierTradeOrder event, cancelling or setting an order."""
+    raw: dict[str, object] = {"Commodity": commodity}
+    if cancel:
+        raw["CancelTrade"] = True
+    else:
+        raw["SaleOrder"] = 100
+    return CarrierTradeOrderEvent(
+        timestamp=stamp,
+        event="CarrierTradeOrder",
+        raw_data=raw,
+        carrier_id=CARRIER_MARKET_ID,
+        commodity=commodity,
+        sale_order=0 if cancel else 100,
+    )
+
+
+def test_a_cancel_after_the_snapshot_suppresses_that_commodity() -> None:
+    """The export cannot know about a cancel taken after it was written."""
+    cancelled = cancelled_since(
+        ANCHOR, [_order("tritium", ANCHOR + timedelta(seconds=28), cancel=True)]
+    )
+
+    assert cancelled == {"tritium"}
+
+
+def test_a_cancel_before_the_snapshot_leaves_the_export_alone() -> None:
+    """An export written afterwards already reflects the cancel."""
+    cancelled = cancelled_since(
+        ANCHOR, [_order("tritium", ANCHOR - timedelta(minutes=5), cancel=True)]
+    )
+
+    assert cancelled == set()
+
+
+def test_a_later_order_overrides_an_earlier_cancel() -> None:
+    """Only the latest word per commodity counts; here that is an order."""
+    events = [
+        _order("tritium", ANCHOR + timedelta(seconds=10), cancel=True),
+        _order("tritium", ANCHOR + timedelta(seconds=30)),
+    ]
+
+    assert cancelled_since(ANCHOR, events) == set()
+
+
+def test_an_out_of_order_event_does_not_displace_a_newer_one() -> None:
+    """Latest wins by timestamp, not by position in the list.
+
+    Journal files are walked oldest first; they overlap at the seams, so
+    an older line can still arrive after a newer one.
+    """
+    events = [
+        _order("tritium", ANCHOR + timedelta(seconds=30), cancel=True),
+        _order("tritium", ANCHOR + timedelta(seconds=10)),
+    ]
+
+    assert cancelled_since(ANCHOR, events) == {"tritium"}
+
+
+def test_an_event_without_a_usable_commodity_is_ignored() -> None:
+    """Nothing to match against the export, so there is nothing to suppress."""
+    nameless = _order("", ANCHOR + timedelta(seconds=10), cancel=True)
+
+    assert cancelled_since(ANCHOR, [nameless]) == set()
+
+
+def test_no_snapshot_time_means_any_cancel_counts() -> None:
+    """With no export timestamp there is nothing to be newer than."""
+    cancelled = cancelled_since(None, [_order("tritium", ANCHOR, cancel=True)])
+
+    assert cancelled == {"tritium"}
 
 
 def _item(key: str, stock: int, localised: str | None = None) -> MarketExportItem:

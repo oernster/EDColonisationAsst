@@ -8,7 +8,9 @@ interface CarrierIdentityListProps {
   dockedCarrierServices?: string[] | null;
 }
 
-const LAST_SEEN_CHIP_MAX_WIDTH = 200;
+// Wider than the bare system name needed, because the chip now carries the
+// "Current star system:" label in front of it.
+const LOCATION_CHIP_MAX_WIDTH = 320;
 
 /**
  * The service line under a carrier's name: its callsign, then whatever
@@ -94,15 +96,20 @@ export const CarrierIdentityList = ({
               sx={{ mt: { xs: 0.5, md: 0 }, alignSelf: { xs: 'flex-start', md: 'center' } }}
             >
               {carrier.last_seen_system && (
+                /* A carrier is never docked: it sits in a star system or is
+                   in transit between two. Naming the system is the state. */
                 <Chip
-                  label={carrier.last_seen_system}
+                  label={`Current star system: ${carrier.last_seen_system}`}
                   size="small"
                   variant="outlined"
-                  sx={{ maxWidth: LAST_SEEN_CHIP_MAX_WIDTH }}
+                  sx={{ maxWidth: LOCATION_CHIP_MAX_WIDTH }}
                 />
               )}
               {isDockedHere && (
-                <Chip label="Currently docked" color="primary" size="small" />
+                /* This says where the COMMANDER is, not the carrier. Reading
+                   "Currently docked" as a fact about the carrier is the
+                   obvious mistake, so it now says whose state it describes. */
+                <Chip label="You are docked here" color="primary" size="small" />
               )}
             </Stack>
           </Paper>

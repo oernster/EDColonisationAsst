@@ -136,7 +136,11 @@ describe('FleetCarriersPanel', () => {
     expect(screen.getByText('MIDNIGHT ELOQUENCE')).toBeTruthy()
     expect(screen.getByText('(X7J-BQG)')).toBeTruthy()
     expect(screen.getByText('Access: Squadron only')).toBeTruthy()
-    expect(screen.getByText('Last seen: Lupus Dark Region BQ-Y d66')).toBeTruthy()
+    // A carrier is parked in a system or in transit; it is never "docked",
+    // and "last seen" understated what the journal actually knows.
+    expect(
+      screen.getByText('Current star system: Lupus Dark Region BQ-Y d66'),
+    ).toBeTruthy()
     expect(screen.getByText('Cargo: 240 t')).toBeTruthy()
   })
 
@@ -297,7 +301,8 @@ describe('FleetCarriersPanel', () => {
 
     render(<FleetCarriersPanel />)
 
-    expect(screen.getByText('Currently docked')).toBeTruthy()
+    // The chip describes where the COMMANDER is, not the carrier.
+    expect(screen.getByText('You are docked here')).toBeTruthy()
     expect(screen.getByText('Squadron carriers')).toBeTruthy()
     // A carrier with no services at all shows its callsign and nothing more.
     expect(screen.getByText('ABC-123')).toBeTruthy()

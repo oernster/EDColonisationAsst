@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Box, Chip, Divider, Stack, Typography } from '@mui/material';
 import {
   CarrierCargoItem,
@@ -203,52 +204,92 @@ export const CarrierCargoSection = ({
           ? `Hold read from the carrier market at ${new Date(holdSnapshotTime).toLocaleString()}, plus your trades since`
           : `Snapshot: ${new Date(snapshotTime).toLocaleString()}`}
       </Typography>
-      <Divider sx={{ mb: 1 }} />
-      <Stack spacing={1.5}>
-        {cargo.map((item) => (
-          <Box
-            key={item.commodity_name}
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 1,
-            }}
-          >
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="body2" noWrap>
+      <Divider sx={{ mb: 1.5 }} />
+
+      {/* What is aboard is the headline of this tab, so it is set as one: a
+          dark panel, the carrier's own amber and a size that reads across the
+          room. The two columns are sized to their content and sit next to each
+          other rather than being pushed to opposite edges, which at this width
+          left the tonnage stranded a screen away from the commodity it
+          belonged to. */}
+      <Box
+        sx={{
+          bgcolor: 'common.black',
+          border: '1px solid',
+          borderColor: 'primary.main',
+          borderRadius: 1,
+          px: { xs: 2, sm: 3 },
+          py: 2,
+        }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'max-content max-content',
+            justifyContent: 'start',
+            columnGap: { xs: 3, sm: 6 },
+            rowGap: 1.25,
+            alignItems: 'baseline',
+          }}
+        >
+          {cargo.map((item) => (
+            <Fragment key={item.commodity_name}>
+              <Typography
+                sx={{
+                  color: 'primary.main',
+                  fontSize: { xs: '1.05rem', sm: '1.25rem' },
+                  fontWeight: 600,
+                  lineHeight: 1.4,
+                }}
+              >
                 {item.commodity_name_localised}
                 {buyOrderCommodities.has(item.commodity_name) && (
-                  <Typography component="span" variant="caption" color="warning.main" sx={{ ml: 1 }}>
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    color="warning.main"
+                    sx={{ ml: 1 }}
+                  >
                     (Buy order)
                   </Typography>
                 )}
               </Typography>
-            </Box>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography variant="body2">
+
+              <Typography
+                sx={{
+                  color: 'primary.main',
+                  fontSize: { xs: '1.05rem', sm: '1.25rem' },
+                  fontWeight: 700,
+                  lineHeight: 1.4,
+                  textAlign: 'right',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
                 {item.stock.toLocaleString()} t
                 {typeof item.capacity === 'number' && (
                   <Typography
                     component="span"
-                    variant="body2"
                     color="text.secondary"
-                    sx={{ ml: 0.5 }}
+                    sx={{ ml: 0.5, fontSize: 'inherit' }}
                   >
                     / {item.capacity.toLocaleString()} t
                   </Typography>
                 )}
+                {typeof item.reserved === 'number' && item.reserved > 0 && (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ ml: 1 }}
+                  >
+                    {item.reserved.toLocaleString()} t reserved
+                  </Typography>
+                )}
               </Typography>
-              {typeof item.reserved === 'number' && item.reserved > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {item.reserved.toLocaleString()} t reserved
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        ))}
-      </Stack>
+            </Fragment>
+          ))}
+        </Box>
+      </Box>
     </Box>
   );
 };

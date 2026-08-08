@@ -22,4 +22,21 @@ from __future__ import annotations
 # preference and not a guarantee; utils.ports resolves what is actually used.
 DEFAULT_BACKEND_PORT = 47021
 
-__all__ = ["DEFAULT_BACKEND_PORT"]
+# Tried in order when the preferred port cannot be bound, before falling back
+# to whatever the operating system will give. A short list of known addresses
+# is worth more than a random one: the web UI keeps a predictable address that
+# a bookmark or a tablet on the LAN can still reach. All of these were checked
+# against a machine whose reservations covered 7949 to 9056, 49711 to 49910
+# and 50000 to 50559, so none of them sits in a range Windows commonly takes.
+BACKEND_PORT_CANDIDATES = (
+    DEFAULT_BACKEND_PORT,
+    46617,
+    45219,
+    44317,
+    43391,
+    41573,
+    39207,
+    37421,
+)
+
+__all__ = ["BACKEND_PORT_CANDIDATES", "DEFAULT_BACKEND_PORT"]

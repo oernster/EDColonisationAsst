@@ -20,10 +20,11 @@ Three things are asserted here.
 * **Module size.** No file over `_MAX_LINES` lines outside an explicit
   allowlist of the files that were already over it when this rule arrived.
 
-The size scan covers TypeScript as well as Python. Three of the files still
-over the limit are front-end, so a scan that walked `*.py` only would report a
-clean repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript
-is measured but not parsed: the import rules are Python only.
+The size scan covers TypeScript as well as Python. That now carries the whole
+allowlist: every file still over the limit is front-end, so a scan that
+walked `*.py` only would report a clean repository while
+`FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is measured but not
+parsed: the import rules are Python only.
 
 Delivery scripts (`buildexe.py`, `buildinstaller.py`) are deliberately outside
 every scan here. They are linear recipes read top to bottom, where splitting a
@@ -76,12 +77,11 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. launcher_components.py is the last one here; it is
-        # the only Qt surface left in the set and sits outside the coverage
-        # gate with the rest of the runtime shell.
-        "backend/src/runtime/launcher_components.py",
-        # Front end. useKeepAwake.ts shows the project already knows how to
-        # move state out of a component and into a hook.
+        # Front end only: every Python file in the repository is now inside
+        # the cap. useKeepAwake.ts shows the project already knows how to move
+        # state out of a component and into a hook. Note that nothing lints
+        # these three (TECH_DEBT item 2), so the line count is the only
+        # automated statement anyone is making about them.
         "frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx",
         "frontend/src/components/SiteList/SiteList.tsx",
         "frontend/src/hooks/useKeepAwake.ts",

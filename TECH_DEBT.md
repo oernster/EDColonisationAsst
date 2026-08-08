@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Four files are over the 400-line module cap
+## 1. Three front-end files are over the 400-line module cap
 
-Fifteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180 and `colonisation_repository.py` from 470 to 288. All eight oversized test modules were then split by the surface each set of tests exercises.
+Sixteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180 `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,13 +22,12 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Four entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+Three entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
-| 425 | `backend/src/runtime/launcher_components.py` |
 | 406 | `frontend/src/hooks/useKeepAwake.ts` |
 
 The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit, which is what removed `carrier_service.py` from the list. The list can only shrink and this item closes when it is empty.
@@ -53,7 +52,9 @@ The if/elif dispatch chain became a `_EVENT_PARSERS` table, which is what remove
 
 The lock rule is now stated at the top of the module rather than only on the one method that had to explain itself: the lock is not reentrant, every method that opens a connection takes it and the two composed of those (`get_stats`, `update_commodity`) must not. `update_commodity` remains a read and a write in two transactions rather than one, which is the price of that rule and is recorded where it happens.
 
-What is left is one backend source module and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `launcher_components.py` at 425 is the last on the backend.
+`launcher_components.py` split along an interface it already had. `LaunchView` declares four methods and names no Qt type, which is why `Launcher` can be driven end to end by a recording stand-in with no QApplication in the test. `launcher_view.py` (194) now holds that interface and its one real implementation, `QtLaunchWindow`; `launcher_components.py` (321) keeps the steps, the subprocess plumbing and the log. It imports the view module and re-exports it under `__all__`, so `launcher.py` and the tests still reach the whole stack through one name and nothing outside the package changed.
+
+**Every Python file in the repository is now inside the cap.** What is left is three front-end files. Nothing lints any of them: item 2 below is why, and until it is done the line count in the structural suite is the only automated statement anyone is making about the front end. `FleetCarriersPanel.tsx` at 752 is the largest and the last component of real size.
 
 ## 2. `npm run lint` cannot run: there is no ESLint configuration
 

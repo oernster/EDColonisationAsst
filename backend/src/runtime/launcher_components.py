@@ -1,11 +1,17 @@
-"""Launcher UI and orchestration components.
+"""Launcher orchestration: also the public surface of the launcher stack.
 
-This module contains the bulk of the GUI launcher implementation that was
-previously defined in a single large file in
-[`launcher.py`](backend/src/launcher.py:1). Keeping these components here
-allows [`launcher.main()`](backend/src/launcher.py:441) to remain a small,
-entrypoint-focused module while the OO logic and Qt view live in a dedicated
-runtime submodule.
+This module contains the GUI launcher's orchestration: the ordered steps that
+take a bare checkout to a running backend, plus the subprocess and log
+plumbing those steps need. The window itself lives in
+[`launcher_view.py`](backend/src/runtime/launcher_view.py:1), which this module
+imports and re-exports so that
+[`launcher.py`](backend/src/launcher.py:1) keeps reaching the whole stack
+through one name.
+
+The dependency is one-way: this module knows about the view module, the view
+module knows nothing about this one; `Launcher` talks only to the
+`LaunchView` interface. That is what lets a full launch sequence be tested
+against a recording stand-in with no Qt involved.
 
 Public API re-exported by [`launcher`](backend/src/launcher.py:1):
 
@@ -14,6 +20,9 @@ Public API re-exported by [`launcher`](backend/src/launcher.py:1):
 - `LaunchView`
 - `QtLaunchWindow`
 - `Launcher`
+
+`__all__` is what marks the re-exports intentional. Without it they read as
+unused imports and an unattended `ruff check --fix` deletes them.
 """
 
 from __future__ import annotations
@@ -25,22 +34,26 @@ import subprocess
 import sys
 import time
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (
-    QApplication,
-    QLabel,
-    QMainWindow,
-    QProgressBar,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from .launcher_view import APP_NAME, PROGRESS_MAX, LaunchView, QtLaunchWindow
 
-APP_NAME = "Elite: Dangerous Colonisation Assistant"
 BACKEND_PORT = 8000
 FRONTEND_PORT = 5173
-PROGRESS_MAX = 100
+
+# Readiness polling. The timeout is generous because the first run of a fresh
+# checkout is creating a venv and installing into it before this point.
+_READINESS_TIMEOUT_SECONDS = 60.0
+_READINESS_POLL_SECONDS = 1.0
+_PROBE_TIMEOUT_SECONDS = 1
+
+# A response at all means the port is answering, which is what readiness asks.
+# 4xx counts: an endpoint that refuses the request is still an endpoint.
+_HTTP_OK = 200
+_HTTP_SERVER_ERROR = 500
+
+# Windows process creation flag: start the tray without a console window.
+_CREATE_NO_WINDOW = 0x08000000
+
+_LOG_FILENAME = "run-edca.log"
 
 
 @dataclass(frozen=True)
@@ -52,139 +65,6 @@ class InitStep:
     action: Callable[[], None]
 
 
-class LaunchView:
-    """Abstraction of the launcher UI for testability and SOLID compliance."""
-
-    def set_status(
-        self, message: str, progress: int
-    ) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    def show_error(self, message: str) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    def allow_open_frontend(self, url: str) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-    def process_events(self) -> None:  # pragma: no cover - interface
-        raise NotImplementedError
-
-
-class QtLaunchWindow(QMainWindow, LaunchView):
-    """Simple launcher window with icon, title, status label and progress bar."""
-
-    def __init__(self, project_root: Path, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._project_root = project_root
-        self._frontend_url: str | None = None
-
-        self.setWindowTitle(f"{APP_NAME} Launcher")
-        # Taller window to comfortably fit a larger app icon and primary button.
-        self.setFixedSize(420, 360)
-        self._init_ui()
-
-    def _init_ui(self) -> None:
-        central = QWidget(self)
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        # Icon
-        icon_label = QLabel(self)
-
-        # STRICTLY use the PNG for the in-window artwork so it renders crisply.
-        # We intentionally do NOT fall back to the ICO here; if the PNG cannot
-        # be loaded, the label will remain empty so the problem is obvious.
-        png_path = self._project_root / "EDColonisationAsst.png"
-
-        pixmap = QPixmap()
-        if png_path.exists():
-            pixmap = QPixmap(str(png_path))
-
-        if not pixmap.isNull():
-            scaled = pixmap.scaled(
-                160,
-                160,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
-            icon_label.setPixmap(scaled)
-
-        icon_label.setMinimumSize(160, 160)
-        icon_label.setAlignment(Qt.AlignHCenter)
-
-        # Title
-        title_label = QLabel(APP_NAME, self)
-        title_label.setAlignment(Qt.AlignHCenter)
-        title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-
-        # Status label
-        self._status_label = QLabel("Initialising...", self)
-        self._status_label.setAlignment(Qt.AlignHCenter)
-        self._status_label.setWordWrap(True)
-
-        # Progress bar
-        self._progress = QProgressBar(self)
-        self._progress.setRange(0, PROGRESS_MAX)
-        self._progress.setValue(0)
-        self._progress.setFormat("%p%")
-        self._progress.setTextVisible(True)
-
-        # "Open UI" button (enabled when ready): make it visually prominent.
-        self._open_button = QPushButton("Open Web UI", self)
-        self._open_button.setEnabled(False)
-        self._open_button.setMinimumHeight(40)
-        self._open_button.setMinimumWidth(200)
-        self._open_button.setStyleSheet(
-            "font-size: 13px; font-weight: 600; padding: 8px 24px;",
-        )
-        self._open_button.clicked.connect(self._on_open_clicked)
-
-        layout.addWidget(icon_label)
-        # Extra space so the large icon does not visually collide with the title.
-        layout.addSpacing(12)
-        layout.addWidget(title_label)
-        layout.addSpacing(8)
-        layout.addWidget(self._status_label)
-        layout.addWidget(self._progress)
-        layout.addSpacing(12)
-        layout.addWidget(self._open_button, alignment=Qt.AlignHCenter)
-
-        central.setLayout(layout)
-        self.setCentralWidget(central)
-
-    # LaunchView implementation -------------------------------------------------
-
-    def set_status(self, message: str, progress: int) -> None:
-        self._status_label.setText(message)
-        self._progress.setValue(progress)
-        self.process_events()
-
-    def show_error(self, message: str) -> None:
-        # For now, just show it prominently in the status label.
-        self._status_label.setText(f"ERROR: {message}")
-        self._progress.setValue(0)
-        self.process_events()
-
-    def allow_open_frontend(self, url: str) -> None:
-        self._frontend_url = url
-        self._open_button.setEnabled(True)
-        self.process_events()
-
-    def process_events(self) -> None:
-        app = QApplication.instance()
-        if app is not None:
-            app.processEvents()
-
-    # ------------------------------------------------------------------ slots
-
-    def _on_open_clicked(self) -> None:
-        if self._frontend_url:
-            import webbrowser  # local import to keep module import cost low
-
-            webbrowser.open(self._frontend_url)
-
-
 class Launcher:
     """Orchestrates initialization steps and updates the view."""
 
@@ -194,15 +74,14 @@ class Launcher:
         self._backend_dir = project_root / "backend"
         self._frontend_dir = project_root / "frontend"
         self._venv_python = self._backend_dir / "venv" / "Scripts" / "python.exe"
-        self._log_path = project_root / "run-edca.log"
+        self._log_path = project_root / _LOG_FILENAME
 
     # Public API -------------------------------------------------------
 
     def run(self) -> None:
         """Run all initialization steps, updating the view."""
         try:
-            steps = self._build_steps()
-            for step in steps:
+            for step in self._build_steps():
                 self._view.set_status(step.name, step.progress)
                 step.action()
             # Once all steps are done, allow opening the UI served by the backend.
@@ -226,6 +105,9 @@ class Launcher:
         runtime. Instead, the frontend is expected to be built ahead of
         time (e.g. `npm run build`) and served as static files by the
         backend. This removes any Node.js/npm requirement for end users.
+
+        The progress figures are the table: each one is where that step
+        leaves the bar, which is why they are written here rather than named.
         """
         return [
             InitStep("Checking Python environment...", 5, self._check_python),
@@ -333,21 +215,21 @@ class Launcher:
         self._append_log("[launcher] Starting tray controller...")
         # Launch tray in the background; we do not wait here, readiness is
         # checked separately.
+        command = [str(self._venv_python), str(tray_script)]
         if sys.platform.startswith("win"):
-            CREATE_NO_WINDOW = 0x08000000
             startup_info = subprocess.STARTUPINFO()
             startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             subprocess.Popen(
-                [str(self._venv_python), str(tray_script)],
+                command,
                 cwd=str(self._project_root),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=CREATE_NO_WINDOW,
+                creationflags=_CREATE_NO_WINDOW,
                 startupinfo=startup_info,
             )
         else:
             subprocess.Popen(
-                [str(self._venv_python), str(tray_script)],
+                command,
                 cwd=str(self._project_root),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -360,8 +242,10 @@ class Launcher:
 
         def _probe(url: str) -> bool:
             try:
-                with urllib.request.urlopen(url, timeout=1) as resp:
-                    return 200 <= resp.getcode() < 500
+                with urllib.request.urlopen(
+                    url, timeout=_PROBE_TIMEOUT_SECONDS
+                ) as resp:
+                    return _HTTP_OK <= resp.getcode() < _HTTP_SERVER_ERROR
             except urllib.error.URLError:
                 return False
 
@@ -369,7 +253,7 @@ class Launcher:
         backend_health = f"http://127.0.0.1:{BACKEND_PORT}/api/health"
         frontend_url = f"http://127.0.0.1:{BACKEND_PORT}/app/"
 
-        deadline = time.time() + 60.0  # 60 seconds
+        deadline = time.time() + _READINESS_TIMEOUT_SECONDS
         self._append_log(
             "[launcher] Waiting for backend at "
             f"{backend_health} and frontend at {frontend_url}...",
@@ -383,7 +267,7 @@ class Launcher:
                 return
             # Light backoff and keep GUI responsive.
             self._view.process_events()
-            time.sleep(1.0)
+            time.sleep(_READINESS_POLL_SECONDS)
 
         self._append_log(
             "[launcher] Timeout waiting for backend/frontend readiness; "
@@ -423,3 +307,15 @@ class Launcher:
         except OSError:
             # Logging failures should not break the launcher.
             pass
+
+
+__all__ = [
+    "APP_NAME",
+    "BACKEND_PORT",
+    "FRONTEND_PORT",
+    "PROGRESS_MAX",
+    "InitStep",
+    "LaunchView",
+    "Launcher",
+    "QtLaunchWindow",
+]

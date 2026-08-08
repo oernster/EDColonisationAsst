@@ -60,7 +60,8 @@ backend/
 │   │   ├── app_singleton.py           # ApplicationInstanceLock
 │   │   ├── common.py                  # Shared runtime helpers
 │   │   ├── environment.py             # Runtime environment detection
-│   │   ├── launcher_components.py     # Dev launcher window/tray helpers
+│   │   ├── launcher_components.py     # Dev launcher orchestration and steps
+│   │   ├── launcher_view.py           # LaunchView interface and Qt window
 │   │   └── tray_components.py         # Dev tray helpers
 │   ├── services/
 │   │   ├── __init__.py

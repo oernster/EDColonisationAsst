@@ -13,12 +13,13 @@ Responsibilities:
   shared with the packaged runtime and tray controller.
 - Detect the project root based on this file's location.
 - Initialise the Qt application, window icon and top-level
-  [`QtLaunchWindow`](backend/src/runtime/launcher_components.py:97).
+  [`QtLaunchWindow`](backend/src/runtime/launcher_view.py:70).
 - Delegate all detailed initialisation logic to
-  [`Launcher`](backend/src/runtime/launcher_components.py:207).
+  [`Launcher`](backend/src/runtime/launcher_components.py:68).
 
-The heavy-weight Qt view and orchestration logic live in the runtime
-submodule to keep this entrypoint small and focused.
+The Qt view lives in `runtime.launcher_view` and the orchestration in
+`runtime.launcher_components`, which re-exports the view so this entrypoint
+still reaches the whole stack through one import.
 """
 
 from __future__ import annotations

@@ -209,15 +209,20 @@ This guarantees only one EDCA backend/tray/launcher combination runs at a time p
 
 ### 2.3 Launcher (development workflow)
 
-[`launcher_components.py`](backend/src/runtime/launcher_components.py:1) factors out most of the dev launcher logic:
+The dev launcher is two modules split along an interface it already had. `LaunchView` declares four methods and no Qt types, so `Launcher` never sees a widget; a full launch sequence is therefore testable against a recording stand-in with no QApplication involved. The dependency runs one way: `launcher_components` imports `launcher_view` and re-exports it, so `launcher.py` still reaches the whole stack through one import.
 
-- `QtLaunchWindow`: PySide6 window with:
+[`launcher_view.py`](backend/src/runtime/launcher_view.py:1) holds the display:
+
+- `LaunchView`: the Qt-free interface (`set_status`, `show_error`, `allow_open_frontend`, `process_events`).
+- `QtLaunchWindow`: the one implementation, a PySide6 window with:
   - Icon, title.
   - Status label.
   - Progress bar.
   - “Open Web UI” button.
 
-- `Launcher`: orchestrates:
+[`launcher_components.py`](backend/src/runtime/launcher_components.py:1) holds the orchestration:
+
+- `Launcher`, which drives:
 
   - Python availability checks.
   - Backend virtualenv creation (`backend/venv`).

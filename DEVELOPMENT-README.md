@@ -158,7 +158,7 @@ On a Windows test machine:
 3. Launch via the Start Menu / Desktop shortcut:
    - The startup splash appears (icon, author, version, live status).
    - A tray icon appears (Open Web UI / Help / Exit).
-   - The browser opens `http://127.0.0.1:8000/app/` once the backend is
+   - The browser opens `http://127.0.0.1:47021/app/` once the backend is
      actually ready.
 4. No system Python or Node.js should be required.
 5. Leave **Launch when finished** ticked on a fresh install and confirm the
@@ -199,9 +199,9 @@ uvicorn src.main:app --reload
 
 or from the project root: `uvicorn backend.src.main:app --reload`.
 
-- REST API: `http://localhost:8000`
-- Swagger docs: `http://localhost:8000/docs`
-- Live updates (AJAX long-poll): `http://localhost:8000/api/changes/longpoll`
+- REST API: `http://localhost:47021`
+- Swagger docs: `http://localhost:47021/docs`
+- Live updates (AJAX long-poll): `http://localhost:47021/api/changes/longpoll`
 
 ### Configuration
 
@@ -334,7 +334,7 @@ Or use the convenience scripts [run-edca.bat](run-edca.bat) /
 
 Use [run-edca-built.sh](run-edca-built.sh) from the project root. It creates a
 venv, installs backend requirements, ensures `frontend/dist` exists and serves
-everything on `http://127.0.0.1:8000/app/`.
+everything on `http://127.0.0.1:47021/app/`.
 
 It replaced five per-distro copies that differed only in their package-manager
 hints. Those hints are now printed at runtime and only when a prerequisite is
@@ -355,10 +355,10 @@ per machine (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and
 The Start Menu / Desktop shortcuts point at `EDColonisationAsst.exe`, which:
 
 - Detects FROZEN mode and starts an in-process `uvicorn.Server` hosting the
-  FastAPI app on `http://127.0.0.1:8000`.
+  FastAPI app on `http://127.0.0.1:47021`.
 - Shows the startup splash immediately (icon, author, version, live status)
   and polls readiness without blocking the UI.
-- Serves the bundled frontend at `http://127.0.0.1:8000/app/` and opens the
+- Serves the bundled frontend at `http://127.0.0.1:47021/app/` and opens the
   browser only once both the health endpoint and the web UI respond.
 - Provides a tray icon with Open Web UI, a Help submenu (About plus
   Check for Updates) and Exit.

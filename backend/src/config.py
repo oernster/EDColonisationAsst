@@ -9,6 +9,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 import yaml
 
+from .constants import DEFAULT_BACKEND_PORT
+
 # Load .env file at the top level of the module
 load_dotenv()
 
@@ -31,7 +33,7 @@ class ServerConfig(BaseSettings):
     """Server configuration"""
 
     host: str = Field(default="0.0.0.0", description="Server host")
-    port: int = Field(default=8000, description="Server port")
+    port: int = Field(default=DEFAULT_BACKEND_PORT, description="Server port")
     cors_origins: list[str] = Field(
         default=["http://localhost:5173"], description="Allowed CORS origins"
     )

@@ -2,6 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Must match DEFAULT_BACKEND_PORT in backend/src/utils/ports.py. Deliberately
+// an unusual port: the obvious ones (8000, 8080, 5000, 3000) are what every
+// other development server reaches for, so they are the ones most likely to be
+// taken or reserved by the operating system.
+const BACKEND_PORT = 47021
+
 // https://vitejs.dev/config/
 export default defineConfig({
   // The built app is served by FastAPI under /app, so we set the base
@@ -20,11 +26,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: `ws://localhost:${BACKEND_PORT}`,
         ws: true,
       },
     },

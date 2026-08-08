@@ -5,6 +5,11 @@ import { AppSettings } from '../../types/settings';
 import { useColonisationStore } from '../../stores/colonisationStore';
 import { isMobileOrTablet } from '../../utils/device';
 
+// Only a last resort for the hints below, when the page is opened from
+// somewhere without a port in its address. The served port is authoritative.
+// Must match DEFAULT_BACKEND_PORT in backend/src/utils/ports.py.
+const DEFAULT_BACKEND_PORT = '47021';
+
 export const SettingsPage = () => {
   const { updateSettings } = useColonisationStore();
   const [settings, setSettings] = useState<AppSettings>({
@@ -31,7 +36,11 @@ export const SettingsPage = () => {
     }
   });
 
-  const backendPort = 8000;
+  // Read from the address actually being served rather than hardcoded: the
+  // backend picks its port at startup and falls back to another when the
+  // configured one cannot be bound, so a fixed number here would show the
+  // user an address that does not answer.
+  const backendPort = window.location.port || DEFAULT_BACKEND_PORT;
   const currentHost = window.location.hostname || 'localhost';
   const localUrl = `http://127.0.0.1:${backendPort}/app/`;
   const lanUrlHint =
@@ -149,7 +158,7 @@ export const SettingsPage = () => {
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
           EDCA will attempt the browser Screen Wake Lock API when available (requires HTTPS or
           localhost). Because you are typically using an HTTP LAN URL
-          (e.g. <code>http://&lt;PC-IP&gt;:8000/app/</code>), Wake Lock may be unavailable; in that
+          (e.g. <code>http://&lt;PC-IP&gt;:{backendPort}/app/</code>), Wake Lock may be unavailable; in that
           case EDCA uses a safe fallback that requires a single tap to start.
           <br />
           <strong>Where to tap:</strong> tap anywhere on the EDCA page after enabling this option

@@ -15,6 +15,7 @@ from typing import Dict
 import pytest
 
 import src.launcher as launcher
+from src.constants import DEFAULT_BACKEND_PORT as BACKEND_PORT
 
 
 def test_main_exits_early_when_lock_already_held(
@@ -68,7 +69,7 @@ def test_main_exits_early_when_lock_already_held(
     code = launcher.main()
 
     assert code == 0
-    assert opened["url"] == "http://127.0.0.1:8000/app/"
+    assert opened["url"] == f"http://127.0.0.1:{BACKEND_PORT}/app/"
 
 
 def test_main_continues_when_lock_error(

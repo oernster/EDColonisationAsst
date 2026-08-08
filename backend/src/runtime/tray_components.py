@@ -44,6 +44,14 @@ except ImportError:
         resolve_about_icon,
     )
 
+try:
+    from ..constants import DEFAULT_BACKEND_PORT  # type: ignore[import-not-found]
+except ImportError:
+    # As above.
+    from backend.src.constants import (  # type: ignore[import-error]
+        DEFAULT_BACKEND_PORT,
+    )
+
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 
@@ -205,7 +213,7 @@ class TrayController:
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            str(DEFAULT_BACKEND_PORT),
         ]
 
         # Log what we're about to start to help diagnose issues in production.

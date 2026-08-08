@@ -1,11 +1,11 @@
 """Find which local process is listening on a TCP port (Windows).
 
 Stdlib only. Useful to confirm which backend instance is serving
-http://127.0.0.1:8000 when results don't match the workspace code.
+http://127.0.0.1:47021 when results don't match the workspace code.
 
 Run from repo root:
 
-  c:/Users/Oliver/Development/EDColonisationAsst/venv/Scripts/python backend/tools/find_port_owner.py 8000
+  c:/Users/Oliver/Development/EDColonisationAsst/venv/Scripts/python backend/tools/find_port_owner.py 47021
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ def _run(cmd: list[str]) -> str:
 def _iter_listening_pids(port: int) -> Iterable[int]:
     out = _run(["netstat", "-ano", "-p", "tcp"])
     # Typical line:
-    #   TCP    127.0.0.1:8000   0.0.0.0:0   LISTENING   12345
+    #   TCP    127.0.0.1:47021   0.0.0.0:0   LISTENING   12345
     pat = re.compile(rf"^\s*TCP\s+\S+:{port}\s+\S+\s+LISTENING\s+(\d+)\s*$")
     for line in out.splitlines():
         m = pat.match(line)
@@ -39,7 +39,7 @@ def _tasklist(pid: int) -> str:
 
 
 def main(argv: list[str]) -> int:
-    port = int(argv[1]) if len(argv) > 1 else 8000
+    port = int(argv[1]) if len(argv) > 1 else 47021
     pids = sorted(set(_iter_listening_pids(port)))
     if not pids:
         print(f"No LISTENING TCP sockets found on port {port}.")
@@ -54,4 +54,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-

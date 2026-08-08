@@ -52,9 +52,9 @@ if [ ! -d "frontend/node_modules" ]; then
 fi
 
 echo
-echo "Starting backend (API server) on http://localhost:8000 ..."
+echo "Starting backend (API server) on http://localhost:47021 ..."
 # Run backend in the background
-"$PYTHON" -m uvicorn backend.src.main:app --host 0.0.0.0 --port 8000 &
+"$PYTHON" -m uvicorn backend.src.main:app --host 0.0.0.0 --port 47021 &
 BACKEND_PID=$!
 
 echo

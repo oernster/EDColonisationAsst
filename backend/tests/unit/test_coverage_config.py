@@ -25,6 +25,7 @@ import pytest
 
 import src.config as config_mod
 import src.utils.journal as journal_mod
+from src.constants import DEFAULT_BACKEND_PORT
 
 # The concrete Path class for the machine actually running the tests.
 # Substituting this for src.config.Path lets path arithmetic succeed even
@@ -182,7 +183,7 @@ def test_get_config_missing_files_uses_defaults(
 
     cfg = config_mod.get_config()
 
-    assert cfg.server.port == 8000
+    assert cfg.server.port == DEFAULT_BACKEND_PORT
     assert cfg.websocket.ping_interval == 30
     assert cfg.logging.level == "INFO"
 
@@ -200,7 +201,7 @@ def test_get_config_invalid_yaml_falls_back_to_defaults(
 
     cfg = config_mod.get_config()
 
-    assert cfg.server.port == 8000
+    assert cfg.server.port == DEFAULT_BACKEND_PORT
     assert cfg.logging.level == "INFO"
 
 

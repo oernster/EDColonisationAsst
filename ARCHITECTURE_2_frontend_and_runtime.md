@@ -191,7 +191,7 @@ API:
 - First process per user to acquire the lock becomes the **main instance** (launcher/tray or runtime).
 - Any subsequent run:
 
-  - Packaged runtime (`runtime_entry.py`): opens the existing UI (`http://127.0.0.1:8000/app/`) in the browser and exits with code `0`.
+  - Packaged runtime (`runtime_entry.py`): opens the existing UI (`http://127.0.0.1:47021/app/`) in the browser and exits with code `0`.
   - Dev launcher (`launcher.py`): same redirect behaviour.
   - Tray controller (`tray_app.py`): exits without starting another backend/frontend pair.
 
@@ -288,7 +288,7 @@ Key classes:
 
   - Sets EDCA icon and tooltip.
   - Offers:
-    - “Open Web UI” (launches default browser at `RuntimeEnvironment.frontend_url`, usually `http://127.0.0.1:8000/app/`).
+    - “Open Web UI” (launches default browser at `RuntimeEnvironment.frontend_url`, usually `http://127.0.0.1:47021/app/`).
     - “Help” submenu ([`help_menu.py`](backend/src/runtime/help_menu.py:1), shared with the dev tray): “About” (icon, author, copyright, open source credits) and “Check for Updates” (opens the GitHub releases page).
     - “Exit” (with confirmation).
   - Clicking/double‑clicking the tray icon also opens the web UI.

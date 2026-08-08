@@ -132,7 +132,7 @@ uvicorn backend.src.main:app --reload
 npm --prefix frontend run dev
 ```
 
-Backend: `http://localhost:8000` (Swagger at `/docs`). Frontend dev
+Backend: `http://localhost:47021` (Swagger at `/docs`). Frontend dev
 server: `http://localhost:5173`.
 
 ### 5. Optional: enable the pre-commit hook

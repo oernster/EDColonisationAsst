@@ -47,7 +47,7 @@ below); it does nothing at all when the game is not writing journals.
 
 Your browser will open automatically at:
 
-http://127.0.0.1:8000/app/
+http://127.0.0.1:47021/app/
 
 EDCA will begin reading your journal files immediately.
 
@@ -119,15 +119,15 @@ The script:
 
 - Sets up a Python virtual environment and backend runtime dependencies.
 - Ensures the frontend is built (or lets you skip the build via environment variables).
-- Starts the backend on `http://127.0.0.1:8000`.
-- Opens your browser at `http://127.0.0.1:8000/app/`.
+- Starts the backend on `http://127.0.0.1:47021`.
+- Opens your browser at `http://127.0.0.1:47021/app/`.
 
 For full Linux prerequisites and advanced usage (including environment variables and alternative workflows), see [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md).
 
 The installed runtime starts a local web server and opens your browser to:
 
 ```text
-http://127.0.0.1:8000/app/
+http://127.0.0.1:47021/app/
 ```
 
 ---
@@ -155,7 +155,7 @@ You can point EDCA at a different journal directory via the Settings page in the
 You can open the EDCA UI from another device (for example, a tablet) as long as:
 
 - The PC running EDCA and the tablet/phone are on the **same local network** (Wi‑Fi/LAN).
-- Your firewall allows local access to port `8000` on the PC.
+- Your firewall allows local access to port `47021` on the PC.
 
 ### 1. Find your PC’s LAN IP address (Windows)
 
@@ -185,13 +185,13 @@ On your tablet/phone (connected to the same Wi‑Fi/LAN):
 2. Enter the following URL, replacing `<PC-LAN-IP>` with the IPv4 address you found:
 
    ```text
-   http://<PC-LAN-IP>:8000/app/
+   http://<PC-LAN-IP>:47021/app/
    ```
 
    Example:
 
    ```text
-   http://192.168.1.238:8000/app/
+   http://192.168.1.238:47021/app/
    ```
 
 This works **only on your local network**; EDCA is not intended to be exposed directly to the internet.
@@ -207,7 +207,7 @@ How it works:
 
 1. **Preferred**: Screen Wake Lock API (when supported).
    - Requires a **secure context** (HTTPS or `localhost`).
-2. **Fallback** (for typical LAN access over HTTP like `http://<PC-LAN-IP>:8000/app/`):
+2. **Fallback** (for typical LAN access over HTTP like `http://<PC-LAN-IP>:47021/app/`):
    - EDCA uses a safe fallback that requires a **single tap** to start (mobile autoplay restrictions).
 
 The current state is shown in the header via the “Keep awake” indicator in [`App()`](frontend/src/App.tsx:63).

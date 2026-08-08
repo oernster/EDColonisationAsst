@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 import src.runtime.launcher_components as launcher_mod
 import src.runtime.tray_components as tray_mod
+from src.constants import DEFAULT_BACKEND_PORT as BACKEND_PORT
 
 from tests.unit._test_runtime_components_support import (
     DummyAction,
@@ -59,7 +60,7 @@ def test_launcher_run_happy_path_uses_view_and_allows_open_frontend(
         "wait_for_readiness",
     ]
     # The view should ultimately be told to allow opening the /app/ URL.
-    assert view.frontend_urls == ["http://127.0.0.1:8000/app/"]
+    assert view.frontend_urls == [f"http://127.0.0.1:{BACKEND_PORT}/app/"]
 
 
 def test_process_group_terminate_variants() -> None:

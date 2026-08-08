@@ -11,8 +11,8 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 │                          React Frontend (Vite)                     │
 │  - System selector, site list, Fleet Carriers, settings UI         │
 │  - Talks to backend via:                                           │
-│      • REST  → http://localhost:8000/api/*                         │
-│      • Live updates (AJAX long-poll) → http://localhost:8000/api/changes/longpoll │
+│      • REST  → http://localhost:47021/api/*                         │
+│      • Live updates (AJAX long-poll) → http://localhost:47021/api/changes/longpoll │
 └─────────────────────────────────────────────────────────────────────┘
                             ▲                  ▲
                             │                  │

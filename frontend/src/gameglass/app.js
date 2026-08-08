@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const inProgressList = document.getElementById('in-progress-list');
     const completedList = document.getElementById('completed-list');
-    const API_URL = 'http://127.0.0.1:8000/api/sites';
+    // Must match DEFAULT_BACKEND_PORT in backend/src/utils/ports.py.
+    const API_URL = 'http://127.0.0.1:47021/api/sites';
 
     const fetchData = async () => {
         try {

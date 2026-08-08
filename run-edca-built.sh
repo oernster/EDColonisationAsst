@@ -21,7 +21,7 @@ set -euo pipefail
 #
 # Options via env:
 #   EDCA_HOST=127.0.0.1                   (bind host for uvicorn)
-#   EDCA_PORT=8000                        (bind port for uvicorn)
+#   EDCA_PORT=47021                        (bind port for uvicorn)
 #   EDCA_PYTHON=python3.12                (python executable used to create the backend venv)
 #   EDCA_VENV_DIR=.venv312                (where to create/use the backend venv; default: backend/.venv)
 #   EDCA_RECREATE_VENV=1                  (delete and recreate the venv if Python version mismatch)
@@ -40,7 +40,7 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 cd "${SCRIPT_DIR}"
 
 APP_HOST="${EDCA_HOST:-127.0.0.1}"
-APP_PORT="${EDCA_PORT:-8000}"
+APP_PORT="${EDCA_PORT:-47021}"
 UI_URL="http://${APP_HOST}:${APP_PORT}/app/"
 
 log() { printf '%s\n' "$*"; }

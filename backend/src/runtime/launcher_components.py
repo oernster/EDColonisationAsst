@@ -36,7 +36,17 @@ import time
 
 from .launcher_view import APP_NAME, PROGRESS_MAX, LaunchView, QtLaunchWindow
 
-BACKEND_PORT = 8000
+try:
+    from ..constants import DEFAULT_BACKEND_PORT  # type: ignore[import-not-found]
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script,
+    # which the frozen Nuitka build does. That is an ImportError; anything else
+    # raised while importing is a real defect and should surface.
+    from backend.src.constants import (  # type: ignore[import-error]
+        DEFAULT_BACKEND_PORT,
+    )
+
+BACKEND_PORT = DEFAULT_BACKEND_PORT
 FRONTEND_PORT = 5173
 
 # Readiness polling. The timeout is generous because the first run of a fresh

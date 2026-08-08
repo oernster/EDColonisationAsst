@@ -23,7 +23,7 @@ def _get_json(url: str, *, timeout_s: float = 2.0) -> object:
 
 
 def main() -> int:
-    base = "http://127.0.0.1:8000"
+    base = "http://127.0.0.1:47021"
     endpoints = [
         f"{base}/api/health",
         f"{base}/api/carriers/current",
@@ -70,11 +70,19 @@ def main() -> int:
                         "trade_orders_scope": carrier.get("trade_orders_scope"),
                         "counts": {
                             "buy_orders": len(buy) if isinstance(buy, list) else None,
-                            "sell_orders": len(sell) if isinstance(sell, list) else None,
-                            "cargo_rows": len(cargo) if isinstance(cargo, list) else None,
+                            "sell_orders": len(sell)
+                            if isinstance(sell, list)
+                            else None,
+                            "cargo_rows": len(cargo)
+                            if isinstance(cargo, list)
+                            else None,
                         },
-                        "sell_orders_preview": sell[:5] if isinstance(sell, list) else None,
-                        "buy_orders_preview": buy[:5] if isinstance(buy, list) else None,
+                        "sell_orders_preview": sell[:5]
+                        if isinstance(sell, list)
+                        else None,
+                        "buy_orders_preview": buy[:5]
+                        if isinstance(buy, list)
+                        else None,
                     },
                     indent=2,
                 )
@@ -95,8 +103,12 @@ def main() -> int:
         from src.services.journal_parser import JournalParser
         from src.services.carrier_service import build_current_carrier_state_response
 
-        journal_dir = Path(r"C:\Users\Oliver\Saved Games\Frontier Developments\Elite Dangerous")
-        files = sorted(journal_dir.glob("Journal.*.log"), key=lambda p: p.stat().st_mtime)
+        journal_dir = Path(
+            r"C:\Users\Oliver\Saved Games\Frontier Developments\Elite Dangerous"
+        )
+        files = sorted(
+            journal_dir.glob("Journal.*.log"), key=lambda p: p.stat().st_mtime
+        )
         files_to_parse = files[-25:]
 
         parser = JournalParser()
@@ -115,7 +127,9 @@ def main() -> int:
                 json.dumps(
                     {
                         "snapshot_time": carrier.snapshot_time.isoformat(),
-                        "trade_orders_scope": getattr(carrier, "trade_orders_scope", None),
+                        "trade_orders_scope": getattr(
+                            carrier, "trade_orders_scope", None
+                        ),
                         "counts": {
                             "buy_orders": len(carrier.buy_orders),
                             "sell_orders": len(carrier.sell_orders),
@@ -134,4 +148,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

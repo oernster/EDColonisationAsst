@@ -23,6 +23,7 @@ import sys
 from .common import RuntimeMode, get_runtime_mode
 
 try:
+    from ..constants import DEFAULT_BACKEND_PORT  # type: ignore[import-not-found]
     from ..utils.ports import (  # type: ignore[import-not-found]
         choose_port,
         read_recorded_port,
@@ -31,16 +32,13 @@ except ImportError:
     # The relative form fails only when this module runs as a top-level script,
     # which the frozen Nuitka build does. That is an ImportError; anything else
     # raised while importing is a real defect and should surface.
+    from backend.src.constants import (  # type: ignore[import-error]
+        DEFAULT_BACKEND_PORT,
+    )
     from backend.src.utils.ports import (  # type: ignore[import-error]
         choose_port,
         read_recorded_port,
     )
-
-# The port asked for before anything is known about the machine. It is a
-# preference and never a guarantee: see utils.ports for why a fixed port cannot
-# be relied on, then resolve_backend_port() below for what happens when it
-# cannot be had.
-DEFAULT_BACKEND_PORT = 8000
 
 # Written by whichever instance is serving, read by the next run and by a
 # second instance looking for the web UI of the one already running.

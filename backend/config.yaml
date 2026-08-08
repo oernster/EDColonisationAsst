@@ -10,7 +10,7 @@ server:
   - http://localhost:5173
   - https://oernster.github.io
   host: 0.0.0.0
-  port: 8000
+  port: 47021
 websocket:
   ping_interval: 30
   reconnect_attempts: 5

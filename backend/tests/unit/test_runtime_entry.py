@@ -43,8 +43,23 @@ def test_main_exits_early_when_lock_already_held(
         opened["url"] = url
         return True
 
-    # Ensure our dummy lock and browser are used.
+    class DummyEnvironment:
+        """Stands in for the detected environment with a known address.
+
+        Pinned rather than compared against a second detect() call: the port is
+        resolved against the machine now, so two calls can legitimately answer
+        differently and the test would be asserting nothing.
+        """
+
+        frontend_url = "http://127.0.0.1:9057/app/"
+
+        @classmethod
+        def detect(cls) -> "DummyEnvironment":
+            return cls()
+
+    # Ensure our dummy lock, environment and browser are used.
     monkeypatch.setattr(runtime_entry, "ApplicationInstanceLock", DummyLock)
+    monkeypatch.setattr(runtime_entry, "RuntimeEnvironment", DummyEnvironment)
     monkeypatch.setattr(runtime_entry.webbrowser, "open", fake_open)
 
     # Also silence any debug logging to avoid filesystem writes during tests.
@@ -53,7 +68,7 @@ def test_main_exits_early_when_lock_already_held(
     code = runtime_entry.main()
 
     assert code == 0
-    assert opened["url"] == runtime_entry.RuntimeEnvironment.detect().frontend_url
+    assert opened["url"] == DummyEnvironment.frontend_url
 
 
 def test_main_continues_when_lock_error(monkeypatch: pytest.MonkeyPatch) -> None:

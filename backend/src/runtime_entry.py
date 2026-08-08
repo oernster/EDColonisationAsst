@@ -167,6 +167,11 @@ def main() -> int:
                 )
                 if not no_browser:
                     try:
+                        # detect() resolves the port the RUNNING instance is
+                        # serving on, because it prefers the recorded port when
+                        # something is already bound there. The port is not
+                        # fixed: Windows can reserve the configured one, so a
+                        # hardcoded URL here would send the user nowhere.
                         webbrowser.open(RuntimeEnvironment.detect().frontend_url)
                     except Exception:  # noqa: BLE001, S110
                         # Browser launch failures must not crash the runtime.

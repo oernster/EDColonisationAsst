@@ -22,6 +22,86 @@ import sys
 
 from .common import RuntimeMode, get_runtime_mode
 
+try:
+    from ..utils.ports import (  # type: ignore[import-not-found]
+        choose_port,
+        read_recorded_port,
+    )
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script,
+    # which the frozen Nuitka build does. That is an ImportError; anything else
+    # raised while importing is a real defect and should surface.
+    from backend.src.utils.ports import (  # type: ignore[import-error]
+        choose_port,
+        read_recorded_port,
+    )
+
+# The port asked for before anything is known about the machine. It is a
+# preference and never a guarantee: see utils.ports for why a fixed port cannot
+# be relied on, then resolve_backend_port() below for what happens when it
+# cannot be had.
+DEFAULT_BACKEND_PORT = 8000
+
+# Written by whichever instance is serving, read by the next run and by a
+# second instance looking for the web UI of the one already running.
+RECORDED_PORT_FILENAME = "runtime-port"
+
+_LOOPBACK_HOST = "127.0.0.1"
+
+
+def _configured_server(attribute: str, fallback: str | int) -> str | int:
+    """Return one server setting from configuration; the fallback if unreadable.
+
+    Read defensively and late: the value comes from hand-editable YAML, so a
+    bad one arrives as a validation error rather than as one predictable type.
+    A setting that cannot be read is not worth failing a startup over.
+    """
+    try:
+        try:
+            from ..config import get_config  # type: ignore[import-not-found]
+        except ImportError:
+            from backend.src.config import get_config  # type: ignore[import-error]
+
+        config = get_config()
+        server = getattr(config, "server", config)
+        return getattr(server, attribute, fallback) or fallback
+    except Exception:  # noqa: BLE001
+        # Deliberately broad, for the reason in the docstring.
+        return fallback
+
+
+def configured_backend_port() -> int:
+    """Return the port the configuration asks for; the default if unset."""
+    return int(_configured_server("port", DEFAULT_BACKEND_PORT))
+
+
+def configured_backend_host() -> str:
+    """Return the host the server will bind; the loopback default if unset.
+
+    The port is probed against this same host so that what the probe sees is
+    what the server's own bind will see: a port free on the loopback can still
+    be taken on the wildcard address.
+    """
+    return str(_configured_server("host", _LOOPBACK_HOST))
+
+
+def resolve_backend_port(recorded_file: Path) -> int:
+    """Return a port the backend can actually bind.
+
+    The configured port is a preference. Windows reserves whole ranges, so it
+    may be unbindable while appearing unused, in which case the operating
+    system is asked for one instead. If even that fails there is nothing
+    sensible left to try, so the configured port is returned and the backend
+    controller reports the real reason it cannot start.
+    """
+    preferred = configured_backend_port()
+    chosen = choose_port(
+        configured_backend_host(),
+        preferred,
+        recorded=read_recorded_port(recorded_file),
+    )
+    return chosen if chosen is not None else preferred
+
 
 @dataclass(frozen=True)
 class RuntimeEnvironment:
@@ -34,12 +114,21 @@ class RuntimeEnvironment:
 
     mode: RuntimeMode
     project_root: Path
-    backend_port: int = 8000
+    backend_port: int = DEFAULT_BACKEND_PORT
 
     @property
     def frontend_url(self) -> str:
         """Return the URL of the web UI served by the backend."""
         return f"http://127.0.0.1:{self.backend_port}/app/"
+
+    @property
+    def recorded_port_file(self) -> Path:
+        """Where the port actually being served is recorded.
+
+        Beside the runtime log in the install directory, so a second instance
+        and the next run can both find it without reading configuration.
+        """
+        return self.project_root / RECORDED_PORT_FILENAME
 
     @property
     def icon_path(self) -> Path:
@@ -102,4 +191,5 @@ class RuntimeEnvironment:
         else:
             project_root = Path(__file__).resolve().parents[2]
 
-        return cls(mode=mode, project_root=project_root)
+        port = resolve_backend_port(project_root / RECORDED_PORT_FILENAME)
+        return cls(mode=mode, project_root=project_root, backend_port=port)

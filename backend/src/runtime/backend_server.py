@@ -12,7 +12,6 @@ interface to [`RuntimeApplication`](backend/src/runtime/app_runtime.py:1).
 
 from __future__ import annotations
 
-import socket
 import threading
 import time
 
@@ -20,6 +19,24 @@ import uvicorn
 
 from .common import RuntimeMode, _debug_log, fastapi_app, logger
 from .environment import RuntimeEnvironment
+
+try:
+    from ..utils.ports import (  # type: ignore[import-not-found]
+        PORT_FREE,
+        describe,
+        probe_port,
+        record_port,
+    )
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script,
+    # which the frozen Nuitka build does. That is an ImportError; anything else
+    # raised while importing is a real defect and should surface.
+    from backend.src.utils.ports import (  # type: ignore[import-error]
+        PORT_FREE,
+        describe,
+        probe_port,
+        record_port,
+    )
 
 _LOOPBACK_HOST = "127.0.0.1"
 _PROBE_TIMEOUT_SECONDS = 1
@@ -34,10 +51,7 @@ _HTTP_ERROR = 400
 # Named startup failures. A backend that will never answer is reported with its
 # cause the moment it is known, rather than as an unexplained wait that runs the
 # readiness budget out and then blames slowness.
-STARTUP_FAILURE_PORT_IN_USE = (
-    "The local backend could not start: port {port} is already in use by "
-    "another program. Close that program, then start the assistant again."
-)
+STARTUP_FAILURE_PORT = "The local backend could not start: {reason}."
 STARTUP_FAILURE_SERVER_STOPPED = "The local backend {what}: {detail}"
 _FAILURE_EXITED = "exited during startup"
 _FAILURE_CRASHED = "crashed"
@@ -197,22 +211,26 @@ class BackendServerController:
 
         host = self._resolve_host()
 
-        if not self._port_available(host):
-            self._startup_failure = STARTUP_FAILURE_PORT_IN_USE.format(
-                port=self._env.backend_port,
-            )
+        category = probe_port(host, self._env.backend_port)
+        if category != PORT_FREE:
+            reason = describe(category, self._env.backend_port)
+            self._startup_failure = STARTUP_FAILURE_PORT.format(reason=reason)
             logger.error(
-                "Port %d on %s is already in use; the in-process server was "
-                "not started.",
+                "Port %d on %s is %s; the in-process server was not started.",
                 self._env.backend_port,
                 host,
+                category,
             )
             _debug_log(
                 "[BackendServerController] port "
-                f"{self._env.backend_port} on {host} already in use; "
+                f"{self._env.backend_port} on {host} is {category}; "
                 "in-process uvicorn not started",
             )
             return
+
+        # Record it only once it is known to be bindable, so the next run and
+        # any second instance reuse a port that actually worked.
+        record_port(self._env.recorded_port_file, self._env.backend_port)
 
         _debug_log(
             "[BackendServerController] starting in-process uvicorn on "
@@ -237,20 +255,6 @@ class BackendServerController:
         self._thread = thread
         thread.start()
         _debug_log("[BackendServerController] uvicorn-inprocess thread started")
-
-    def _port_available(self, host: str) -> bool:
-        """Whether the configured backend port can still be bound on this host.
-
-        Deliberately without SO_REUSEADDR, because asyncio does not set it on
-        Windows either: this bind therefore sees exactly what uvicorn's own
-        bind is about to see, which is the point of asking early.
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-            try:
-                probe.bind((host, self._env.backend_port))
-            except OSError:
-                return False
-        return True
 
     def _resolve_host(self) -> str:
         """

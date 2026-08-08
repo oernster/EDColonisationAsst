@@ -155,14 +155,18 @@ def test_start_reports_port_in_use_and_starts_no_server(
     assert controller._thread is None
 
 
-def test_port_available_is_true_for_a_free_port(
+def test_start_records_the_port_it_bound_for_the_next_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A port that worked is written down, so the next run reuses it.
+
+    The port is no longer fixed, so the address has to be recorded somewhere a
+    second instance and the next start can both find it.
+    """
     host = "127.0.0.1"
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind((host, 0))
         free_port = probe.getsockname()[1]
-    # The socket is closed, so the port is free again.
 
     env = RuntimeEnvironment(
         mode=RuntimeMode.FROZEN,
@@ -170,8 +174,14 @@ def test_port_available_is_true_for_a_free_port(
         backend_port=free_port,
     )
     controller = backend_server_mod.BackendServerController(env)
+    monkeypatch.setattr(controller, "_resolve_host", lambda: host)
+    # Stop short of actually serving: the recording happens before the thread.
+    monkeypatch.setattr(controller, "_make_runner", lambda server, host: lambda: None)
 
-    assert controller._port_available(host) is True
+    controller.start()
+
+    assert env.recorded_port_file.read_text(encoding="utf-8") == str(free_port)
+    assert controller.startup_failure() is None
 
 
 def test_runner_records_a_systemexit_as_a_named_failure(tmp_path: Path) -> None:

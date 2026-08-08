@@ -1,4 +1,4 @@
-"""Assembling the setup window's layout, and naming its primary action.
+"""Assembling the setup window's layout and naming its primary action.
 
 Construction is separated from behaviour so each stays small enough to read in
 one pass: this module only builds widgets, places them and decides what the
@@ -222,13 +222,23 @@ def _build_options(widgets: WindowWidgets) -> QVBoxLayout:
     return options
 
 
-def _build_actions(widgets: WindowWidgets) -> QVBoxLayout:
-    """Build the stacked action buttons."""
-    actions = QVBoxLayout()
+def _build_actions(widgets: WindowWidgets) -> QHBoxLayout:
+    """Build the action row that closes the window's column.
+
+    House shape: one row at the bottom, the destructive action alone on the
+    left, a stretch, then the constructive actions on the right with the
+    primary one last. Reading order and pointer travel then agree; Uninstall
+    is nowhere near the button the user actually came to press.
+
+    Three full-width pills stacked above the options they act on was the
+    previous shape, which put the buttons before the settings they consume.
+    """
+    actions = QHBoxLayout()
     actions.setSpacing(BUTTON_SPACING)
-    actions.addWidget(widgets.primary)
-    actions.addWidget(widgets.repair)
     actions.addWidget(widgets.uninstall)
+    actions.addStretch()
+    actions.addWidget(widgets.repair)
+    actions.addWidget(widgets.primary)
     return actions
 
 
@@ -245,13 +255,16 @@ def build_window(
     )
     layout.setSpacing(SECTION_SPACING)
 
+    # Read top to bottom: what this is, where it goes, what you get, how it is
+    # going, then what to press. The stretch sits above the progress so the
+    # action row is pinned to the bottom edge rather than floating mid-window.
     layout.addLayout(_build_header(widgets))
-    layout.addLayout(_build_actions(widgets))
     layout.addWidget(widgets.path_label)
     layout.addLayout(_build_options(widgets))
+    layout.addStretch()
     layout.addWidget(widgets.progress)
     layout.addWidget(widgets.status)
-    layout.addStretch()
+    layout.addLayout(_build_actions(widgets))
 
     window.setCentralWidget(central)
     return widgets

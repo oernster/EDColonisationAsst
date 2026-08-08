@@ -1,7 +1,7 @@
 """The setup window: a themed, state-aware lifecycle screen.
 
 The window holds no installer logic of its own. It reads one state snapshot,
-decides what to offer, and hands each operation to a worker thread. British
+decides what to offer and hands each operation to a worker thread. British
 spelling is used in comments. No em dashes appear anywhere.
 """
 
@@ -240,9 +240,31 @@ class InstallerWindow(QMainWindow):
 
     # ------------------------------------------------------------- outcomes
 
+    def _launch_if_requested(self, result: object) -> None:
+        """Launch the application and close the setup program, when asked to.
+
+        Shared by install, reinstall, upgrade, downgrade and repair, because the
+        tick box says "when finished" and means it in every one of those cases.
+
+        The operation returns the executable it deployed; repair does not,
+        and an install that reports nothing back is still an install. So the
+        path falls back to where the application was just put rather than
+        silently skipping the launch.
+        """
+        if not self._widgets.launch_on_finish.isChecked():
+            return
+        exe_path = (
+            result
+            if isinstance(result, Path)
+            else installed_exe(self._snapshot.install_dir)
+        )
+        if not exe_path.exists():
+            return
+        launch(exe_path)
+        self.close()
+
     def _installed(self, result: object) -> None:
         """Report a completed install and launch the app when asked to."""
-        exe_path = result if isinstance(result, Path) else None
         show_info(
             self,
             INSTALL_DONE_TITLE,
@@ -253,12 +275,10 @@ class InstallerWindow(QMainWindow):
             ),
         )
         self._refresh()
-        if exe_path is not None and self._widgets.launch_on_finish.isChecked():
-            launch(exe_path)
-            self.close()
+        self._launch_if_requested(result)
 
-    def _repaired(self, _result: object) -> None:
-        """Report a completed repair."""
+    def _repaired(self, result: object) -> None:
+        """Report a completed repair and launch the app when asked to."""
         show_info(
             self,
             REPAIR_DONE_TITLE,
@@ -269,6 +289,7 @@ class InstallerWindow(QMainWindow):
             ),
         )
         self._refresh()
+        self._launch_if_requested(result)
 
     def _uninstalled(self, _result: object) -> None:
         """Report a completed uninstall and return the window to its first state."""

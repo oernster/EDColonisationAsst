@@ -44,6 +44,9 @@ SMALL_FONT_PX = 11
 INDICATOR_PX = 14
 BORDER_PX = 1
 INDICATOR_RADIUS_PX = 3
+# The focus ring's width. Reserved as a transparent border at rest so gaining
+# the ring changes only its colour, never the button's size.
+RING_PX = 2
 
 
 def _gradient(start: str, end: str, *, upward: bool = False) -> str:
@@ -148,7 +151,16 @@ QPushButton#{UNINSTALL_BUTTON} {{
     padding: 8px 18px;
     border-radius: {BORDER_RADIUS_PX}px;
     font-weight: 600;
-    border: none;
+    /* Transparent rather than absent, so gaining a ring cannot reflow the row. */
+    border: {RING_PX}px solid transparent;
+}}
+/* Every ring rule is gated on :enabled, so a disabled button never lights up
+   under the mouse and never reads as a skipped focus target. */
+QPushButton#{PRIMARY_BUTTON}:enabled:hover, QPushButton#{REPAIR_BUTTON}:enabled:hover,
+QPushButton#{UNINSTALL_BUTTON}:enabled:hover,
+QPushButton#{PRIMARY_BUTTON}:enabled:focus, QPushButton#{REPAIR_BUTTON}:enabled:focus,
+QPushButton#{UNINSTALL_BUTTON}:enabled:focus {{
+    border-color: {theme.focus_ring};
 }}
 QPushButton#{PRIMARY_BUTTON} {{
     color: {theme.primary_text};
@@ -176,10 +188,13 @@ QPushButton#{REPAIR_BUTTON}:pressed {{
         theme.repair_pressed_start, theme.repair_pressed_end, upward=True
     )};
 }}
+/* Destructive, so it carries its own colour in the text rather than a fill.
+   The border is left to the ring rules above; owning a border colour here
+   would collide with the focus ring on the one control that most needs it,
+   and the fill stays clear at rest so hover still reads as a change. */
 QPushButton#{UNINSTALL_BUTTON} {{
     background-color: transparent;
     color: {theme.danger_text};
-    border: {BORDER_PX}px solid {theme.danger_border};
 }}
 QPushButton#{UNINSTALL_BUTTON}:enabled:hover {{
     background-color: {theme.danger_hover_bg};
@@ -187,11 +202,12 @@ QPushButton#{UNINSTALL_BUTTON}:enabled:hover {{
 QPushButton#{UNINSTALL_BUTTON}:pressed {{
     background-color: {theme.danger_pressed_bg};
 }}
+/* A disabled action states it permanently, rather than only on contact. */
 QPushButton#{PRIMARY_BUTTON}:disabled, QPushButton#{REPAIR_BUTTON}:disabled,
 QPushButton#{UNINSTALL_BUTTON}:disabled {{
     background-color: {theme.chrome_bg};
     color: {theme.border};
-    border-color: {theme.border};
+    border-color: {theme.disabled_ring};
 }}
 QPushButton#{LIGHT_THEME_BUTTON}, QPushButton#{DARK_THEME_BUTTON} {{
     border-radius: {THEME_BUTTON_RADIUS_PX}px;

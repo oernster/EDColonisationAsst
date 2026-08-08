@@ -473,7 +473,7 @@ This API-focused description is intended to be sufficient for shard authors to i
 
 ## 5. Fleet carrier APIs (optional)
 
-These endpoints expose the commander’s Fleet carrier data derived from Elite: Dangerous journal files. They are **optional** for GameGlass shards – use them if you want to display carrier cargo and market orders in addition to colonisation data.
+These endpoints expose the commander’s Fleet carrier data derived from Elite: Dangerous journal files. They are **optional** for GameGlass shards: use them if you want to display the carrier hold and market orders in addition to colonisation data.
 
 Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` events by the backend logic in [`carrier_service.py`](backend/src/services/carrier_service.py:1) and surfaced via the carrier API routes in [`carriers.py`](backend/src/api/carriers.py:60).
 
@@ -607,9 +607,9 @@ Key fields for a shard:
 - `identity.name` / `identity.callsign`: for the carrier header.
 - `cargo[*].commodity_name_localised`, `stock`, `capacity`: for a simple cargo panel.
 - `buy_orders` / `sell_orders`:
-  - `commodity_name_localised` – display name.
-  - `price` – CR/t.
-  - `remaining_amount` / `original_amount` – order fill progress.
+  - `commodity_name_localised`: display name.
+  - `price`: CR/t.
+  - `remaining_amount` / `original_amount`: order fill progress.
 - `space_usage`: (when present) the authoritative carrier capacity breakdown from `CarrierStats.SpaceUsage`.
   - Shards that want a single “free after buy orders” number can compute:
     - `space_usage.free_space` (already accounts for reserved buy space) or

@@ -69,6 +69,7 @@ backend/
 │   │   ├── colonisation_event_parser.py # The two events whose format changed
 │   │   ├── carrier_event_parser.py    # The three fleet carrier events
 │   │   ├── commander_event_parser.py  # Location, FSDJump, Docked, Commander
+│   │   ├── market_event_parser.py     # MarketBuy and MarketSell, one parser
 │   │   ├── startup_ingestion.py       # First-run backfill and repeat-run tail sync
 │   │   ├── journal_ingestion.py       # Watchdog boundary; routes parsed events
 │   │   ├── journal_tail_reader.py     # Incremental byte-offset reads of a journal
@@ -76,6 +77,7 @@ backend/
 │   │   ├── carrier_service.py         # Carrier response builders (public surface)
 │   │   ├── carrier_events.py          # Latest-event lookups over a journal stream
 │   │   ├── carrier_fleet.py           # Own and squadron carriers
+│   │   ├── carrier_hold.py            # Per-commodity hold from the export plus trades
 │   │   ├── carrier_identity.py        # Docked + CarrierStats + CarrierLocation -> identity
 │   │   ├── carrier_market.py          # Market.json merge and SpaceUsage arithmetic
 │   │   ├── carrier_naming.py          # Commodity name normalisation
@@ -302,6 +304,7 @@ The nine parsers, by module:
 | [`colonisation_event_parser.py`](backend/src/services/colonisation_event_parser.py:1) | `ColonisationConstructionDepot`, `ColonisationContribution` | The only two whose journal format has changed in service, so the only two carrying real normalisation |
 | [`carrier_event_parser.py`](backend/src/services/carrier_event_parser.py:1) | `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder` | The fleet carrier feature area, reconciled downstream by `carrier_identity` and `carrier_orders` |
 | [`commander_event_parser.py`](backend/src/services/commander_event_parser.py:1) | `Location`, `FSDJump`, `Docked`, `Commander` | Where the commander is and who they are; all four are plain field maps |
+| [`market_event_parser.py`](backend/src/services/market_event_parser.py:1) | `MarketBuy`, `MarketSell` | One parser for both, because they are the same shape. Direction is carried as a flag so the hold derivation never has to know journal spellings |
 
 `parse_construction_depot` normalises:
 
@@ -410,9 +413,22 @@ Key carrier endpoints:
 - `GET /api/carriers/current/state`: reconstructed snapshot including:
   - Identity + services
   - Buy and sell orders from `CarrierTradeOrder` events
+  - The per-commodity hold, with the age of the export it is anchored on and any tonnage it cannot account for (see below)
   - Capacity metrics from `CarrierStats.SpaceUsage`
   - `space_usage` breakdown (when present)
   - Market.json merge to avoid “missing order” artefacts when the journal only emits deltas
+
+### 6.1 The carrier hold
+
+Elite Dangerous emits no carrier inventory event, so [`carrier_hold.py`](backend/src/services/carrier_hold.py:1) derives one. Three sources, two of which produce it and one of which checks it:
+
+- **`Market.json` `Stock` is the anchor.** It is absolute; it is also the carrier's real hold rather than only what is listed for sale. The game rewrites it when the commander docks and opens the carrier's commodity market, so it is a snapshot rather than a live reading.
+- **`MarketBuy` and `MarketSell` against the carrier's own market move it afterwards.** Buying takes tonnage out; selling puts tonnage in. These are why those two events are parsed at all.
+- **`CarrierStats.SpaceUsage.Cargo` is an independent total**, so the difference against the summed hold is surfaced rather than hidden. Zero means the snapshot still agrees with the carrier.
+
+**The snapshot is the anchor, never a starting guess.** Reconstructing a hold from transactions alone was measured against 629 `CarrierStats` samples from a real carrier and matched none of them, drifting by up to 4,880 tonnes and producing impossible negatives, because cargo also moves by routes the commander's own journal never records. Every derived tonnage is therefore clamped at zero.
+
+What the carrier **holds** and what it is **offering** are separate questions. A sell order's `Stock` is the tonnage attached to that order and stays journal-derived; the hold covers every commodity aboard whether or not it carries an order. Reading one as the other is what previously hid cargo with no sell order against it.
 - `GET /api/carriers/mine`: known own/squadron carriers derived from recent `CarrierStats`/`CarrierLocation`.
 
 Key colonisation endpoints:

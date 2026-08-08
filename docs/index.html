@@ -265,7 +265,7 @@
       "featureList": [
         "Journal-driven tracking of colonisation construction sites",
         "Per-system shopping list of commodities still needed, with progress",
-        "Fleet carrier cargo, market orders and capacity in one view",
+        "Per-commodity fleet carrier hold, market orders and capacity in one view",
         "Per-system station and base-landing tracking",
         "Browser HUD accessible from a tablet over the local network",
         "Local-first with no cloud, no account and no telemetry"
@@ -315,7 +315,7 @@
         {
           "@type": "Question",
           "name": "What does EDCA track?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's cargo, market orders and capacity, all from your journal." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's hold, market orders and capacity, all from your journal." }
         },
         {
           "@type": "Question",
@@ -375,7 +375,7 @@
         <div class="card">
           <div class="icon">&#128752;</div>
           <h3>Fleet carrier logistics</h3>
-          <p>Your carrier's cargo, market buy and sell orders and capacity breakdown in one place, rebuilt from your journal and Market.json.</p>
+          <p>What your carrier is actually holding, commodity by commodity, alongside its buy and sell orders plus its capacity breakdown. The hold is a real inventory rather than a list of what you happen to have on sale; it also says how current it is.</p>
         </div>
         <div class="card">
           <div class="icon">&#128506;</div>
@@ -400,8 +400,8 @@
       <div class="shot">
         <img src="assets/screenshot-systems.png" loading="lazy" alt="The EDCA system view: a per-system shopping list aggregating the colonisation commodities still needed across construction sites, each with progress, average payment and the sites that need it">
         <p class="caption">System view: the shopping list of commodities still needed across a system's construction sites.</p>
-        <img src="assets/screenshot-carrier.png" loading="lazy" alt="The EDCA fleet carrier view showing carrier cargo, market buy and sell orders and capacity usage">
-        <p class="caption">Fleet carrier view: cargo, market orders and capacity, rebuilt from your journal.</p>
+        <img src="assets/screenshot-carrier.png" loading="lazy" alt="The EDCA fleet carrier view showing the per-commodity carrier hold, market buy and sell orders and capacity usage">
+        <p class="caption">Fleet carrier view: the hold, market orders and capacity, rebuilt from your journal.</p>
       </div>
     </section>
 
@@ -458,7 +458,7 @@
         </div>
         <div class="card">
           <h3>What does EDCA track?</h3>
-          <p>Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's cargo, market orders and capacity, all from your journal.</p>
+          <p>Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's hold, market orders and capacity, all from your journal.</p>
         </div>
         <div class="card">
           <h3>Can I use EDCA on a tablet?</h3>

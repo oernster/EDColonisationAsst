@@ -108,6 +108,14 @@ otherwise.
 - Qt widget behaviour is not unit-tested (see the omit rationale above);
   anything worth asserting is factored out of the widgets into plain
   Python first.
+- The one exception is thread affinity, in
+  [`test_worker_threading.py`](tests/installer/test_worker_threading.py). It
+  touches no widget and uses `QCoreApplication`, so it needs no display and is
+  not a fragile UI test. It asserts the property whose absence crashed the
+  setup program: a signal connected to a bare callable has no receiver whose
+  thread Qt can consult, so it runs in the sender's thread. Widget calls then
+  happen off the interface thread and a cleanup that joins the worker joins
+  itself. That is measured here rather than assumed anywhere.
 
 ### The installer suite
 

@@ -255,9 +255,18 @@ test in [tests/installer/](tests/installer) that fails if it does.
 One behaviour is deliberately outside that list: every long operation runs
 on a worker thread and reports back through signals, so the window stays
 responsive without re-entering the event loop from inside the copy. The
-worker is Qt, so it sits in `installer/ui` outside the coverage gate and is
-verified by running the installer, not by a test. What it drives (the phase
-spans and the per-file progress) is gated: `test_copy_tree_reports_progress_across_the_phase`,
+worker is Qt, so it sits in `installer/ui` outside the coverage gate. The one
+property that matters is asserted anyway in
+`tests/installer/test_worker_threading.py`: **the outcome is delivered on the
+interface thread.** A Qt signal connected to a bare callable has no receiver
+whose thread affinity Qt can consult, so it degrades to a direct connection
+and runs in the sender's thread. That put widget calls and modal dialogs on
+the worker thread; it also made the cleanup join the very thread it ran on. Every
+worker signal is now connected to a bound method of `OperationRunner`, which
+lives on the interface thread. The thread is joined before the callback
+runs so a callback may safely close the window. What the worker drives (the
+phase spans and the per-file progress) is gated:
+`test_copy_tree_reports_progress_across_the_phase`,
 `test_scaled_maps_progress_into_the_phase_span`.
 
 ---

@@ -13,7 +13,8 @@ No spreadsheets. No manual tracking. Runs locally.
 Replaces manual tracking with automatic, journal-driven state.
 
 - Tracks colonisation construction sites directly from your journal data  
-- Shows fleet carrier cargo and market orders in one place  
+- Shows what your fleet carrier is actually holding, commodity by commodity  
+- Shows fleet carrier buy and sell orders in one place  
 - Updates automatically as you play  
 - Runs entirely locally (no external services, no accounts) 
 
@@ -65,7 +66,7 @@ install directory, the shortcuts and the sign-in entry.
 
 ## Fleet carrier data and journal updates
 
-EDCA's Fleet Carrier view (cargo and market orders) is built from your local Elite Dangerous journal data.
+EDCA's Fleet Carrier view (the hold plus market orders) is built from your local Elite Dangerous journal data.
 
 Internally, EDCA:
 
@@ -84,6 +85,15 @@ This has two important consequences:
 EDCA cannot force Elite Dangerous to write new journal data; it can only reflect what is actually present in your local `Journal.*.log` files.
 
 > **Tip:** The Fleet Carrier UI uses the carrier capacity breakdown from `CarrierStats.SpaceUsage` when available (TotalCapacity, Crew/ModulePacks usage, Cargo usage and reserved space for buy orders).
+
+### What the carrier is holding
+
+The game emits no carrier inventory event, so the **Cargo** tab derives one. The per-commodity hold is anchored on the `Stock` column of your carrier's own market export, which is the real hold rather than only what you have listed for sale. It is then carried forward by your own purchases and sales against the carrier.
+
+Two things follow from that:
+
+- The breakdown only refreshes when you **dock at the carrier and open its commodity market**, because that is when the game rewrites the export. The tab shows how old that reading is rather than presenting it as live.
+- Cargo can also move by routes your journal never records, for example another commander trading at your carrier. `CarrierStats` reports the carrier's own total independently, so where that total disagrees with the summed breakdown, the tab reports the difference instead of quietly showing a wrong number.
 
 > **Note:** Because this is not a code‑signed commercial product, Windows SmartScreen
 > (and some antivirus tools) may warn that the installer or runtime is from an

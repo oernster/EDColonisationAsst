@@ -20,9 +20,9 @@ Three things are asserted here.
 * **Module size.** No file over `_MAX_LINES` lines outside an explicit
   allowlist of the files that were already over it when this rule arrived.
 
-The size scan covers TypeScript as well as Python. Four of the files over the
-limit are front-end components, so a scan that walked `*.py` only would report
-a clean repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript
+The size scan covers TypeScript as well as Python. Three of the files still
+over the limit are front-end, so a scan that walked `*.py` only would report a
+clean repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript
 is measured but not parsed: the import rules are Python only.
 
 Delivery scripts (`buildexe.py`, `buildinstaller.py`) are deliberately outside
@@ -76,11 +76,9 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. journal_parser.py is the one to take next: it is the
-        # largest remaining file here and its per-event parsers are already
-        # separate functions. Splitting it does not settle the open question in
-        # TECH_DEBT item 3 about the US spellings; leave that ruling alone.
-        "backend/src/services/journal_parser.py",
+        # Backend source. colonisation_repository.py is the one to take next:
+        # it is the largest remaining file here; it is also the only one where a
+        # split has to keep every write inside the transaction it is in today.
         "backend/src/repositories/colonisation_repository.py",
         "backend/src/runtime/launcher_components.py",
         # Front end. useKeepAwake.ts shows the project already knows how to

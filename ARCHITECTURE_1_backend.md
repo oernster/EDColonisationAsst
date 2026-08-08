@@ -62,7 +62,10 @@ backend/
 │   │   └── tray_components.py         # Dev tray helpers
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── journal_parser.py          # Parses Journal.*.log events
+│   │   ├── journal_parser.py          # Relevance, file walk and line dispatch
+│   │   ├── colonisation_event_parser.py # The two events whose format changed
+│   │   ├── carrier_event_parser.py    # The three fleet carrier events
+│   │   ├── commander_event_parser.py  # Location, FSDJump, Docked, Commander
 │   │   ├── startup_ingestion.py       # First-run backfill and repeat-run tail sync
 │   │   ├── journal_ingestion.py       # Watchdog boundary; routes parsed events
 │   │   ├── journal_tail_reader.py     # Incremental byte-offset reads of a journal
@@ -105,7 +108,7 @@ On startup, the lifespan context manager `lifespan(app)`:
    - [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130)
    - [`DataAggregator`](backend/src/services/data_aggregator.py:37)
    - [`SystemTracker`](backend/src/services/system_tracker.py:1)
-   - [`JournalParser`](backend/src/services/journal_parser.py:39)
+   - [`JournalParser`](backend/src/services/journal_parser.py:71)
    - [`FileWatcher`](backend/src/services/file_watcher.py:39)
 
 3. Stores them on `app.state` and wires dependencies:
@@ -275,51 +278,36 @@ Concurrency:
 
 ### 6.1 Parser
 
-[`JournalParser`](backend/src/services/journal_parser.py:39) is responsible for parsing individual journal lines and files.
+[`JournalParser`](backend/src/services/journal_parser.py:71) owns which events matter, how a file is walked and how a line is dispatched. The per-event parsing lives in three modules beside it, grouped by how much work each group does.
 
 - `parse_file(path) -> list[JournalEvent]`:
   - Iterates lines in `Journal.*.log` and calls `parse_line()`.
+  - One unreadable line is logged and skipped; one unreadable file yields an empty list. Neither abandons the rest.
 
 - `parse_line(line: str) -> Optional[JournalEvent]`:
-  - Parses JSON.
-  - Filters to **relevant events**:
+  - Parses JSON and reads the timestamp.
+  - Filters to `RELEVANT_EVENTS`, then looks the event up in `_EVENT_PARSERS` and calls it. The table replaced an if/elif chain that restated every event name a second time.
+  - `RELEVANT_EVENTS` stays a separate `ClassVar` because it is a subclass extension point; a subclass that widens it past what the table knows gets `None` rather than an exception.
 
-    ```python
-    RELEVANT_EVENTS = {
-        "ColonisationConstructionDepot",
-        "ColonisationConstructionDepot",
-        "ColonisationContribution",
-        "ColonisationContribution",
-        "Location",
-        "FSDJump",
-        "Docked",
-        "Commander",
-        "CarrierLocation",
-        "CarrierStats",
-        "CarrierTradeOrder",
-    }
-    ```
+The nine parsers, by module:
 
-  - Dispatches to internal handlers:
-    - `_parse_construction_depot(...)`
-    - `_parse_contribution(...)`
-    - `_parse_location(...)`
-    - `_parse_fsd_jump(...)`
-    - `_parse_docked(...)`
-    - `_parse_commander(...)`
-    - `_parse_carrier_location(...)`
-    - `_parse_carrier_stats(...)`
-    - `_parse_carrier_trade_order(...)`
+| Module | Events | Why they are together |
+|---|---|---|
+| [`colonisation_event_parser.py`](backend/src/services/colonisation_event_parser.py:1) | `ColonisationConstructionDepot`, `ColonisationContribution` | The only two whose journal format has changed in service, so the only two carrying real normalisation |
+| [`carrier_event_parser.py`](backend/src/services/carrier_event_parser.py:1) | `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder` | The fleet carrier feature area, reconciled downstream by `carrier_identity` and `carrier_orders` |
+| [`commander_event_parser.py`](backend/src/services/commander_event_parser.py:1) | `Location`, `FSDJump`, `Docked`, `Commander` | Where the commander is and who they are; all four are plain field maps |
 
-- `_parse_construction_depot` normalises:
+`parse_construction_depot` normalises:
 
   - Old `Commodities` arrays with `Total`/`Delivered`.
   - New `ResourcesRequired` arrays with `RequiredAmount`/`ProvidedAmount`.
+  - Missing station and system fields, which fall back to placeholders rather than raising.
 
-- `_parse_contribution` supports both:
+`parse_contribution` supports both:
 
   - Legacy flat schema (`Commodity`, `TotalQuantity`).
   - New `ColonisationContribution` with `Contributions: [{Name, Name_Localised, Amount}]`.
+  - Anything else raises `ValueError`, which `parse_line` turns into a warning and a `None`.
 
 ### 6.2 Ingestion and system tracking
 

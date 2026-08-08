@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Six files are over the 400-line module cap
+## 1. Five files are over the 400-line module cap
 
-Thirteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267 and `main.py` from 494 to 306. All eight oversized test modules were then split by the surface each set of tests exercises.
+Fourteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306 and `journal_parser.py` from 488 to 180. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,13 +22,12 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Six entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+Five entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
-| 488 | `backend/src/services/journal_parser.py` |
 | 470 | `backend/src/repositories/colonisation_repository.py` |
 | 425 | `backend/src/runtime/launcher_components.py` |
 | 406 | `frontend/src/hooks/useKeepAwake.ts` |
@@ -47,7 +46,11 @@ What came out of `App.tsx`, with why each piece is one: `theme.ts` (62) because 
 
 The three identical `change_bus.bump()` guards became one `notify_clients_best_effort`, which is why `main.py` no longer imports `change_bus` at all.
 
-What is left is three backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `journal_parser.py` at 488 is the largest on the backend. Splitting it does not settle item 3 below.
+`journal_parser.py` split on an observation its own code made: not one of the nine `_parse_*` methods touched `self`. They are now module-level functions in three modules grouped by how much work each does: `colonisation_event_parser.py` (206) holds the two events whose journal format has changed in service and therefore all the normalisation, `carrier_event_parser.py` (140) the three fleet carrier events and `commander_event_parser.py` (92) the four plain field maps. What is left in `journal_parser.py` (180) is relevance, the file walk and the dispatch.
+
+The if/elif dispatch chain became a `_EVENT_PARSERS` table, which is what removes the second restatement of every event name. `RELEVANT_EVENTS` is deliberately NOT derived from that table: a test subclass widens it and an eventual ruling on item 3 might too, so it stays a separate extension point with `parse_line` handling a name the table does not know. Nothing about the split touches item 3, which is still open. No test changed: every one of them goes through `parse_line` or `parse_file`, so coverage stayed at 100% untouched.
+
+What is left is two backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `colonisation_repository.py` at 470 is the largest on the backend.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 
@@ -61,14 +64,14 @@ Two steps, in order. Add a flat `eslint.config.js` with the TypeScript and React
 
 ## 3. The US spelling of the colonisation events is documented but not implemented
 
-`journal_parser.py` said it three times over: `RELEVANT_EVENTS` is commented "accept both US and UK spellings", the dispatch reaches for the parsers through set literals shaped to hold more than one name each; `_parse_construction_depot`'s docstring lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats it handles.
+The parser says it twice over: `RELEVANT_EVENTS` in `journal_parser.py` is commented "accept both US and UK spellings"; `parse_construction_depot` in `colonisation_event_parser.py` lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats its docstring claims to handle. It said it a third time through a dispatch chain whose set literals were shaped to hold more than one name each; that chain is now a lookup table, so the claim no longer has a place to hide.
 
 None of it is there. The set held `"ColonisationContribution"` twice, which is how it went unnoticed: a set deduplicates, so the second entry was invisible at runtime and the slot that should have carried the z-spelling was silently consumed. `Coloniz` does not appear anywhere in `backend/src` or `backend/tests`. Any journal line carrying `ColonizationConstructionDepot` or `ColonizationContribution` is dropped by the `event_type not in RELEVANT_EVENTS` guard before any parser sees it.
 
 The duplicate is removed, which is a no-op at runtime and is as far as this should go without a decision. **Needs a ruling**, because both directions change something:
 
-- Implement it: add both z-spellings to `RELEVANT_EVENTS` and to the two dispatch sets. That makes the parser start accepting events it currently drops, which is a behaviour change and wants a test with a real US-spelled journal line.
-- Delete the claim: strip the three mentions so nothing promises a capability the parser does not have.
+- Implement it: add both z-spellings to `RELEVANT_EVENTS` and to `_EVENT_PARSERS`, pointing at the same two functions. That makes the parser start accepting events it currently drops, which is a behaviour change and wants a test with a real US-spelled journal line.
+- Delete the claim: strip both mentions so nothing promises a capability the parser does not have.
 
 I would implement it, because the game writes what it writes and dropping an event silently is the worse failure. It needs your call on whether Frontier ever emits the z-spelling; if they never have, deleting the claim is the honest and cheaper answer.
 

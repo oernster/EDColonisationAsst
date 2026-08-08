@@ -15,6 +15,14 @@ import {
 // the commander is not docked at a carrier, not a failure worth reporting.
 const NOT_FOUND = 404;
 
+/**
+ * The detail views available for the carrier you are docked at.
+ *
+ * Named rather than indexed so that adding a view cannot silently renumber
+ * the others.
+ */
+export type CarrierViewTab = 'market' | 'cargo' | 'status';
+
 interface CarrierStoreState {
   // Current docked carrier (real-time, based on latest journal events)
   currentCarrierInfo: CurrentCarrierResponse | null;
@@ -33,7 +41,7 @@ interface CarrierStoreState {
   myCarriersError: string | null;
 
   // UI state: active Fleet Carrier detail tab
-  carrierViewTab: 'cargo' | 'market';
+  carrierViewTab: CarrierViewTab;
 
   // Actions
   loadCurrentCarrier: () => Promise<void>;
@@ -42,7 +50,7 @@ interface CarrierStoreState {
   // Refresh that *does* show loading state (manual user action).
   forceRefreshCurrentCarrier: () => Promise<void>;
   loadMyCarriers: () => Promise<void>;
-  setCarrierViewTab: (tab: 'cargo' | 'market') => void;
+  setCarrierViewTab: (tab: CarrierViewTab) => void;
   clearCarrierError: () => void;
 }
 

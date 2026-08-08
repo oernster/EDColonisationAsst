@@ -8,11 +8,12 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { useCarrierStore } from '../../stores/carrierStore';
+import { CarrierViewTab, useCarrierStore } from '../../stores/carrierStore';
 import { CarrierIdentity } from '../../types/fleetCarriers';
 import { CarrierCargoSection } from './CarrierCargoSection';
 import { CarrierIdentityList } from './CarrierIdentityList';
 import { CarrierMarketSection } from './CarrierMarketSection';
+import { CarrierStatusSection } from './CarrierStatusSection';
 import { CurrentCarrierHeader } from './CurrentCarrierHeader';
 
 /**
@@ -25,8 +26,18 @@ import { CurrentCarrierHeader } from './CurrentCarrierHeader';
  */
 const DOCKED_POLL_INTERVAL_MS = 5000;
 
-/** Tab index 0 is the left-most tab: Market on the left, Cargo on the right. */
-const MARKET_TAB_INDEX = 0;
+/**
+ * The detail tabs, in the order they appear.
+ *
+ * MUI addresses tabs by index, so the order lives here once and the index is
+ * derived from it. Adding a tab used to mean remembering which number each
+ * view had become.
+ */
+const CARRIER_TABS: { value: CarrierViewTab; label: string }[] = [
+  { value: 'market', label: 'Market' },
+  { value: 'cargo', label: 'Cargo' },
+  { value: 'status', label: 'Status' },
+];
 
 const a11yProps = (index: number) => ({
   id: `carrier-tab-${index}`,
@@ -76,8 +87,15 @@ export const FleetCarriersPanel = () => {
   }, [refreshCurrentCarrier, loadMyCarriers]);
 
   const handleCarrierViewTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setCarrierViewTab(newValue === MARKET_TAB_INDEX ? 'market' : 'cargo');
+    setCarrierViewTab(CARRIER_TABS[newValue].value);
   };
+
+  // A tab removed from the list while it was the selected one would otherwise
+  // leave MUI with an index of -1 and no tab highlighted.
+  const activeTabIndex = Math.max(
+    0,
+    CARRIER_TABS.findIndex((tab) => tab.value === carrierViewTab),
+  );
 
   const dockedIdentity: CarrierIdentity | null =
     currentCarrierInfo && currentCarrierInfo.docked_at_carrier
@@ -128,14 +146,15 @@ export const FleetCarriersPanel = () => {
           <>
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
               <Tabs
-                value={carrierViewTab === 'market' ? 0 : 1}
+                value={activeTabIndex}
                 onChange={handleCarrierViewTabChange}
                 aria-label="carrier detail tabs"
                 textColor="primary"
                 indicatorColor="primary"
               >
-                <Tab label="Market" {...a11yProps(0)} />
-                <Tab label="Cargo" {...a11yProps(1)} />
+                {CARRIER_TABS.map((tab, index) => (
+                  <Tab key={tab.value} label={tab.label} {...a11yProps(index)} />
+                ))}
               </Tabs>
             </Box>
 
@@ -157,6 +176,9 @@ export const FleetCarriersPanel = () => {
                 buyOrders={currentCarrierState.buy_orders}
                 sellOrders={currentCarrierState.sell_orders}
               />
+            )}
+            {carrierViewTab === 'status' && (
+              <CarrierStatusSection status={currentCarrierState.status ?? null} />
             )}
           </>
         )}

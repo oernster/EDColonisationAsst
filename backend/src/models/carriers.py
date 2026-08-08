@@ -13,6 +13,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from .carrier_status import CarrierStatus
+
 
 class CarrierRole(str, Enum):
     """Role of a carrier relative to the current commander."""
@@ -300,6 +302,14 @@ class CarrierState(BaseModel):
             "(trade orders exist "
             "but are too old to trust), 'market_export' (Market.json "
             "snapshot) or 'none'."
+        ),
+    )
+    status: CarrierStatus | None = Field(
+        default=None,
+        description=(
+            "How the carrier is running: fuel, jump range, balances and crew, "
+            "read from the same CarrierStats event as the space usage above. "
+            "None when no CarrierStats has been seen for this carrier."
         ),
     )
     snapshot_time: datetime = Field(

@@ -89,6 +89,50 @@ export interface CarrierSpaceUsage {
   free_space?: number | null;
 }
 
+/**
+ * The carrier's balances and the tax it charges for its services.
+ *
+ * Every field is optional: the journal has changed shape across game updates,
+ * so a missing number means "not reported" and never zero.
+ */
+export interface CarrierFinance {
+  carrier_balance?: number | null;
+  reserve_balance?: number | null;
+  available_balance?: number | null;
+  reserve_percent?: number | null;
+  tax_rate_rearm?: number | null;
+  tax_rate_refuel?: number | null;
+  tax_rate_repair?: number | null;
+}
+
+/**
+ * One crew position aboard the carrier.
+ *
+ * A position exists whether or not it has been hired, which is what
+ * `activated` says. `enabled` is the narrower question of whether a hired
+ * service is currently switched on, and the journal reports it only for
+ * activated roles.
+ */
+export interface CarrierCrewMember {
+  role: string;
+  activated: boolean;
+  enabled?: boolean | null;
+  name?: string | null;
+}
+
+/** How the carrier is running, as opposed to what it is carrying. */
+export interface CarrierStatus {
+  /** Tritium in the carrier's own tank, in tonnes. */
+  fuel_level?: number | null;
+  /** How far it can jump right now, in light years. */
+  jump_range_current?: number | null;
+  jump_range_max?: number | null;
+  /** Scheduled to be scrapped, which ends with the carrier and its cargo gone. */
+  pending_decommission: boolean;
+  finance?: CarrierFinance | null;
+  crew: CarrierCrewMember[];
+}
+
 export interface CarrierState {
   identity: CarrierIdentity;
   /**
@@ -149,6 +193,11 @@ export interface CarrierState {
     | 'stale'
     | 'none'
     | null;
+  /**
+   * Fuel, jump range, balances and crew, read from the same CarrierStats
+   * event as the space usage. Null when no CarrierStats has been seen.
+   */
+  status?: CarrierStatus | null;
   snapshot_time: string;
 }
 

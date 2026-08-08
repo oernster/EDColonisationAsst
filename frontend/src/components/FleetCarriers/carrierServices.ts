@@ -65,7 +65,17 @@ export const formatServiceName = (service: string) => {
   if (!name) {
     return service
   }
-  return name.charAt(0).toUpperCase() + name.slice(1)
+
+  // Crew roles arrive as CamelCase (BlackMarket, VoucherRedemption) where
+  // station services arrive lowercase, so splitting on an interior capital
+  // reads the first correctly and leaves the second untouched.
+  name = name.replace(/([a-z])([A-Z])/g, '$1 $2')
+
+  const [first, ...rest] = name.split(' ')
+  return [
+    first.charAt(0).toUpperCase() + first.slice(1),
+    ...rest.map((word) => word.toLowerCase()),
+  ].join(' ')
 }
 
 /**

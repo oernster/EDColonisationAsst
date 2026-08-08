@@ -57,6 +57,7 @@ from .carrier_naming import (
     _prettify_commodity_name,
 )
 from .carrier_orders import build_orders_for_carrier
+from .carrier_status import derive_carrier_status
 from .carrier_transit import derive_carrier_transit
 
 logger = get_logger(__name__)
@@ -297,6 +298,7 @@ def build_current_carrier_state_response(
         buy_orders=buy_orders,
         sell_orders=sell_orders,
         trade_orders_scope=trade_orders_scope,
+        status=derive_carrier_status(stats),
         snapshot_time=snapshot_time,
     )
     return CarrierStateResponse(carrier=state)

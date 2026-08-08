@@ -7,6 +7,7 @@ latest Elite: Dangerous journal file; no additional persistence is used.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -29,6 +30,17 @@ from ..utils.logger import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/carriers", tags=["carriers"])
+
+
+def _now() -> datetime:
+    """The current UTC time.
+
+    The only wall-clock read in the carrier stack. The services below take it
+    as an argument so they stay deterministic under test; retiring a booked
+    carrier jump the application never saw complete is the one question they
+    cannot answer from journal events alone.
+    """
+    return datetime.now(UTC)
 
 
 def _load_recent_journal_events() -> tuple[list[JournalEvent], Path | None, str | None]:
@@ -87,7 +99,7 @@ async def get_current_carrier() -> CurrentCarrierResponse:
     enriching it with CarrierStats/CarrierLocation where available.
     """
     events, _journal_dir, _ = _load_recent_journal_events()
-    return build_current_carrier_response(events)
+    return build_current_carrier_response(events, now=_now())
 
 
 @router.get("/current/state", response_model=CarrierStateResponse)
@@ -107,7 +119,9 @@ async def get_current_carrier_state() -> CarrierStateResponse:
     if not events:
         raise HTTPException(status_code=404, detail="No journal data available")
 
-    response = build_current_carrier_state_response(events, journal_dir=journal_dir)
+    response = build_current_carrier_state_response(
+        events, journal_dir=journal_dir, now=_now()
+    )
     if response is None:
         raise HTTPException(
             status_code=404,
@@ -126,4 +140,4 @@ async def get_my_carriers() -> MyCarriersResponse:
     exposes for this commander.
     """
     events, _journal_dir, _ = _load_recent_journal_events()
-    return build_my_carriers_response(events)
+    return build_my_carriers_response(events, now=_now())

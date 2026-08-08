@@ -6,6 +6,8 @@ groups by carrier id rather than reconstructing one carrier's state.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from ..models.api_models import (
     MyCarriersResponse,
 )
@@ -20,11 +22,16 @@ from ..models.journal_events import (
 )
 from ..utils.logger import get_logger
 from .carrier_identity import build_identity_from_journal
+from .carrier_transit import derive_carrier_transit
 
 logger = get_logger(__name__)
 
 
-def build_my_carriers_response(events: list[JournalEvent]) -> MyCarriersResponse:
+def build_my_carriers_response(
+    events: list[JournalEvent],
+    *,
+    now: datetime | None = None,
+) -> MyCarriersResponse:
     """Build MyCarriersResponse listing the commander's Fleet carriers.
 
     This mirrors the behaviour of the original /api/carriers/mine logic:
@@ -38,6 +45,12 @@ def build_my_carriers_response(events: list[JournalEvent]) -> MyCarriersResponse
       otherwise.
     - Does not infer an explicit separate 'squadron carrier' list from
       DockingAccess; squadron_carriers remains empty.
+    - Derives each carrier's transit state, so a row can say the carrier is
+      on its way somewhere rather than only where it was last seen.
+
+    Args:
+        events: The journal event stream, oldest first.
+        now: Current time, passed through to the transit derivation.
     """
     if not events:
         return MyCarriersResponse(own_carriers=[], squadron_carriers=[])
@@ -66,9 +79,10 @@ def build_my_carriers_response(events: list[JournalEvent]) -> MyCarriersResponse
 
         location = latest_location_by_id.get(carrier_id)
         docked = latest_docked_by_market_id.get(carrier_id)
+        transit = derive_carrier_transit(events, carrier_id, now=now)
 
         if docked is not None:
-            identity = build_identity_from_journal(docked, event, location)
+            identity = build_identity_from_journal(docked, event, location, transit)
         else:
             fake_docked = DockedEvent(
                 timestamp=event.timestamp,
@@ -84,7 +98,9 @@ def build_my_carriers_response(events: list[JournalEvent]) -> MyCarriersResponse
                 station_economies=[],
                 raw_data=event.raw_data,
             )
-            identity = build_identity_from_journal(fake_docked, event, location)
+            identity = build_identity_from_journal(
+                fake_docked, event, location, transit
+            )
 
         own_carriers.append(identity)
 

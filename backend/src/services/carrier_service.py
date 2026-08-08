@@ -18,7 +18,7 @@ helps keep API modules under the desired line length threshold.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..models.api_models import (
@@ -29,7 +29,9 @@ from ..models.carriers import (
     CarrierState,
 )
 from ..models.journal_events import (
+    CarrierStatsEvent,
     CarrierTradeOrderEvent,
+    DockedEvent,
     JournalEvent,
     MarketTransactionEvent,
 )
@@ -55,6 +57,7 @@ from .carrier_naming import (
     _prettify_commodity_name,
 )
 from .carrier_orders import build_orders_for_carrier
+from .carrier_transit import derive_carrier_transit
 
 logger = get_logger(__name__)
 
@@ -66,6 +69,7 @@ __all__ = [
     "build_identity_from_journal",
     "build_my_carriers_response",
     "build_orders_for_carrier",
+    "derive_carrier_transit",
     "find_latest_carrier_location_for_id",
     "find_latest_carrier_stats_for_callsign",
     "find_latest_carrier_stats_for_id",
@@ -89,10 +93,32 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
+def _journal_carrier_id(
+    docked_carrier: DockedEvent,
+    stats: CarrierStatsEvent | None,
+) -> int:
+    """Return the CarrierID the jump events are keyed by.
+
+    CarrierJumpRequest and CarrierJumpCancelled both carry CarrierID, which is
+    what CarrierStats reports. Docked.MarketID usually matches it and is the
+    only key available when no CarrierStats has been seen.
+    """
+    if stats is not None:
+        return stats.carrier_id
+    return docked_carrier.market_id
+
+
 def build_current_carrier_response(
     events: list[JournalEvent],
+    *,
+    now: datetime | None = None,
 ) -> CurrentCarrierResponse:
-    """Construct CurrentCarrierResponse from a sequence of journal events."""
+    """Construct CurrentCarrierResponse from a sequence of journal events.
+
+    Args:
+        events: The journal event stream, oldest first.
+        now: Current time, passed through to the transit derivation.
+    """
     if not events:
         return CurrentCarrierResponse(docked_at_carrier=False, carrier=None)
 
@@ -102,7 +128,10 @@ def build_current_carrier_response(
 
     stats = find_latest_carrier_stats_for_id(events, docked_carrier.market_id)
     location = find_latest_carrier_location_for_id(events, docked_carrier.market_id)
-    identity = build_identity_from_journal(docked_carrier, stats, location)
+    transit = derive_carrier_transit(
+        events, _journal_carrier_id(docked_carrier, stats), now=now
+    )
+    identity = build_identity_from_journal(docked_carrier, stats, location, transit)
 
     return CurrentCarrierResponse(docked_at_carrier=True, carrier=identity)
 
@@ -111,8 +140,14 @@ def build_current_carrier_state_response(
     events: list[JournalEvent],
     *,
     journal_dir: Path | None = None,
+    now: datetime | None = None,
 ) -> CarrierStateResponse | None:
     """Construct CarrierStateResponse for the currently docked carrier.
+
+    Args:
+        events: The journal event stream, oldest first.
+        journal_dir: Where to look for the Market.json export.
+        now: Current time, passed through to the transit derivation.
 
     Returns:
         CarrierStateResponse if a Fleet carrier docking context can be
@@ -138,7 +173,10 @@ def build_current_carrier_state_response(
         # If Docked.MarketID does not match CarrierID, CarrierLocation will also
         # typically be keyed by CarrierID.
         location = find_latest_carrier_location_for_id(events, stats.carrier_id)
-    identity = build_identity_from_journal(docked_carrier, stats, location)
+    transit = derive_carrier_transit(
+        events, _journal_carrier_id(docked_carrier, stats), now=now
+    )
+    identity = build_identity_from_journal(docked_carrier, stats, location, transit)
 
     carrier_trade_id = identity.carrier_id or docked_carrier.market_id
 

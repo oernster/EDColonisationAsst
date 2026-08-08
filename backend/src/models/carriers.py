@@ -22,6 +22,43 @@ class CarrierRole(str, Enum):
     OTHER = "other"
 
 
+class CarrierTransitState(str, Enum):
+    """Where a carrier is, as opposed to where it was last seen.
+
+    A carrier is never docked: it is holding station in a star system or it
+    is between two of them. A cancelled jump is not a third state, it simply
+    returns the carrier to PARKED.
+    """
+
+    PARKED = "parked"
+    IN_TRANSIT = "in_transit"
+
+
+class CarrierTransit(BaseModel):
+    """A carrier's movement state derived from its jump events."""
+
+    state: CarrierTransitState = Field(
+        description="Whether the carrier is holding station or between systems."
+    )
+    destination_system: str | None = Field(
+        default=None,
+        description=("Star system the carrier is jumping to. None when it is parked."),
+    )
+    destination_body: str | None = Field(
+        default=None,
+        description=(
+            "Body the carrier will hold at on arrival, when the journal named one."
+        ),
+    )
+    departure_time: datetime | None = Field(
+        default=None,
+        description=(
+            "When the carrier leaves, which is what a countdown runs against. "
+            "None when the journal did not carry one."
+        ),
+    )
+
+
 class CarrierIdentity(BaseModel):
     """High-level identity of a fleet carrier."""
 
@@ -69,6 +106,14 @@ class CarrierIdentity(BaseModel):
             "CarrierStats.Crew (activated crew roles) and StationServices on the "
             "Docked/CarrierStats events (e.g. exploration, outfitting, "
             "pioneersupplies, vistagenomics, bartender)."
+        ),
+    )
+    transit: CarrierTransit | None = Field(
+        default=None,
+        description=(
+            "Whether the carrier is holding station or jumping, derived from its "
+            "CarrierJumpRequest, CarrierJumpCancelled and CarrierLocation events. "
+            "None when the journals carry no jump history for it at all."
         ),
     )
 

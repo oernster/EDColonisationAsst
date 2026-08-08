@@ -1,9 +1,12 @@
-"""Parsers for the three fleet carrier journal events.
+"""Parsers for the fleet carrier journal events.
 
 `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` are what the carrier
 services in this package reconcile into a single carrier identity, its market
-and its orders. Each parser here is a field map onto the typed event; the
-reconciliation itself belongs to carrier_identity and carrier_orders.
+and its orders. `CarrierJumpRequest` and `CarrierJumpCancelled` are what
+carrier_transit reconciles, with CarrierLocation, into where the carrier is
+right now. Each parser here is a field map onto the typed event; the
+reconciliation itself belongs to carrier_identity, carrier_orders and
+carrier_transit.
 
 The one rule that is not obvious is the sentinel in the trade order, which is
 recorded at that function rather than here.
@@ -15,6 +18,8 @@ from datetime import datetime
 from typing import Any
 
 from ..models.journal_events import (
+    CarrierJumpCancelledEvent,
+    CarrierJumpRequestEvent,
     CarrierLocationEvent,
     CarrierStatsEvent,
     CarrierTradeOrderEvent,
@@ -85,6 +90,68 @@ def parse_carrier_stats(
     )
 
 
+def parse_carrier_jump_request(
+    data: dict[str, Any],
+    timestamp: datetime,
+) -> CarrierJumpRequestEvent:
+    """Parse CarrierJumpRequest event.
+
+    Example (from your journal):
+
+        {
+          "timestamp":"2026-06-16T19:53:56Z",
+          "event":"CarrierJumpRequest",
+          "CarrierType":"FleetCarrier",
+          "CarrierID":3700569600,
+          "SystemName":"Fong Wang",
+          "Body":"Fong Wang 4",
+          "SystemAddress":3274669295979,
+          "BodyID":14,
+          "DepartureTime":"2026-06-16T20:09:10Z"
+        }
+    """
+    departure_raw = data.get("DepartureTime")
+    departure_time = (
+        datetime.fromisoformat(departure_raw)
+        if isinstance(departure_raw, str) and departure_raw
+        else None
+    )
+
+    return CarrierJumpRequestEvent(
+        timestamp=timestamp,
+        event=data["event"],
+        carrier_id=data["CarrierID"],
+        system_name=data["SystemName"],
+        system_address=data["SystemAddress"],
+        body=data.get("Body"),
+        departure_time=departure_time,
+        raw_data=data,
+    )
+
+
+def parse_carrier_jump_cancelled(
+    data: dict[str, Any],
+    timestamp: datetime,
+) -> CarrierJumpCancelledEvent:
+    """Parse CarrierJumpCancelled event.
+
+    Example (from your journal):
+
+        {
+          "timestamp":"2026-04-18T16:29:19Z",
+          "event":"CarrierJumpCancelled",
+          "CarrierType":"FleetCarrier",
+          "CarrierID":3700569600
+        }
+    """
+    return CarrierJumpCancelledEvent(
+        timestamp=timestamp,
+        event=data["event"],
+        carrier_id=data["CarrierID"],
+        raw_data=data,
+    )
+
+
 def parse_carrier_trade_order(
     data: dict[str, Any],
     timestamp: datetime,
@@ -134,6 +201,8 @@ def parse_carrier_trade_order(
 
 
 __all__ = [
+    "parse_carrier_jump_cancelled",
+    "parse_carrier_jump_request",
     "parse_carrier_location",
     "parse_carrier_stats",
     "parse_carrier_trade_order",

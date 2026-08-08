@@ -8,6 +8,28 @@
 
 export type CarrierRole = 'own' | 'squadron' | 'other';
 
+/**
+ * Whether a carrier is holding station or has a jump booked.
+ *
+ * A carrier is never docked anywhere: it sits in a star system, or it has a
+ * jump scheduled and is on its way out. A cancelled jump is not a third
+ * state, it simply returns the carrier to parked.
+ */
+export type CarrierTransitState = 'parked' | 'in_transit';
+
+export interface CarrierTransit {
+  state: CarrierTransitState;
+  /** Star system being jumped to. Null while parked. */
+  destination_system?: string | null;
+  /** Body the carrier will hold at, when the journal named one. */
+  destination_body?: string | null;
+  /**
+   * When the carrier leaves, which is what the countdown runs against. The
+   * carrier stays put in its current system until this moment.
+   */
+  departure_time?: string | null;
+}
+
 export interface CarrierIdentity {
   carrier_id: number | null;
   market_id?: number | null;
@@ -26,6 +48,12 @@ export interface CarrierIdentity {
    * derived from CarrierStats.Services or StationServices on the Docked event.
    */
   services?: string[] | null;
+  /**
+   * Whether the carrier is holding station or has a jump booked, derived from
+   * its jump and location events. Null when the journals carry no jump
+   * history for it at all, which is not the same as knowing it is parked.
+   */
+  transit?: CarrierTransit | null;
 }
 
 export interface CarrierCargoItem {

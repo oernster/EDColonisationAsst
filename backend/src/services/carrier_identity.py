@@ -11,6 +11,7 @@ from __future__ import annotations
 from ..models.carriers import (
     CarrierIdentity,
     CarrierRole,
+    CarrierTransit,
 )
 from ..models.journal_events import (
     CarrierLocationEvent,
@@ -26,6 +27,7 @@ def build_identity_from_journal(
     docked_event: DockedEvent,
     stats: CarrierStatsEvent | None,
     location: CarrierLocationEvent | None,
+    transit: CarrierTransit | None = None,
 ) -> CarrierIdentity:
     """Construct a CarrierIdentity from journal events.
 
@@ -35,6 +37,8 @@ def build_identity_from_journal(
     - Current journal data does not reliably distinguish an official
       squadron carrier from a personal carrier with squadron docking
       access, so we do *not* infer CarrierRole.SQUADRON here.
+    - Transit state is derived separately (see carrier_transit) and passed
+      in, so that every surface showing a carrier shows the same answer.
     """
     # Fleet carriers expose both a Docked.MarketID and
     # CarrierStats/CarrierTradeOrder.CarrierID.
@@ -132,4 +136,5 @@ def build_identity_from_journal(
         last_seen_system=last_seen_system,
         last_seen_timestamp=last_seen_timestamp,
         services=services,
+        transit=transit,
     )

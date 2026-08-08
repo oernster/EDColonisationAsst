@@ -5,16 +5,16 @@ These tests need no shared scaffolding beyond their own imports.
 """
 
 import json
+
 from src.models.journal_events import (
+    CarrierJumpCancelledEvent,
+    CarrierJumpRequestEvent,
     ColonisationConstructionDepotEvent,
     ColonisationContributionEvent,
-    LocationEvent,
-    FSDJumpEvent,
-    DockedEvent,
     CommanderEvent,
-    CarrierLocationEvent,
-    CarrierStatsEvent,
-    CarrierTradeOrderEvent,
+    DockedEvent,
+    FSDJumpEvent,
+    LocationEvent,
 )
 
 
@@ -178,6 +178,59 @@ def test_parse_commander_event(parser):
     assert isinstance(event, CommanderEvent)
     assert event.name == "CMDR Test"
     assert event.fid == "ABC123"
+
+
+def test_parse_carrier_jump_request_event(parser):
+    """A booked carrier jump, verbatim from the journal."""
+    line = (
+        '{ "timestamp":"2026-06-16T19:53:56Z", "event":"CarrierJumpRequest", '
+        '"CarrierType":"FleetCarrier", "CarrierID":3700569600, '
+        '"SystemName":"Fong Wang", "Body":"Fong Wang 4", '
+        '"SystemAddress":3274669295979, "BodyID":14, '
+        '"DepartureTime":"2026-06-16T20:09:10Z" }'
+    )
+
+    event = parser.parse_line(line)
+
+    assert event is not None
+    assert isinstance(event, CarrierJumpRequestEvent)
+    assert event.carrier_id == 3700569600
+    assert event.system_name == "Fong Wang"
+    assert event.system_address == 3274669295979
+    assert event.body == "Fong Wang 4"
+    assert event.departure_time is not None
+    assert event.departure_time.hour == 20
+    assert event.departure_time.minute == 9
+
+
+def test_parse_carrier_jump_request_without_a_departure_time(parser):
+    """Older journals omit DepartureTime and Body; the jump still parses."""
+    line = (
+        '{"timestamp":"2026-06-16T19:53:56Z","event":"CarrierJumpRequest",'
+        '"CarrierID":3700569600,"SystemName":"Fong Wang",'
+        '"SystemAddress":3274669295979}'
+    )
+
+    event = parser.parse_line(line)
+
+    assert event is not None
+    assert isinstance(event, CarrierJumpRequestEvent)
+    assert event.departure_time is None
+    assert event.body is None
+
+
+def test_parse_carrier_jump_cancelled_event(parser):
+    """An abandoned jump carries nothing but the carrier it belongs to."""
+    line = (
+        '{ "timestamp":"2026-04-18T16:29:19Z", "event":"CarrierJumpCancelled", '
+        '"CarrierType":"FleetCarrier", "CarrierID":3700569600 }'
+    )
+
+    event = parser.parse_line(line)
+
+    assert event is not None
+    assert isinstance(event, CarrierJumpCancelledEvent)
+    assert event.carrier_id == 3700569600
 
 
 def test_parse_irrelevant_event(parser):

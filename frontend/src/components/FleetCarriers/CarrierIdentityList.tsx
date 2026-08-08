@@ -1,5 +1,6 @@
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import { CarrierIdentity } from '../../types/fleetCarriers';
+import { CarrierTransitChip } from './CarrierTransitChip';
 import { formatServiceName, visibleServicesSorted } from './carrierServices';
 
 interface CarrierIdentityListProps {
@@ -105,6 +106,12 @@ export const CarrierIdentityList = ({
                   sx={{ maxWidth: LOCATION_CHIP_MAX_WIDTH }}
                 />
               )}
+              {/* Beside the system, not instead of it: the carrier is still
+                  sitting there until its departure time comes round. */}
+              <CarrierTransitChip
+                transit={carrier.transit}
+                maxWidth={LOCATION_CHIP_MAX_WIDTH}
+              />
               {isDockedHere && (
                 /* This says where the COMMANDER is, not the carrier. Reading
                    "Currently docked" as a fact about the carrier is the

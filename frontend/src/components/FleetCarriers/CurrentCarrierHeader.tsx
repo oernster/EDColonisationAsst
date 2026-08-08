@@ -1,5 +1,6 @@
 import { Box, Chip, Stack, Typography } from '@mui/material';
 import { CarrierIdentity, CarrierState } from '../../types/fleetCarriers';
+import { CarrierTransitChip } from './CarrierTransitChip';
 import {
   formatDockingAccess,
   formatServiceName,
@@ -93,6 +94,9 @@ export const CurrentCarrierHeader = ({
                 size="small"
               />
             )}
+            {/* Sits beside the system rather than replacing it: a booked jump
+                does not move the carrier, it leaves at its departure time. */}
+            <CarrierTransitChip transit={dockedIdentity.transit} />
             {carrierState?.total_cargo_tonnage != null && (
               <Chip
                 label={`Cargo: ${carrierState.total_cargo_tonnage.toLocaleString()} t`}

@@ -126,6 +126,43 @@ class CarrierStatsEvent(JournalEvent):
     )
 
 
+class CarrierJumpRequestEvent(JournalEvent):
+    """CarrierJumpRequest event - a jump booked to another star system.
+
+    A carrier is never docked anywhere: it sits in a star system or it is
+    between them. This event opens the second case. The carrier stays put
+    until DepartureTime, which is roughly fifteen to twenty minutes out, so
+    the pending window is long enough to be worth showing with a countdown.
+
+    Arrival is not this event's business: it is a CarrierLocation for the
+    same carrier at the requested SystemAddress. See carrier_transit.
+    """
+
+    carrier_id: int = Field(description="Unique carrier ID")
+    system_name: str = Field(description="Destination star system name")
+    system_address: int = Field(description="Destination system address")
+    body: str | None = Field(
+        default=None, description="Destination body the carrier will hold at"
+    )
+    departure_time: datetime | None = Field(
+        default=None,
+        description=(
+            "When the carrier leaves. Absent in older journals, which costs "
+            "the countdown but not the in-transit state itself."
+        ),
+    )
+
+
+class CarrierJumpCancelledEvent(JournalEvent):
+    """CarrierJumpCancelled event - a booked jump abandoned before departure.
+
+    Carries nothing but the carrier id: which jump it cancels is decided by
+    time order, since only the newest request can be outstanding.
+    """
+
+    carrier_id: int = Field(description="Unique carrier ID")
+
+
 class CarrierTradeOrderEvent(JournalEvent):
     """
     CarrierTradeOrder event - buy or sell orders configured on a fleet carrier.

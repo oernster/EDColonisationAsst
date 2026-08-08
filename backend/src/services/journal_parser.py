@@ -29,6 +29,8 @@ from typing import Any, ClassVar
 from ..models.journal_events import JournalEvent
 from ..utils.logger import get_logger
 from .carrier_event_parser import (
+    parse_carrier_jump_cancelled,
+    parse_carrier_jump_request,
     parse_carrier_location,
     parse_carrier_stats,
     parse_carrier_trade_order,
@@ -57,6 +59,8 @@ _EVENT_PARSERS: dict[str, EventParser] = {
     "CarrierLocation": parse_carrier_location,
     "CarrierStats": parse_carrier_stats,
     "CarrierTradeOrder": parse_carrier_trade_order,
+    "CarrierJumpRequest": parse_carrier_jump_request,
+    "CarrierJumpCancelled": parse_carrier_jump_cancelled,
     "MarketBuy": parse_market_transaction,
     "MarketSell": parse_market_transaction,
 }
@@ -95,6 +99,10 @@ class JournalParser(IJournalParser):
         "CarrierLocation",
         "CarrierStats",
         "CarrierTradeOrder",
+        # Fleet carrier movement. A booked jump and its abandonment; arrival
+        # is a CarrierLocation, so it needs no event of its own here.
+        "CarrierJumpRequest",
+        "CarrierJumpCancelled",
         # Market transactions. Only those against the commander's own carrier
         # are used, purely to carry a Market.json hold snapshot forward.
         "MarketBuy",

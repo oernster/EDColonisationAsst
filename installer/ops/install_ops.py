@@ -19,7 +19,7 @@ from pathlib import Path
 from installer.constants import APP_DISPLAY_NAME, FALLBACK_VERSION
 from installer.ops.commands import CommandRunner, default_runner
 from installer.ops.copy_tree import copy_tree, count_files
-from installer.ops.errors import AppRunningError
+from installer.ops.errors import AppRunningError, RuntimeExeError
 from installer.ops.paths import (
     directory_size_kb,
     installed_exe,
@@ -64,6 +64,13 @@ APP_RUNNING_MESSAGE = (
     "is open. Close it from the system tray, then try again."
 )
 
+RUNTIME_EXE_FAILED_MESSAGE = (
+    f"{APP_DISPLAY_NAME} could not write its program file to {{target}}. The "
+    "installation is incomplete and would still run the previous version, so "
+    "it has been stopped rather than reported as finished. Close the "
+    "application if it is open, then run this installer again."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class InstallOptions:
@@ -82,25 +89,36 @@ def guard_not_running(runner: CommandRunner | None = None) -> None:
 
 
 def ensure_runtime_exe(install_dir: Path) -> Path | None:
-    """Make sure the runtime executable is present in an install directory.
+    """Write the bundled runtime executable into an install directory.
 
     Nuitka strips loose executables out of an included data directory, so the
-    copied payload may arrive without one. The runtime is embedded a second
-    time under its own directory for exactly this case, and is recovered from
-    there. Best effort: a failure leaves the shortcuts to be skipped rather
-    than failing an install whose files are already down.
+    copied payload arrives WITHOUT one and this is the only path that delivers
+    the application binary. It therefore overwrites rather than skipping what
+    is already there: on a reinstall or an upgrade, the executable at the
+    target is the PREVIOUS version's.
+
+    Skipping the copy because the target existed is the defect this replaces,
+    since that target is exactly the file needing replacement. It made a
+    first install correct and every reinstall a no-op for the one file that
+    carries the code, so the user kept running the old build while VERSION, the
+    icon and the licence beside it were all refreshed. In the field that showed
+    up as a 3.0.0 install whose splash reported 2.9.0, against an executable
+    months older than the files next to it.
+
+    A missing bundled runtime is not fatal: whatever is already installed is
+    left alone rather than a working install being broken. A copy that fails is
+    fatal, because the alternative is reporting success over a stale binary.
     """
     target = installed_exe(install_dir)
-    if target.is_file():
-        return target
     source = bundled_runtime_exe()
     if source is None:
-        return None
+        return target if target.is_file() else None
+
     try:
         install_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-    except OSError:
-        return None
+    except OSError as exc:
+        raise RuntimeExeError(RUNTIME_EXE_FAILED_MESSAGE.format(target=target)) from exc
     return target
 
 

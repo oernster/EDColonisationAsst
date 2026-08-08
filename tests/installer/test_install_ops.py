@@ -24,7 +24,7 @@ from installer.constants import (
     UNINSTALLER_NAME,
     VERSION_FILE_NAME,
 )
-from installer.ops.errors import AppRunningError, PayloadError
+from installer.ops.errors import AppRunningError, PayloadError, RuntimeExeError
 from installer.ops.install_ops import (
     InstallOptions,
     copy_uninstaller,
@@ -76,13 +76,28 @@ def test_guard_not_running_refuses_while_the_app_holds_its_files() -> None:
         guard_not_running(FakeRunner([running_result()]))
 
 
-def test_ensure_runtime_exe_leaves_a_copied_executable_alone(tmp_path: Path) -> None:
+def test_ensure_runtime_exe_replaces_the_previous_installs_executable(
+    bundle: Path, tmp_path: Path
+) -> None:
+    """A reinstall must overwrite the executable that is already there.
+
+    This is the only path that delivers the runtime, because Nuitka strips
+    loose executables out of an included data directory, so copy_tree never
+    writes one. An executable found at the target therefore belongs to the
+    PREVIOUS install; skipping the copy because it exists is how a reinstall
+    kept running the old build while every data file beside it was updated,
+    observed in the field as a 3.0.0 VERSION file sitting next to a 2.9.0
+    executable months older than it.
+    """
     install_dir = tmp_path / "installed"
     install_dir.mkdir()
-    already = install_dir / EXE_NAME
-    already.write_bytes(b"copied")
+    stale = install_dir / EXE_NAME
+    stale.write_bytes(b"the previous version")
 
-    assert ensure_runtime_exe(install_dir) == already
+    replaced = ensure_runtime_exe(install_dir)
+
+    assert replaced == stale
+    assert stale.read_bytes() == b"runtime"
 
 
 def test_ensure_runtime_exe_recovers_the_embedded_copy(
@@ -103,13 +118,33 @@ def test_ensure_runtime_exe_reports_nothing_when_none_is_bundled(
     assert ensure_runtime_exe(tmp_path / "installed") is None
 
 
-def test_ensure_runtime_exe_reports_nothing_when_the_copy_fails(
+def test_ensure_runtime_exe_fails_loudly_when_the_copy_fails(
     bundle: Path, tmp_path: Path
 ) -> None:
+    """A failure to write the binary must stop the install, not be swallowed.
+
+    Returning None here let the install carry on and report success while the
+    previous version's executable stayed on disk, which is indistinguishable to
+    the user from an install that worked.
+    """
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory", encoding="utf-8")
 
-    assert ensure_runtime_exe(blocked) is None
+    with pytest.raises(RuntimeExeError):
+        ensure_runtime_exe(blocked)
+
+
+def test_ensure_runtime_exe_keeps_an_install_when_nothing_is_bundled(
+    staged_payload: Path, tmp_path: Path
+) -> None:
+    """With no bundled runtime, leave a working install alone rather than break it."""
+    install_dir = tmp_path / "installed"
+    install_dir.mkdir()
+    existing = install_dir / EXE_NAME
+    existing.write_bytes(b"already installed")
+
+    assert ensure_runtime_exe(install_dir) == existing
+    assert existing.read_bytes() == b"already installed"
 
 
 def test_copy_uninstaller_places_a_copy_under_the_install(tmp_path: Path) -> None:

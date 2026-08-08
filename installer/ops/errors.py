@@ -31,6 +31,17 @@ class UnsafePayloadEntryError(PayloadError):
     """
 
 
+class RuntimeExeError(InstallerError):
+    """The runtime executable could not be written into the install directory.
+
+    Raised rather than tolerated. This is the only path that delivers the
+    application binary, so an install that swallows a failure here leaves the
+    PREVIOUS version on disk with every data file around it updated, then
+    reports success. That is not a degraded install; it is a wrong one that
+    looks right, which cost a release cycle to spot.
+    """
+
+
 class AppRunningError(InstallerError):
     """The application is running, so its files cannot be replaced or removed."""
 

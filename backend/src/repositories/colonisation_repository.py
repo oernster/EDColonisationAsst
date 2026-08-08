@@ -1,88 +1,42 @@
-"""Colonisation data repository"""
+"""Colonisation data repository.
+
+`ColonisationRepository` is the only thing in the application that reads or
+writes the colonisation database. Two concerns were lifted out of it once it
+passed the module cap, both chosen because neither takes part in a query's
+transaction:
+
+- colonisation_db: where the file is, what schema version it holds and how a
+  connection is opened. All of it runs once, in `__init__`, before any lock.
+- colonisation_mapping: rebuilding a `ConstructionSite` from a row and
+  normalising a commodity key. Both are pure.
+
+Concurrency, which did not move and must not:
+
+- `self._lock` is a non-reentrant `asyncio.Lock`. Every method that opens a
+  connection takes it. Every method that calls one of those must NOT take it
+  as well or it deadlocks, which is why `get_stats` and `update_commodity` are
+  the two without it: they are composed of the others.
+- Each connection is opened inside its own `with` block, so one transaction
+  never spans two methods. `update_commodity` is therefore a read and a write
+  in two separate transactions, not one; the comment on it records why.
+"""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
 from datetime import UTC, datetime
 import json
-import os
-from pathlib import Path
 import sqlite3
 
-from ..models.colonisation import Commodity, ConstructionSite
+from ..models.colonisation import ConstructionSite
 from ..utils.logger import get_logger
-from ..utils.runtime import is_frozen
+from .colonisation_db import ColonisationDatabase, resolve_db_file
+from .colonisation_mapping import normalise_commodity_key, row_to_site
 
 logger = get_logger(__name__)
 
-
-def _get_db_file() -> Path:
-    """
-    Determine the location of the colonisation SQLite database.
-
-    - In DEV mode (non-frozen): keep the DB next to backend/src as before:
-        backend/colonisation.db
-
-    - In FROZEN mode (packaged EXE via Nuitka): store the DB under a
-      user-local, writable directory so it persists across runs and does
-      not live in Nuitka's temporary onefile extraction directory:
-
-        %LOCALAPPDATA%\\EDColonisationAsst\\colonisation.db
-
-      If LOCALAPPDATA is not set for any reason, fall back to the user's
-      home directory.
-    """
-    if not is_frozen():
-        return Path(__file__).parent.parent / "colonisation.db"
-
-    local_appdata = os.environ.get("LOCALAPPDATA")
-    if local_appdata:
-        base = Path(local_appdata) / "EDColonisationAsst"
-    else:
-        base = Path.home() / ".edcolonisationasst"
-
-    return base / "colonisation.db"
-
-
-def _normalise_commodity_key(name: str) -> str:
-    """Normalise a journal commodity identifier into a stable key.
-
-    Elite Dangerous sometimes uses slightly different strings for the same
-    underlying commodity across events, for example:
-
-      - "aluminium"
-      - "$Aluminium_Name;"
-
-    To ensure ColonisationContribution events can always be matched to the
-    commodities discovered via ColonisationConstructionDepot snapshots, we
-    convert both sides to a canonical, lower-case token:
-
-      - strip surrounding whitespace
-      - lower-case
-      - strip a leading "$" and trailing ";" if present
-      - strip a trailing "_name" suffix if present
-
-    The original, user-facing name remains in Commodity.name_localised.
-    """
-    key = name.strip().lower()
-    if not key:
-        return key
-
-    # Strip journal-style wrappers like "$Aluminium_Name;"
-    if key.startswith("$") and key.endswith(";"):
-        key = key[1:-1]
-
-    # Strip a trailing "_name" suffix if present.
-    key = key.removesuffix("_name")
-
-    return key
-
-
-DB_FILE = _get_db_file()
-
-# Increment this when we make a breaking change to the on-disk schema for the
-# colonisation database. The repository will reset (delete and recreate) any
-# existing DB that does not advertise this version in its metadata table.
-CURRENT_DB_SCHEMA_VERSION = 1
+DB_FILE = resolve_db_file()
 
 
 class IColonisationRepository(ABC):
@@ -130,138 +84,14 @@ class ColonisationRepository(IColonisationRepository):
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
-        self._initialise_database()
+        # Read at construction rather than per query. DB_FILE is a module
+        # constant in production; the tests that redirect it do so before
+        # building the repository.
+        self._database = ColonisationDatabase(DB_FILE)
+        self._database.initialise()
 
-    def _get_db_connection(self):
-        # Ensure the parent directory for the DB exists before connecting,
-        # especially in FROZEN mode where we store the DB under
-        # %LOCALAPPDATA%\\EDColonisationAsst.
-        db_dir = DB_FILE.parent
-        try:
-            db_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            logger.error("Failed to create DB directory %s: %s", db_dir, exc)
-            # Let sqlite3.connect raise a clearer error below.
-        return sqlite3.connect(DB_FILE)
-
-    def _create_tables(self) -> None:
-        """Create database tables if they don't exist."""
-        with self._get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS construction_sites (
-                    market_id INTEGER PRIMARY KEY,
-                    station_name TEXT NOT NULL,
-                    station_type TEXT,
-                    system_name TEXT NOT NULL,
-                    system_address INTEGER,
-                    construction_progress REAL,
-                    construction_complete BOOLEAN,
-                    construction_failed BOOLEAN,
-                    commodities TEXT,
-                    last_updated TEXT
-                )
-            """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS metadata (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-            """
-            )
-            conn.commit()
-
-    def _get_schema_version(self) -> int | None:
-        """
-        Read the current schema version from the metadata table, if present.
-
-        Returns:
-            The stored integer schema version, None if missing or invalid.
-        """
-        try:
-            with self._get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT value FROM metadata WHERE key = 'db_schema_version'"
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                return int(row[0])
-        except sqlite3.Error as exc:
-            # Reading a metadata row can only fail as a sqlite3.Error here: a missing
-            # table on a pre-migration database, a locked file. Treating the version
-            # as unknown triggers the migration path.
-            logger.warning(
-                "Failed to read db_schema_version from metadata; "
-                "treating as unknown: %s",
-                exc,
-            )
-            return None
-
-    def _set_schema_version(self, version: int) -> None:
-        """Persist the given schema version into the metadata table."""
-        with self._get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO metadata (key, value)
-                VALUES ('db_schema_version', ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                """,
-                (str(version),),
-            )
-            conn.commit()
-
-    def _initialise_database(self) -> None:
-        """
-        Ensure the on-disk database matches the expected schema version.
-
-        Behaviour:
-            - If no DB file exists, create it, create tables and set the current
-              schema version.
-            - If a DB file exists but has no version metadata or a different
-              version, delete it once and recreate it with the current schema
-              version.
-
-        On first run (or after reset), the FastAPI lifespan helper
-        `prime_colonisation_database_if_empty` is responsible for repopulating
-        the fresh DB from the user's journal files.
-        """
-        # If the DB file does not exist at all, just create it and stamp the
-        # version.
-        if not DB_FILE.exists():
-            self._create_tables()
-            self._set_schema_version(CURRENT_DB_SCHEMA_VERSION)
-            return
-
-        # DB file exists; check metadata.
-        current_version = self._get_schema_version()
-        if current_version == CURRENT_DB_SCHEMA_VERSION:
-            return
-
-        # Unknown or outdated schema. Remove the file once and recreate it.
-        try:
-            DB_FILE.unlink()
-            logger.info(
-                "Deleted existing colonisation DB at %s due to missing or "
-                "outdated schema metadata; a fresh DB will be created.",
-                DB_FILE,
-            )
-        except FileNotFoundError:
-            # Someone else may have removed it; that's fine.
-            pass
-        except OSError as exc:
-            # unlink() fails as OSError: the file being held open by another process,
-            # a permissions problem. Both are worth reporting to the user rather than
-            # crashing the reset.
-            logger.error("Failed to delete colonisation DB %s: %s", DB_FILE, exc)
-
-        self._create_tables()
-        self._set_schema_version(CURRENT_DB_SCHEMA_VERSION)
+    def _get_db_connection(self) -> sqlite3.Connection:
+        return self._database.connect()
 
     async def add_construction_site(self, site: ConstructionSite) -> None:
         async with self._lock:
@@ -309,7 +139,7 @@ class ColonisationRepository(IColonisationRepository):
                     "SELECT * FROM construction_sites WHERE market_id = ?", (market_id,)
                 )
                 row = cursor.fetchone()
-                return self._row_to_site(row) if row else None
+                return row_to_site(row) if row else None
 
     async def get_sites_by_system(self, system_name: str) -> list[ConstructionSite]:
         async with self._lock:
@@ -322,7 +152,7 @@ class ColonisationRepository(IColonisationRepository):
                     (system_name,),
                 )
                 rows = cursor.fetchall()
-                return [self._row_to_site(row) for row in rows if row]
+                return [row_to_site(row) for row in rows if row]
 
     async def get_all_systems(self) -> list[str]:
         async with self._lock:
@@ -347,11 +177,14 @@ class ColonisationRepository(IColonisationRepository):
                     "ORDER BY system_name, station_name"
                 )
                 rows = cursor.fetchall()
-                return [self._row_to_site(row) for row in rows if row]
+                return [row_to_site(row) for row in rows if row]
 
     async def get_stats(self) -> dict[str, int]:
         """
         Get basic statistics about stored construction sites.
+
+        Does not take the lock. get_all_sites below takes it and the lock is
+        not reentrant.
 
         Returns:
             Dict[str, int]: {
@@ -364,13 +197,11 @@ class ColonisationRepository(IColonisationRepository):
         sites = await self.get_all_sites()
         total_sites = len(sites)
         completed_sites = sum(1 for s in sites if s.construction_complete)
-        in_progress_sites = total_sites - completed_sites
-        total_systems = len({s.system_name for s in sites})
 
         stats = {
-            "total_systems": total_systems,
+            "total_systems": len({s.system_name for s in sites}),
             "total_sites": total_sites,
-            "in_progress_sites": in_progress_sites,
+            "in_progress_sites": total_sites - completed_sites,
             "completed_sites": completed_sites,
         }
         logger.info(f"REPOSITORY: Stats calculated: {stats}")
@@ -387,14 +218,15 @@ class ColonisationRepository(IColonisationRepository):
             because both get_site_by_market_id() and add_construction_site()
             handle their own locking. Acquiring the lock here and then calling
             those methods would result in a deadlock with the non-reentrant
-            asyncio.Lock.
+            asyncio.Lock. The read and the write are therefore two separate
+            transactions rather than one.
 
         Matching strategy:
             Elite Dangerous can emit slightly different identifiers for the
             same commodity across events (e.g. "aluminium" vs
             "$Aluminium_Name;"). To ensure ColonisationContribution events
             update the correct Commodity row even when the raw strings differ,
-            we compare normalised keys derived via _normalise_commodity_key(...)
+            we compare normalised keys derived via normalise_commodity_key(...)
             on both the stored commodity name and the incoming commodity_name.
         """
         site = await self.get_site_by_market_id(market_id)
@@ -404,7 +236,7 @@ class ColonisationRepository(IColonisationRepository):
             )
             return
 
-        target_key = _normalise_commodity_key(commodity_name)
+        target_key = normalise_commodity_key(commodity_name)
         if not target_key:
             logger.warning(
                 "Cannot update commodity: empty commodity name for market ID %s",
@@ -414,7 +246,7 @@ class ColonisationRepository(IColonisationRepository):
 
         updated = False
         for commodity in site.commodities:
-            if _normalise_commodity_key(commodity.name) == target_key:
+            if normalise_commodity_key(commodity.name) == target_key:
                 # Use the latest observed cumulative total. Journal semantics
                 # guarantee that TotalQuantity is non-decreasing, so a simple
                 # assignment is sufficient; however, guard against any
@@ -425,16 +257,7 @@ class ColonisationRepository(IColonisationRepository):
                 updated = True
                 break
 
-        if updated:
-            await self.add_construction_site(site)
-            logger.debug(
-                "Updated commodity %s at %s (market_id=%s) to provided_amount=%s",
-                commodity_name,
-                site.station_name,
-                market_id,
-                provided_amount,
-            )
-        else:
+        if not updated:
             logger.warning(
                 "Commodity %s (normalised key=%s) not found at site %s (market_id=%s)",
                 commodity_name,
@@ -442,6 +265,16 @@ class ColonisationRepository(IColonisationRepository):
                 site.station_name,
                 market_id,
             )
+            return
+
+        await self.add_construction_site(site)
+        logger.debug(
+            "Updated commodity %s at %s (market_id=%s) to provided_amount=%s",
+            commodity_name,
+            site.station_name,
+            market_id,
+            provided_amount,
+        )
 
     async def clear_all(self) -> None:
         async with self._lock:
@@ -451,20 +284,5 @@ class ColonisationRepository(IColonisationRepository):
                 conn.commit()
             logger.info("Cleared all colonisation data")
 
-    def _row_to_site(self, row: sqlite3.Row) -> ConstructionSite | None:
-        if not row:
-            return None
-        commodities_data = json.loads(row["commodities"])
-        commodities = [Commodity(**c) for c in commodities_data]
-        return ConstructionSite(
-            market_id=row["market_id"],
-            station_name=row["station_name"],
-            station_type=row["station_type"],
-            system_name=row["system_name"],
-            system_address=row["system_address"],
-            construction_progress=row["construction_progress"],
-            construction_complete=row["construction_complete"],
-            construction_failed=row["construction_failed"],
-            commodities=commodities,
-            last_updated=datetime.fromisoformat(row["last_updated"]),
-        )
+
+__all__ = ["DB_FILE", "ColonisationRepository", "IColonisationRepository"]

@@ -76,10 +76,9 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. colonisation_repository.py is the one to take next:
-        # it is the largest remaining file here; it is also the only one where a
-        # split has to keep every write inside the transaction it is in today.
-        "backend/src/repositories/colonisation_repository.py",
+        # Backend source. launcher_components.py is the last one here; it is
+        # the only Qt surface left in the set and sits outside the coverage
+        # gate with the rest of the runtime shell.
         "backend/src/runtime/launcher_components.py",
         # Front end. useKeepAwake.ts shows the project already knows how to
         # move state out of a component and into a hook.

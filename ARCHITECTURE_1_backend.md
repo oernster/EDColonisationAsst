@@ -12,7 +12,7 @@ This document focuses on the **Python backend** of the Elite: Dangerous Colonisa
   - Pydantic v2 + `pydantic-settings` in [`backend/src/config.py`](backend/src/config.py:1)
   - YAML configuration in [`backend/config.yaml`](backend/config.yaml:1)
   - Commander/Inara secrets in `backend/commander.yaml` (user-created from the example)
-- **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130)
+- **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
 - **File watching**: `watchdog` in [`FileWatcher`](backend/src/services/file_watcher.py:1)
 - **HTTP client**: `httpx` (for Inara) in [`backend/src/services/inara_service.py`](backend/src/services/inara_service.py:1)
 - **Live updates**: AJAX long-polling via [`backend/src/api/changes.py`](backend/src/api/changes.py:1) backed by [`ChangeBus`](backend/src/services/change_bus.py:1)
@@ -49,7 +49,9 @@ backend/
 │   │   └── journal_events.py          # Typed journal event models
 │   ├── repositories/
 │   │   ├── __init__.py
-│   │   └── colonisation_repository.py # SQLite-backed repository
+│   │   ├── colonisation_repository.py # SQLite-backed repository
+│   │   ├── colonisation_db.py        # DB location, schema version, connections
+│   │   └── colonisation_mapping.py   # Row to model, commodity key normalisation
 │   ├── runtime/
 │   │   ├── __init__.py
 │   │   ├── app_runtime.py             # Packaged runtime orchestration
@@ -105,7 +107,7 @@ On startup, the lifespan context manager `lifespan(app)`:
 1. Loads configuration via [`get_config()`](backend/src/config.py:1).
 2. Constructs core components:
 
-   - [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130)
+   - [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
    - [`DataAggregator`](backend/src/services/data_aggregator.py:37)
    - [`SystemTracker`](backend/src/services/system_tracker.py:1)
    - [`JournalParser`](backend/src/services/journal_parser.py:71)
@@ -115,7 +117,7 @@ On startup, the lifespan context manager `lifespan(app)`:
 
    - [`set_dependencies`](backend/src/api/routes.py:35) for REST routes.
 
-4. Decides whether this is a first run by reading [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:256) once (`total_sites == 0`), then **schedules the initial journal ingestion as a background task** (`_startup_ingestion` via `asyncio.create_task`) rather than awaiting it inline.
+4. Decides whether this is a first run by reading [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:182) once (`total_sites == 0`), then **schedules the initial journal ingestion as a background task** (`_startup_ingestion` via `asyncio.create_task`) rather than awaiting it inline.
 
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
@@ -133,12 +135,14 @@ Because the heavy ingestion is off the readiness path, `test_lifespan_readiness.
 
 ### 3.2 Automatic DB reset for new installs
 
-The colonisation SQLite DB is located via [`_get_db_file()`](backend/src/repositories/colonisation_repository.py:18), which chooses:
+Everything in this section lives in [`colonisation_db.py`](backend/src/repositories/colonisation_db.py:1). It runs once, at repository construction, before any query and outside the repository lock, which is what lets it sit in a module of its own.
 
-- **Dev mode** (non‑frozen): `backend/colonisation.db`
+The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repositories/colonisation_db.py:42), which chooses:
+
+- **Dev mode** (non‑frozen): `backend/src/colonisation.db`, derived from that module's own location
 - **Frozen/packaged runtime**: `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows or `~/.edcolonisationasst/colonisation.db` on POSIX.
 
-To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130) now:
+To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationDatabase`](backend/src/repositories/colonisation_db.py:75):
 
 - Defines a schema version constant:
 
@@ -146,7 +150,7 @@ To ensure **new installs** and incompatible schema changes start from a clean sl
   CURRENT_DB_SCHEMA_VERSION = 1
   ```
 
-- Creates two tables in [`_create_tables`](backend/src/repositories/colonisation_repository.py:151):
+- Creates two tables in `_create_tables`:
 
   ```sql
   CREATE TABLE IF NOT EXISTS construction_sites (...);
@@ -156,12 +160,12 @@ To ensure **new installs** and incompatible schema changes start from a clean sl
   );
   ```
 
-- On repository initialisation, calls `_initialise_database()`:
+- Is asked by the repository's constructor for `initialise()`:
 
   1. If the DB file **does not exist**:
-     - Creates tables and stamps the current schema version in `metadata` via `_set_schema_version(CURRENT_DB_SCHEMA_VERSION)`.
+     - Creates tables and stamps the current schema version in `metadata`.
   2. If the DB file **exists**:
-     - Reads `db_schema_version` from `metadata` using `_get_schema_version()`.
+     - Reads `db_schema_version` from `metadata` using `read_schema_version()`.
      - If the stored version equals `CURRENT_DB_SCHEMA_VERSION`, it is left as‑is.
      - If the version is missing or different (e.g. from an older install or a manually copied DB), it:
        - Deletes the DB file once.
@@ -236,7 +240,7 @@ Fleet carrier domain models are in [`backend/src/models/carriers.py`](backend/sr
 
 ## 5. Repository and persistence
 
-[`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:130) abstracts the SQLite DB for colonisation data:
+[`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80) abstracts the SQLite DB for colonisation data. It owns the queries and the locking; the file location and schema live in [`colonisation_db.py`](backend/src/repositories/colonisation_db.py:1) and the row-to-model translation in [`colonisation_mapping.py`](backend/src/repositories/colonisation_mapping.py:1).
 
 - Table `construction_sites` holds a row per depot, with `commodities` stored as JSON.
 - Table `metadata` stores `db_schema_version` and future metadata keys.
@@ -261,16 +265,17 @@ Key methods:
 
 - `update_commodity(market_id: int, commodity_name: str, provided_amount: int) -> None`
   - Loads the site.
-  - Normalises `commodity_name` and each `commodity.name` via `_normalise_commodity_key(...)`.
+  - Normalises `commodity_name` and each `commodity.name` via `normalise_commodity_key(...)`.
   - Updates `commodity.provided_amount` using `max(old, new)`.
 
 - `clear_all() -> None`
   - Deletes all rows from `construction_sites` (used by tests and `/api/debug/reload-journals`).
 
-Concurrency:
+Concurrency, which the split deliberately left where it was:
 
-- Uses an `asyncio.Lock` (`self._lock`) to guard compound operations.
-- Methods that call other lock‑taking methods are carefully written to avoid deadlock (e.g. `update_commodity` does not take the lock directly but relies on `get_site_by_market_id` / `add_construction_site` doing so).
+- A non‑reentrant `asyncio.Lock` (`self._lock`) guards every method that opens a connection.
+- A method that calls one of those must therefore NOT take the lock as well. `get_stats` and `update_commodity` are the two composed of the others, so neither takes it.
+- Each connection is opened inside its own `with` block, so one transaction never spans two methods. `update_commodity` is a read and a write in two separate transactions rather than one; that is the price of the deadlock rule above and is recorded on the method.
 
 ---
 

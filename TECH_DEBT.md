@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Five files are over the 400-line module cap
+## 1. Four files are over the 400-line module cap
 
-Fourteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306 and `journal_parser.py` from 488 to 180. All eight oversized test modules were then split by the surface each set of tests exercises.
+Fifteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180 and `colonisation_repository.py` from 470 to 288. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,13 +22,12 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Five entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+Four entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
-| 470 | `backend/src/repositories/colonisation_repository.py` |
 | 425 | `backend/src/runtime/launcher_components.py` |
 | 406 | `frontend/src/hooks/useKeepAwake.ts` |
 
@@ -50,9 +49,11 @@ The three identical `change_bus.bump()` guards became one `notify_clients_best_e
 
 The if/elif dispatch chain became a `_EVENT_PARSERS` table, which is what removes the second restatement of every event name. `RELEVANT_EVENTS` is deliberately NOT derived from that table: a test subclass widens it and an eventual ruling on item 3 might too, so it stays a separate extension point with `parse_line` handling a name the table does not know. Nothing about the split touches item 3, which is still open. No test changed: every one of them goes through `parse_line` or `parse_file`, so coverage stayed at 100% untouched.
 
-What is left is two backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `colonisation_repository.py` at 470 is the largest on the backend.
+`colonisation_repository.py` was the one to be careful with, because it is the only file in this list holding a lock and a transaction boundary. The cut was chosen so that neither moved: `colonisation_db.py` (225) takes the file location, the schema version and the connection, all of which run once in the constructor before any lock exists; `colonisation_mapping.py` (76) takes the row-to-model rebuild and the commodity-key normalisation, both pure. What is left in `colonisation_repository.py` (288) is the queries and the locking, untouched.
 
-`backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
+The lock rule is now stated at the top of the module rather than only on the one method that had to explain itself: the lock is not reentrant, every method that opens a connection takes it and the two composed of those (`get_stats`, `update_commodity`) must not. `update_commodity` remains a read and a write in two transactions rather than one, which is the price of that rule and is recorded where it happens.
+
+What is left is one backend source module and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `launcher_components.py` at 425 is the last on the backend.
 
 ## 2. `npm run lint` cannot run: there is no ESLint configuration
 

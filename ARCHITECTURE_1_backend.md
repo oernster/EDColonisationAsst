@@ -434,12 +434,19 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 
 ## 7. Aggregation and Inara integration
 
+> **The Inara branch is inert in the shipped build.**
+> [`get_system_colonisation_data`](backend/src/services/inara_service.py:36) performs no HTTP request and returns an empty list unconditionally, so `aggregate_by_system` always takes its "no Inara data" path and returns local journal data alone. The reason is upstream: no confirmed INAPI v1 event exposes the construction and colonisation data this feature needs. An earlier attempt was built on community-goal events, which are unrelated and produced misleading errors and logs.
+>
+> The merge rules below therefore describe code that only test doubles reach today. They are documented because they are the contract any future Inara integration must satisfy, not because they currently run. `INARA_API_URL` and the module-level rate-limit and cache state beside it (`_MIN_CALL_INTERVAL_SECONDS`, `_CACHE_TTL`, `_last_call_at`, `_ban_until`, `_rate_limit_lock`, `_system_cache`) are likewise unreferenced, held for that same future call.
+>
+> EDCA makes no outbound request for colonisation data. The only network calls in the packaged runtime are loopback probes against its own backend; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it.
+
 [`DataAggregator`](backend/src/services/data_aggregator.py:37) provides high-level views over `ConstructionSite` data:
 
 - `aggregate_by_system(system_name) -> SystemColonisationData`:
 
   - Fetches local sites via `repository.get_sites_by_system(system_name)`.
-  - Optionally queries Inara via [`InaraService`](backend/src/services/inara_service.py:1) and merges:
+  - Merges those local sites with whatever [`InaraService`](backend/src/services/inara_service.py:1) returns, which in the shipped build is always nothing (see the note above):
 
     - Upgrades local sites to completed when Inara marks them as complete.
     - Adds Inara‑only completed sites.

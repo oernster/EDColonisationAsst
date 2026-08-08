@@ -235,6 +235,10 @@ backend/commander.yaml
 
 # Colonisation database (local dev/runtime state)
 backend/src/colonisation.db
+# The WAL sidecars the database writes beside itself. Ignored for the same
+# reason as the database: they are one machine's local state.
+backend/src/colonisation.db-shm
+backend/src/colonisation.db-wal
 
 # installation files
 EDColonisationAsstInstaller.exe

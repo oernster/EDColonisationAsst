@@ -273,3 +273,35 @@ def test_get_config_posix_custom_path_is_not_overridden(
     cfg = config_mod.get_config()
 
     assert cfg.journal.directory == "/definitely/missing/posix/journals"
+
+
+def test_the_journal_default_uses_detection_when_it_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No path is hardcoded any more: the default is worked out.
+
+    What used to sit here was a literal containing `%USERNAME%`, which is a
+    cmd.exe variable that nothing in Python expands, so the default named a
+    directory that could not exist on any machine.
+    """
+    detected = tmp_path / "Saved Games" / "Frontier Developments" / "Elite Dangerous"
+    detected.mkdir(parents=True)
+    monkeypatch.setattr(journal_mod, "find_journal_directory", lambda: detected)
+
+    assert config_mod._default_journal_directory() == str(detected)
+
+
+def test_the_journal_default_names_the_standard_place_when_detection_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Detection only fails before the game has written any journals.
+
+    Naming the standard location gives the watcher somewhere to look once it
+    does, rather than leaving the directory empty.
+    """
+    monkeypatch.setattr(journal_mod, "find_journal_directory", lambda: None)
+
+    default = config_mod._default_journal_directory()
+
+    assert default.endswith(str(Path("Frontier Developments") / "Elite Dangerous"))
+    assert str(Path.home()) in default

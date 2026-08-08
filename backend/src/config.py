@@ -15,13 +15,35 @@ from .constants import DEFAULT_BACKEND_PORT
 load_dotenv()
 
 
+def _default_journal_directory() -> str:
+    """Where the journals are, worked out rather than assumed.
+
+    This used to be a hardcoded literal containing `%USERNAME%`, which is a
+    cmd.exe variable that nothing in Python expands, so it named a directory
+    that could not exist on any machine. Detection has always been available;
+    it simply was not used here.
+
+    The import is deliberately late. utils/__init__ pulls in the logger, and
+    the logger imports this module, so importing it at the top would be
+    circular.
+    """
+    from .utils.journal import find_journal_directory
+
+    detected = find_journal_directory()
+    if detected is not None:
+        return str(detected)
+
+    # Detection only fails when the game has not written journals yet. Name
+    # the standard location so the watcher has somewhere to look once it does.
+    saved_games = Path.home() / "Saved Games" / "Frontier Developments"
+    return str(saved_games / "Elite Dangerous")
+
+
 class JournalConfig(BaseSettings):
     """Journal file configuration"""
 
     directory: str = Field(
-        default=(
-            r"C:\Users\%USERNAME%\Saved Games\Frontier Developments" "\\Elite Dangerous"
-        ),
+        default_factory=_default_journal_directory,
         description="Path to Elite: Dangerous journal directory",
     )
     watch_interval: float = Field(

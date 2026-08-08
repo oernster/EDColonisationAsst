@@ -1,4 +1,4 @@
-# <img width="64" height="64" alt="edcolonisationasst-icon" src="https://github.com/user-attachments/assets/f840c1d9-f120-448d-ae1c-43dbc6cf0d8a" /> Elite Dangerous Colonisation Assistant (EDCA)
+# <img width="128" height="128" alt="EDColonisationAsst" src="https://github.com/user-attachments/assets/94129dab-d96b-4bf2-8d42-bac5c1fe933f" /> Elite Dangerous Colonisation Assistant (EDCA)
 
 ## Designed for players actively working on colonisation sites and fleet carrier logistics.
 
@@ -33,11 +33,6 @@ Dangerous writes journals per player on the local machine, so EDCA can only
 ever see your own contributions and does not pretend otherwise. It is also
 Windows-only as a packaged release (a source checkout runs on Linux; see
 below); it does nothing at all when the game is not writing journals.
-
----
-
-<img width="1582" height="1248" alt="{D494D007-E38F-465D-9AF5-BF34A431AEF3}" src="https://github.com/user-attachments/assets/9b73bf79-8524-4c58-bd9e-ae8e70fc08ec" />
-<img width="1581" height="1180" alt="{173686A9-ADF6-4BC7-A637-A72F629DFEF4}" src="https://github.com/user-attachments/assets/e52917a0-dc5f-4938-b708-5151eb1f7060" />
 
 ---
 

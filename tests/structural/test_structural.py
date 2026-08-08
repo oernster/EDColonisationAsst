@@ -17,8 +17,9 @@ Three things are asserted here.
 * **Isolation of the setup program.** `installer/` and `installer_main.py`
   import nothing from `backend/`, which is what keeps the compiled onefile down
   to PySide6 plus the standard library.
-* **Module size.** No file over `_MAX_LINES` lines outside an explicit
-  allowlist of the files that were already over it when this rule arrived.
+* **Module size.** No file over `_MAX_LINES` lines. The rule arrived with an
+  allowlist of the files that were already over it; that list is now empty and
+  gone with it, so the cap applies to every scanned file without exception.
 
 The size scan covers TypeScript as well as Python, which is what caught the
 front end at all: a scan walking `*.py` only would have reported a clean
@@ -69,21 +70,6 @@ _SIZE_SCAN_TREES = (
 )
 _SIZE_SCAN_MODULES = (_SETUP_PROGRAM_ENTRY,)
 _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
-
-# Files already over the limit when this rule was introduced. Tracked debt: this
-# set may only shrink. Do not add to it; decompose new code instead.
-# `test_legacy_allowlist_has_no_stale_entries` fails if an entry is no longer
-# over the limit or no longer exists, so an entry cannot outlive its file.
-_LEGACY_OVER_LIMIT = frozenset(
-    {
-        # One file left. useKeepAwake.ts is a hook rather than a component, so
-        # it will not come apart the way the two panels did; its length is the
-        # wake-lock strategies it falls through, not layout. It is linted;
-        # every other file that left this list took a characterisation suite
-        # with it, so it should too.
-        "frontend/src/hooks/useKeepAwake.ts",
-    }
-)
 
 
 def _rel(path: Path) -> str:
@@ -188,23 +174,9 @@ def test_the_setup_program_imports_nothing_from_the_application():
 def test_modules_within_line_limit():
     offenders = []
     for path in _scanned_files():
-        rel = _rel(path)
-        if rel in _LEGACY_OVER_LIMIT:
-            continue
         lines = _line_count(path)
         if lines > _MAX_LINES:
-            offenders.append(f"{rel}: {lines} lines (limit {_MAX_LINES})")
+            offenders.append(f"{_rel(path)}: {lines} lines (limit {_MAX_LINES})")
     assert not offenders, "Files over the line limit (decompose them):\n" + "\n".join(
         sorted(offenders)
     )
-
-
-def test_legacy_allowlist_has_no_stale_entries():
-    stale = []
-    for rel in sorted(_LEGACY_OVER_LIMIT):
-        path = _ROOT / rel
-        if not path.exists():
-            stale.append(f"{rel}: missing (remove from allowlist)")
-        elif _line_count(path) <= _MAX_LINES:
-            stale.append(f"{rel}: now within limit (remove from allowlist)")
-    assert not stale, "Stale legacy allowlist entries:\n" + "\n".join(stale)

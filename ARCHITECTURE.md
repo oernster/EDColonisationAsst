@@ -124,14 +124,14 @@ anything. Before it existed the shape held by habit rather than by rule.
 - **The setup program is a separate program.** It imports nothing from
   `backend/`, which is what keeps the compiled onefile down to PySide6 plus the
   standard library. `test_the_setup_program_imports_nothing_from_the_application`.
-- **No file exceeds 400 lines** outside `_LEGACY_OVER_LIMIT`, the explicit list
-  of the nineteen that were already over it when the rule arrived. The list may
-  only shrink and a stale entry fails the suite, so new code is held to the
-  limit from the first line. `test_modules_within_line_limit`,
-  `test_legacy_allowlist_has_no_stale_entries`.
+- **No file exceeds 400 lines.** The rule arrived with an allowlist of the
+  nineteen that were already over it, which could only shrink and which a
+  staleness test emptied one entry at a time. It is empty, so the allowlist and
+  that test are gone and the cap now applies to every scanned file without
+  exception. `test_modules_within_line_limit`.
 
 The size scan reads TypeScript as well as Python, because four of the nineteen
-are front-end components. `buildexe.py` and `buildinstaller.py` are outside
+were front-end components. `buildexe.py` and `buildinstaller.py` are outside
 every scan: they are linear recipes read top to bottom.
 
 ---

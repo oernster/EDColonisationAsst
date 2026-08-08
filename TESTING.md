@@ -143,7 +143,7 @@ asserts the shape the architecture documents describe. It imports nothing from
 the application: it reads source files and walks their syntax trees, so it adds
 no coverage and costs a fraction of a second.
 
-Five rules:
+Four rules:
 
 - `models` is the innermost layer and imports nothing else from the backend.
 - `repositories` stays free of `api`, `services` and `runtime`; `services`
@@ -152,13 +152,12 @@ Five rules:
   exactly as one at module level.
 - The setup program imports nothing from `backend/`, which is what keeps the
   compiled onefile down to PySide6 plus the standard library.
-- No file exceeds 400 lines outside `_LEGACY_OVER_LIMIT`, the explicit list of
-  the nineteen files that were already over it when the rule arrived. New code
-  is held to the limit from the first line.
-- No allowlist entry is stale: an entry whose file has been decomposed or
-  deleted fails the suite, so the list can only shrink.
+- No file exceeds 400 lines. The rule arrived with an allowlist of the nineteen
+  files that were already over it, which could only shrink and which a staleness
+  test emptied one entry at a time. It is empty, so the allowlist and that test
+  are gone and every scanned file is now held to the limit.
 
-The size scan reads TypeScript as well as Python. Four of the nineteen are
+The size scan reads TypeScript as well as Python. Four of the nineteen were
 front-end components, so a scan that walked `*.py` only would have reported a
 clean repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is
 measured but not parsed: the import rules are Python only.

@@ -48,7 +48,14 @@ frontend/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
     │   └── carrierStore.ts       # Zustand store for Fleet carrier data
     ├── hooks/
-    │   └── (no websocket hooks; live updates use AJAX long-poll in App)
+    │   ├── useLiveUpdates.ts         # AJAX long-poll loop and its backoff
+    │   ├── useBackendMeta.ts         # Version, health and commander name
+    │   ├── useThemeMode.ts           # Theme choice, persisted
+    │   ├── useKeepAwakePreference.ts # Whether the user wants keep-awake
+    │   ├── useKeepAwake.ts           # Which keep-awake strategy is in force
+    │   ├── keepAwakeCapabilities.ts  # Wake Lock, secure context, handheld probes
+    │   ├── keepAwakeVideo.ts         # The hidden fallback video, start to finish
+    │   └── useRepaintHeartbeat.ts    # Compositor nudge alongside a held lock
     ├── types/
     │   ├── colonisation.ts       # Shared frontend types for colonisation data
     │   ├── fleetCarriers.ts      # Types for Fleet carrier data

@@ -217,7 +217,7 @@ footer .mono { font-family: var(--mono); }
 
    The site was one long page. It is now several, so two things have to work
    that did not exist before: a bar that says where you are and what else there
-   is, and a link at the foot of each page that carries the reader on to the
+   is, plus a link at the foot of each page that carries the reader on to the
    next step rather than leaving them at a dead end.
    --------------------------------------------------------------------------- */
 

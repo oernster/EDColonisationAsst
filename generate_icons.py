@@ -105,7 +105,7 @@ SOCIAL_STRAPLINE_COLOUR = (0x95, 0x95, 0x9F)
 SOCIAL_RULE_HEIGHT = 3
 
 # One line, deliberately not the product name: the badge says that already.
-SOCIAL_STRAPLINE = "What still needs hauling, and where to."
+SOCIAL_STRAPLINE = "What still needs hauling and where to."
 SOCIAL_STRAPLINE_SIZE = 34
 
 # The gap between the badge and the strapline, then between the strapline and

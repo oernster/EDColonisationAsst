@@ -2,12 +2,12 @@
 
 The project keeps two icon files at its root and nothing else: the master
 `EDColonisationAsst.png`, which is what the application shows in its own
-windows, and `EDColonisationAsst.ico`, which is what the PE build, the
+windows, plus `EDColonisationAsst.ico`, which is what the PE build, the
 shortcuts and the tray use. This script derives the second from the first, and
 gives the first a transparent background if it arrived without one.
 
 The badge is never resampled. Artwork that arrives flattened onto a background
-is fixed by clearing that background, and a canvas that is not square is fixed
+is fixed by clearing that background; a canvas that is not square is fixed
 by padding it, so every pixel of the badge survives exactly as drawn. The only
 resampling here is the downscale into the icon frames, which is unavoidable.
 Enlarging artwork to fill a canvas is specifically what this script must never
@@ -50,7 +50,25 @@ ICO_FILE = PROJECT_ROOT / "EDColonisationAsst.ico"
 SITE_ICON = PROJECT_ROOT / "docs" / "assets" / "edca-icon.png"
 SITE_ICON_SIZE = 256
 
-# The web UI's own copy: the header badge on every tab, and the browser tab
+# The site's favicon set, at the root of the published directory rather than
+# under assets/, which is where the house style puts it.
+#
+# A single large PNG is not enough on its own. A browser that finds no .ico
+# falls back to /favicon.ico at the DOMAIN root. This site is published
+# under a path on a domain whose root belongs to the profile hub, so the
+# fallback quietly serves a different project's icon. That is the whole defect.
+SITE_FAVICON_ICO = PROJECT_ROOT / "docs" / "favicon.ico"
+SITE_FAVICON_ICO_SIZES = (16, 32, 48)
+
+SITE_FAVICON_PNG = PROJECT_ROOT / "docs" / "favicon-32.png"
+SITE_FAVICON_PNG_SIZE = 32
+
+# Home screen on iOS and iPadOS, which is a real case here: the web UI is meant
+# to be opened on a tablet beside the cockpit.
+SITE_APPLE_TOUCH_ICON = PROJECT_ROOT / "docs" / "apple-touch-icon.png"
+SITE_APPLE_TOUCH_SIZE = 180
+
+# The web UI's own copy: the header badge on every tab, plus the browser tab
 # icon. Written from here for the same reason as the site's copy, so replacing
 # the artwork cannot leave the running application showing the previous icon.
 # It is imported by App.tsx rather than dropped in public/, so Vite fingerprints
@@ -72,7 +90,7 @@ WEB_ICON_SIZE = 192
 # A bigger master is therefore the only way to make the badge bigger here.
 SOCIAL_CARD = PROJECT_ROOT / "docs" / "assets" / "social-card.png"
 
-# 1200x630 is what the og:image tags on every page of the site declare, and the
+# 1200x630 is what the og:image tags on every page of the site declare; it is the
 # 1.91:1 ratio the platforms crop to.
 SOCIAL_CARD_SIZE = (1200, 630)
 
@@ -86,11 +104,11 @@ SOCIAL_STRAPLINE_COLOUR = (0x95, 0x95, 0x9F)
 # (body::before). The card carries the same one.
 SOCIAL_RULE_HEIGHT = 3
 
-# One line, and deliberately not the product name: the badge says that already.
+# One line, deliberately not the product name: the badge says that already.
 SOCIAL_STRAPLINE = "What still needs hauling, and where to."
 SOCIAL_STRAPLINE_SIZE = 34
 
-# The gap between the badge and the strapline, and between the strapline and
+# The gap between the badge and the strapline, then between the strapline and
 # the bottom edge. The badge is then centred in whatever height is left, so the
 # layout holds if the master is replaced with a larger one.
 SOCIAL_STRAPLINE_GAP = 46
@@ -212,7 +230,7 @@ def clear_background(image: Image.Image) -> Image.Image:
             pixels[x, y] = TRANSPARENT
             continue
         # The rim was flattened onto black, so its colour arrives already
-        # multiplied by its own coverage. Undo that, or the edge stays dark.
+        # multiplied by its own coverage. Undo that; the edge stays dark otherwise.
         scale = OPAQUE / alpha
         pixels[x, y] = (
             min(OPAQUE, round(red * scale)),
@@ -250,19 +268,35 @@ def _scaled(image: Image.Image, size: int) -> Image.Image:
     return resized.convert(RGBA)
 
 
-def write_ico(image: Image.Image) -> None:
-    """Write the multi-size Windows icon beside the master.
+def _write_ico(path: Path, image: Image.Image, sizes: tuple[int, ...]) -> None:
+    """Write a multi-size ICO.
 
     Each frame is scaled here rather than left to the ICO writer, so that the
     premultiplied path above is the one every size goes through.
     """
-    frames = [_scaled(image, size) for size in sorted(ICO_SIZES, reverse=True)]
+    frames = [_scaled(image, size) for size in sorted(sizes, reverse=True)]
     largest, *rest = frames
     largest.save(
-        ICO_FILE,
+        path,
         format="ICO",
         sizes=[frame.size for frame in frames],
         append_images=rest,
+    )
+
+
+def write_ico(image: Image.Image) -> None:
+    """Write the multi-size Windows icon beside the master."""
+    _write_ico(ICO_FILE, image, ICO_SIZES)
+
+
+def write_site_favicons(badge: Image.Image) -> None:
+    """Write the published site's favicon set beside its pages."""
+    _write_ico(SITE_FAVICON_ICO, badge, SITE_FAVICON_ICO_SIZES)
+    _scaled(badge, SITE_FAVICON_PNG_SIZE).save(
+        SITE_FAVICON_PNG, format="PNG", optimize=True
+    )
+    _scaled(badge, SITE_APPLE_TOUCH_SIZE).save(
+        SITE_APPLE_TOUCH_ICON, format="PNG", optimize=True
     )
 
 
@@ -358,6 +392,14 @@ def main() -> int:
     if SITE_ICON.parent.is_dir():
         _scaled(master, SITE_ICON_SIZE).save(SITE_ICON, format="PNG", optimize=True)
         print(f"Wrote {SITE_ICON.relative_to(PROJECT_ROOT)} at {SITE_ICON_SIZE}px")
+
+        write_site_favicons(master)
+        icon_sizes = ", ".join(str(s) for s in SITE_FAVICON_ICO_SIZES)
+        print(f"Wrote {SITE_FAVICON_ICO.relative_to(PROJECT_ROOT)} at {icon_sizes}")
+        print(
+            f"Wrote {SITE_FAVICON_PNG.relative_to(PROJECT_ROOT)} "
+            f"and {SITE_APPLE_TOUCH_ICON.relative_to(PROJECT_ROOT)}"
+        )
 
         _write_web_icon(master)
         write_social_card(master)

@@ -48,6 +48,19 @@ export interface CarrierOrder {
   stock?: number;
 }
 
+/**
+ * Raw CarrierStats.SpaceUsage breakdown, every field optional because a
+ * journal may report the capacity without the parts it is divided into.
+ */
+export interface CarrierSpaceUsage {
+  total_capacity?: number | null;
+  crew?: number | null;
+  module_packs?: number | null;
+  cargo?: number | null;
+  cargo_space_reserved?: number | null;
+  free_space?: number | null;
+}
+
 export interface CarrierState {
   identity: CarrierIdentity;
   cargo: CarrierCargoItem[];
@@ -55,14 +68,7 @@ export interface CarrierState {
   /**
    * Raw CarrierStats.SpaceUsage breakdown (when available).
    */
-  space_usage?: {
-    total_capacity?: number | null;
-    crew?: number | null;
-    module_packs?: number | null;
-    cargo?: number | null;
-    cargo_space_reserved?: number | null;
-    free_space?: number | null;
-  } | null;
+  space_usage?: CarrierSpaceUsage | null;
   /**
    * Total cargo tonnage in the carrier hold, taken from CarrierStats.SpaceUsage.Cargo
    * when available. This may exceed the sum of per‑commodity market stock shown in

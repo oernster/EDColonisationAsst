@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Three front-end files are over the 400-line module cap
+## 1. Two front-end files are over the 400-line module cap
 
-Sixteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180, `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
+Seventeen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180, `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,11 +22,10 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Three entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+Two entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
-| 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
 | 406 | `frontend/src/hooks/useKeepAwake.ts` |
 
@@ -54,7 +53,13 @@ The lock rule is now stated at the top of the module rather than only on the one
 
 `launcher_components.py` split along an interface it already had. `LaunchView` declares four methods and names no Qt type, which is why `Launcher` can be driven end to end by a recording stand-in with no QApplication in the test. `launcher_view.py` (194) now holds that interface and its one real implementation, `QtLaunchWindow`; `launcher_components.py` (321) keeps the steps, the subprocess plumbing and the log. It imports the view module and re-exports it under `__all__`, so `launcher.py` and the tests still reach the whole stack through one name and nothing outside the package changed.
 
-**Every Python file in the repository is now inside the cap.** What is left is three front-end files. All three are now linted: `frontend/eslint.config.js` arrived with the flat config the ESLint 9 upgrade had left the project without; the pre-commit hook runs it. `FleetCarriersPanel.tsx` at 752 is the largest and the last component of real size.
+**Every Python file in the repository is now inside the cap.** The front end is linted too: `frontend/eslint.config.js` arrived with the flat config the ESLint 9 upgrade had left the project without; the pre-commit hook runs it.
+
+`FleetCarriersPanel.tsx` held five components and a formatting module in one file, so it split by component: `CarrierCargoSection.tsx` (201), `CurrentCarrierHeader.tsx` (128), `CarrierMarketSection.tsx` (114), `CarrierIdentityList.tsx` (113) and `carrierServices.ts` (97), leaving the panel itself at 214 to own the store wiring, the three effects and the layout. The service filter-and-sort had a copy in the header and another in the list rows and is now one `visibleServicesSorted`; the `space_usage` shape was declared inline twice and is now a named `CarrierSpaceUsage`.
+
+This is the first split in the sweep with no existing tests behind it, since the five Vitest tests render `<App />` and never reach this panel. It arrives with eight characterisation tests covering the not-docked copy, the docked header and its chips, the service filtering and ordering, both market columns, the cargo totals and the free-space arithmetic. Those were checked against three mutations (drop the sort, drop the service filter, drop the buy-order reservation), each of which failed exactly one test.
+
+What is left is two front-end files. `SiteList.tsx` at 598 is the larger. Unlike the panel it has no characterisation suite yet, so writing one is part of splitting it rather than an optional extra.
 
 ## 2. The US spelling of the colonisation events is documented but not implemented
 

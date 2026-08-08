@@ -8,6 +8,7 @@ import {
   Tabs,
   Tab,
   Button,
+  Tooltip,
 } from '@mui/material';
 
 import { SystemSelector } from './components/SystemSelector/SystemSelector';
@@ -20,7 +21,7 @@ import { KeepAwakeChip } from './components/KeepAwake/KeepAwakeChip';
 import { useColonisationStore } from './stores/colonisationStore';
 import { useKeepAwake } from './hooks/useKeepAwake';
 import { useKeepAwakePreference } from './hooks/useKeepAwakePreference';
-import { useThemeMode } from './hooks/useThemeMode';
+import { ThemeMode, useThemeMode } from './hooks/useThemeMode';
 import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { useBackendMeta } from './hooks/useBackendMeta';
 import { darkTheme, lightTheme } from './theme';
@@ -74,6 +75,7 @@ function App() {
   };
 
   const theme = themeMode === 'dark' ? darkTheme : lightTheme;
+  const nextThemeMode: ThemeMode = themeMode === 'dark' ? 'light' : 'dark';
 
   return (
     <ThemeProvider theme={theme}>
@@ -139,22 +141,20 @@ function App() {
                     void enableFromUserGesture();
                   }}
                 />
-                <Button
-                  variant={themeMode === 'light' ? 'contained' : 'outlined'}
-                  size="small"
-                  onClick={() => setThemeModeAndPersist('light')}
-                  sx={THEME_BUTTON_SX}
-                >
-                  ☀️
-                </Button>
-                <Button
-                  variant={themeMode === 'dark' ? 'contained' : 'outlined'}
-                  size="small"
-                  onClick={() => setThemeModeAndPersist('dark')}
-                  sx={THEME_BUTTON_SX}
-                >
-                  🌙
-                </Button>
+                {/* One control, not two. It shows the theme it will switch
+                    TO, so the icon is the choice on offer rather than a
+                    reading of the state you are already looking at. */}
+                <Tooltip title={`Switch to ${nextThemeMode} theme`}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setThemeModeAndPersist(nextThemeMode)}
+                    sx={THEME_BUTTON_SX}
+                    aria-label={`Switch to ${nextThemeMode} theme`}
+                  >
+                    {nextThemeMode === 'light' ? '☀️' : '🌙'}
+                  </Button>
+                </Tooltip>
               </Box>
             </Box>
           </Box>

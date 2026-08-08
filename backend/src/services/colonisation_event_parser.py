@@ -43,7 +43,6 @@ def parse_construction_depot(
     """Parse ColonisationConstructionDepot event.
 
     Handles both legacy and current journal formats, including:
-      - US/UK spellings (handled by RELEVANT_EVENTS / dispatch)
       - `Commodities` (old) vs `ResourcesRequired` (new) payloads
       - Optional StarSystem / SystemAddress keys
     """

@@ -79,7 +79,8 @@ class JournalParser(IJournalParser):
 
     # Event types we care about
     RELEVANT_EVENTS: ClassVar[set[str]] = {
-        # Colonisation-related events (accept both US and UK spellings)
+        # Colonisation-related events. Frontier is a UK studio and writes the
+        # UK spelling, so the z-spelling is deliberately not accepted.
         "ColonisationConstructionDepot",
         "ColonisationContribution",
         # Location / movement / docking

@@ -206,7 +206,11 @@ or from the project root: `uvicorn backend.src.main:app --reload`.
 ### Configuration
 
 Non-sensitive config lives in [backend/config.yaml](backend/config.yaml)
-(journal directory, server host/port, CORS, logging). Commander-specific
+(server host/port, CORS, logging). It names **no journal directory**, on
+purpose: the file is tracked, so a path written into it is one machine's path
+shipped to everybody; the one that used to be there pointed at a Linux
+Steam Proton prefix. The directory is detected instead; set the key only to
+override that. Commander-specific
 and Inara secrets live in `backend/commander.yaml`, which is gitignored;
 copy [backend/example.commander.yaml](backend/example.commander.yaml) or
 let the Settings page in the UI write it for you. Do not commit real API
@@ -291,9 +295,6 @@ the full gate: both suites under the 100% coverage requirement. It resolves its 
 environment is missing pytest or black it fails with a named error rather
 than falling through to `PATH`.
 
-One limit remains: it runs neither linter. That gap is recorded in
-[TECH_DEBT.md](TECH_DEBT.md).
-
 ---
 
 ## Frontend development (React + TypeScript)
@@ -355,9 +356,14 @@ per machine (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and
 The Start Menu / Desktop shortcuts point at `EDColonisationAsst.exe`, which:
 
 - Detects FROZEN mode and starts an in-process `uvicorn.Server` hosting the
-  FastAPI app on `http://127.0.0.1:47021`.
-- Shows the startup splash immediately (icon, author, version, live status)
-  and polls readiness without blocking the UI.
+  FastAPI app on `http://127.0.0.1:47021`. That port is a preference, not a
+  promise: it is probed first, then the port a previous run recorded, then the
+  remaining candidates, then whatever the operating system will give, because
+  Windows reserves whole ranges and can make a port unbindable while it looks
+  unused. Whatever is chosen is recorded, so the address stays put across runs.
+- Shows the startup splash immediately (icon, author, version, live status and
+  a progress bar) and polls readiness without blocking the UI. On a first run
+  the splash reports the journal import stage by stage, measured in bytes read.
 - Serves the bundled frontend at `http://127.0.0.1:47021/app/` and opens the
   browser only once both the health endpoint and the web UI respond.
 - Provides a tray icon with Open Web UI, a Help submenu (About plus

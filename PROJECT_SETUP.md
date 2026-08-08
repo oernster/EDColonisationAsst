@@ -34,8 +34,11 @@ EDCA reads journal files from your local save folder, typically:
 C:\Users\%USERNAME%\Saved Games\Frontier Developments\Elite Dangerous
 ```
 
-The path is configurable via the Settings page in the web UI or
-`backend/config.yaml`.
+It finds that directory itself, so there is nothing to configure for a normal
+installation. The tracked `backend/config.yaml` deliberately names no path: it
+is tracked, so a path written into it is one machine's path shipped to
+everybody. Override it there or via the Settings page in the web UI if your
+journals live somewhere unusual.
 
 ## Project structure
 
@@ -51,8 +54,10 @@ EDColonisationAsst/
 ├── GameGlass-Integration.md  # GameGlass shard integration
 ├── VERSION                   # Single source of truth for the version
 ├── pytest.ini                # Root pytest + coverage gate (backend + installer)
+├── .flake8                   # flake8 at 88, matching black
 ├── buildexe.py               # Windows runtime EXE build (Nuitka)
 ├── buildinstaller.py         # Windows GUI installer build (Nuitka)
+├── generate_icons.py         # Every icon and the site's social card, from one master
 ├── installer_main.py         # Setup program entry point (Nuitka compiles this)
 ├── installer/                # The setup program, a separate PySide6 application
 │   ├── ops/                  # side effects, no Qt (payload, copy, shortcuts, processes)
@@ -60,6 +65,7 @@ EDColonisationAsst/
 │   ├── shared/               # resource anchoring and crash logging, no Qt
 │   └── ui/                   # the themed window, its dialogs and the worker thread
 ├── tests/installer/          # Setup program suite (inside the same 100% gate)
+├── tests/structural/         # Layering, domain purity and the module size cap
 ├── backend/                  # Python FastAPI backend
 │   ├── src/                  # models, services, repositories, api, utils, runtime
 │   ├── tests/unit/           # pytest suite (100% gate; see TESTING.md)
@@ -142,10 +148,10 @@ git config core.hooksPath .githooks
 chmod +x .githooks/pre-commit
 ```
 
-Every commit then formats staged Python files with black and runs the
-backend suite including its coverage gate. It does not run the setup
-program's suite or either linter; see [TECH_DEBT.md](TECH_DEBT.md) for what
-that leaves unguarded and why the hook has been left alone for now.
+Every commit then formats staged Python files with black, lints the Python
+surface and the front end, then runs the whole gated suite from the repository
+root: the backend and the setup program together, at 100% coverage. It is the
+same command and the same gate as running `python -m pytest -q` yourself.
 
 ## Useful commands
 
@@ -160,18 +166,20 @@ pytest -k "test_parse" -q --no-cov   # tests matching a pattern
 black src/ tests/ && isort src/ tests/
 mypy src/ && pylint src/
 
-# Linters, on the surface that is clean (from the root)
+# Linters (from the root)
 ruff check --isolated installer installer_main.py tests
-flake8 --max-line-length=88 installer installer_main.py tests
+flake8 installer installer_main.py tests
+ruff check --config backend/pyproject.toml backend/src
+flake8 backend/src
 
 # Frontend (from frontend/)
 npm run test:ui                      # vitest UI
 npm run type-check && npm run lint
 ```
 
-The `--max-line-length=88` is needed because there is no flake8
-configuration file in the repository, so flake8 would otherwise default to
-79 while black is set to 88.
+flake8 needs no line-length flag: `.flake8` at the repository root sets 88 to
+match black in `backend/pyproject.toml`, so the two tools no longer disagree
+about the lines black itself produced.
 
 ## Resources
 

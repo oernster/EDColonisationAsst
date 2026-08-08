@@ -359,13 +359,33 @@ Returns the health status of the assistant.
   "build_id": "<the build marker; empty in a source checkout>",
   "python_version": "<the interpreter version>",
   "journal_directory": "C:\\\\Users\\\\Example\\\\Saved Games\\\\Frontier Developments\\\\Elite Dangerous",
-  "journal_accessible": true
+  "journal_accessible": true,
+  "startup": {
+    "stage": "importing_journals",
+    "files_done": 12,
+    "files_total": 72,
+    "bytes_done": 9437184,
+    "bytes_total": 70254592,
+    "percent": 13,
+    "message": "Reading your journal history",
+    "explanation": "This happens once, on the first run."
+  }
 }
 ```
 
 `version` is whatever the running build reports; it is read from the
 repository's `VERSION` file, so do not hardcode or pin against a particular
 value in a shard.
+
+`startup` is `null` once startup is done. It exists so the packaged runtime's
+splash can say how far the first-run journal import has got without a second
+endpoint; a shard can use it the same way: `percent` is by bytes rather than
+files, because journal files vary hugely in size and a file count makes a
+progress bar lurch. The API answers normally throughout, so a shard need not
+wait on it.
+
+`journal_directory` is detected rather than configured; a shard should display
+it rather than assume the default path.
 
 Typical usage:
 
@@ -475,7 +495,7 @@ This API-focused description is intended to be sufficient for shard authors to i
 
 These endpoints expose the commander’s Fleet carrier data derived from Elite: Dangerous journal files. They are **optional** for GameGlass shards: use them if you want to display the carrier hold and market orders in addition to colonisation data.
 
-Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` events by the backend logic in [`carrier_service.py`](backend/src/services/carrier_service.py:1) and surfaced via the carrier API routes in [`carriers.py`](backend/src/api/carriers.py:60).
+Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`, `CarrierJumpRequest` and `CarrierJumpCancelled` events, together with the commander's own `Docked`, `Undocked` and market transactions, by the backend logic in [`carrier_service.py`](backend/src/services/carrier_service.py:1) and surfaced via the carrier API routes in [`carriers.py`](backend/src/api/carriers.py:60).
 
 ### 5.1. Current docking context
 
@@ -533,13 +553,22 @@ Typical usage in a shard:
 
 **Purpose**
 
-Returns a reconstructed snapshot of the Fleet carrier the commander is currently docked at, including:
+Returns a reconstructed snapshot of the commander's Fleet carrier, including:
 
-- Identity
-- Cargo snapshot
+- Identity, plus its transit state when a jump is booked
+- The per-commodity hold, how old the export it is anchored on is, plus any tonnage it cannot account for
 - Buy and sell orders
 - Basic cargo and capacity metrics
 - Carrier capacity breakdown (when available)
+- Fuel, jump range, finances, tax rates and crew
+- The balance history over the window the journal covers
+- `commander_aboard`, saying whether the commander is on the carrier
+
+**The snapshot does not require the commander to be aboard.** Where the
+commander is standing does not change what the carrier is holding, so the
+endpoint answers for the carrier either way, rebuilding from the last time they
+were on it. `commander_aboard` is the field that distinguishes the two; a
+shard should label rather than hide the panel when it is `false`.
 
 **Response Shape (simplified)**
 
@@ -615,7 +644,32 @@ Key fields for a shard:
     - `space_usage.free_space` (already accounts for reserved buy space) or
     - `space_usage.total_capacity - space_usage.crew - space_usage.module_packs - space_usage.cargo - space_usage.cargo_space_reserved`
 
-If the commander is not docked at any Fleet carrier, the backend returns a 404 error `"Commander is not currently docked at a fleet carrier"`; shards should handle this by hiding or disabling carrier panels.
+Further fields, all optional and omitted rather than zero-filled when the journal
+did not carry them:
+
+- `identity.transit`: `{ "state": "parked" | "in_transit", "destination_system",
+  "destination_body", "departure_time" }`. There are two states and not three:
+  a cancelled jump simply returns the carrier to `parked`. Run a countdown
+  against `departure_time`; the arrival clears the transit on its own.
+- `cargo_snapshot_time`: when the `Market.json` export the hold is anchored on
+  was written. Show it rather than presenting the hold as live.
+- `cargo_unaccounted_tonnage`: the carrier's own total minus the summed hold.
+  Zero means they still agree.
+- `commander_aboard`: whether the commander is on the carrier.
+- `status`: `{ "fuel_level", "jump_range_current", "jump_range_max",
+  "pending_decommission", "finance": { "carrier_balance", "reserve_balance",
+  "available_balance", "reserve_percent", "tax_rate_rearm", "tax_rate_refuel",
+  "tax_rate_repair" }, "crew": [ { "role", "activated", "enabled", "name" } ] }`.
+- `balance_history`: `{ "entries": [ { "recorded_at", "balance", "change" } ],
+  "current_balance", "observed_from", "observed_to", "net_change", "movements" }`.
+  **No cause is attached to any movement**; a shard should not invent one:
+  the game emits no upkeep event; nothing in the journal separates upkeep
+  from a tritium purchase or from trade income.
+- `snapshot_time`: when this snapshot was built.
+
+A 404 means no carrier could be resolved from the journal window at all, which
+is the case for a commander who has never owned or docked at one. It does not
+mean "not currently docked".
 
 ### 5.3. Listing own and squadron carriers
 
@@ -688,11 +742,16 @@ For a GameGlass shard that wants to display **Fleet carrier state** alongside co
    - Call `/api/health` to confirm the backend is running.
    - Optionally call `/api/carriers/mine` to list known carriers.
 
-2. **When docked at a carrier**
-   - Call `/api/carriers/current` to check if `docked_at_carrier` is `true` and to get the carrier’s identity.
-   - If docked, call `/api/carriers/current/state` to get cargo and market orders and render a carrier panel.
+2. **For the carrier itself**
+   - Call `/api/carriers/current/state` and render the panel. It answers whether
+     or not the commander is aboard.
+   - Call `/api/carriers/current` if you want the docking context on its own;
+     `docked_at_carrier` is resolved from the newest event that settles it, so
+     it goes false when the commander undocks or jumps away.
 
 3. **When the commander undocks or moves**
-   - Handle the 404 from `/api/carriers/current/state` as “not docked at a Fleet carrier” and hide carrier‑specific panels in the shard.
+   - Keep the panel and re-label it from `commander_aboard`. The carrier still
+     holds what it held. Hide the panel only on a 404, which means no carrier
+     could be resolved from the journal at all.
 
 Carrier data is derived from local journals. EDCA parses a window of recent `Journal.*.log` files and may also use `Market.json` as a snapshot source when carrier trade-order journal lines are missing or partial.

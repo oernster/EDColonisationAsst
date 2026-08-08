@@ -16,7 +16,8 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 └─────────────────────────────────────────────────────────────────────┘
                             ▲                  ▲
                             │                  │
-                   JSON over HTTP        JSON over WS
+                   JSON over HTTP     JSON over HTTP
+                        (REST)           (long-poll)
                             │                  │
                             ▼                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -40,9 +41,9 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 ┌─────────────────────────────────────────────────────────────────────┐
 │                 Elite: Dangerous Journal Files                      │
 │  - Journal.*.log  (line-delimited JSON events)                      │
-│  - Location/FSDJump/Docked/Commander events track context           │
+│  - Location/FSDJump/Docked/Undocked/Commander track context         │
 │  - Colonisation* events expose construction depot state             │
-│  - Carrier* events expose Fleet carrier state                       │
+│  - Carrier* events expose carrier state, movement and finances      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,9 +77,21 @@ That document focuses on:
 - Fleet carrier state reconstruction from carrier journal events:
   - `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`.
   - `Market.json` snapshot merge to avoid missing orders when only deltas are emitted.
+  - The per-commodity hold, anchored on that export and carried forward by the
+    commander's own `MarketBuy`/`MarketSell` against the carrier.
+  - Fuel, jump range, finances, tax rates, crew and the balance history, all
+    from `CarrierStats`.
+  - Movement, from `CarrierJumpRequest`, `CarrierJumpCancelled` and the
+    arriving `CarrierLocation`.
+  - Whether the commander is aboard, resolved from the newest of
+    `Docked`/`Undocked`/`FSDJump`/`Location` rather than from the last docking
+    seen, which stays true forever.
   - Normalisation of commodity identifiers and display names.
 - Data aggregation and optional Inara integration.
 - Backend REST APIs and AJAX long-poll live updates.
+- Startup progress reported on the health endpoint, so the splash can say how
+  far the first-run journal import has got.
+- Journal directory detection, so a normal installation needs no configuration.
 - Backend testing and quality tooling.
 
 ### 2.2 Frontend & runtime architecture
@@ -88,15 +101,17 @@ See [`ARCHITECTURE_2_frontend_and_runtime.md`](ARCHITECTURE_2_frontend_and_runti
 That document focuses on:
 
 - React/TypeScript frontend:
-  - Component structure (SystemSelector, SiteList, FleetCarriersPanel, SettingsPage).
+  - Component structure (SystemSelector, the SiteList family, the FleetCarriers
+    family, SettingsPage, AboutPanel).
   - Stores (`colonisationStore`, `carrierStore`).
+  - Hooks for live updates, keep-awake, theme and backend metadata.
   - How the UI uses `/api/*` and AJAX long-polling at `/api/changes/longpoll`.
 - Fleet Carriers UI:
-  - Current docked carrier header and services.
-  - Cargo and buy/sell order presentation.
+  - Carrier header, services and a transit chip when a jump is booked.
+  - Three sub-tabs: Market, Cargo and Status.
   - Known own/squadron carriers list.
 - Settings UI:
-  - Journal directory configuration.
+  - Journal directory override, on top of the detected default.
   - Commander/Inara settings (with Inara integration currently dormant).
 - Runtime / launcher / tray stack:
   - `ApplicationInstanceLock` and single-instance behaviour.

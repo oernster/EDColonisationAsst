@@ -236,7 +236,3 @@ The interpreter is resolved once, from the root `venv/`, which is where the
 tooling lives. If that environment is absent or lacks pytest and black the
 hook stops with a named error rather than falling through to whatever is on
 `PATH`, so the check that runs is never silently a different check.
-
-One limit remains: the hook runs neither linter, because the repository is
-not yet clean under either. That gap is recorded in
-[TECH_DEBT.md](TECH_DEBT.md).

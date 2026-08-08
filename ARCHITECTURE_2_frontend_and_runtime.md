@@ -32,18 +32,40 @@ frontend/
 └── src/
     ├── main.tsx                  # React entry point
     ├── App.tsx                   # Top‑level app component
+    ├── theme.ts                  # The two MUI themes the toggle switches between
     ├── index.css                 # Global styles
     ├── components/
     │   ├── SystemSelector/
     │   │   └── SystemSelector.tsx
     │   ├── SiteList/
-    │   │   └── SiteList.tsx
+    │   │   ├── SiteList.tsx           # The tab: selection, loading, error
+    │   │   ├── SystemSummary.tsx      # Counts and overall progress
+    │   │   ├── SystemShoppingList.tsx # The aggregated per-commodity list
+    │   │   ├── SiteCard.tsx           # One construction site
+    │   │   └── siteAggregation.ts     # The arithmetic, lifted out of the components
     │   ├── FleetCarriers/
-    │   │   └── FleetCarriersPanel.tsx
+    │   │   ├── FleetCarriersPanel.tsx           # The tab and its three sub-tabs
+    │   │   ├── CurrentCarrierHeader.tsx         # Identity, services, aboard or not
+    │   │   ├── CarrierTransitChip.tsx           # Destination and countdown
+    │   │   ├── CarrierCargoSection.tsx          # The hold
+    │   │   ├── CarrierMarketSection.tsx         # Buy and sell orders
+    │   │   ├── CarrierStatusSection.tsx         # Fuel, range, finance, crew
+    │   │   ├── CarrierBalanceHistorySection.tsx # Balance movements over time
+    │   │   ├── CarrierIdentityList.tsx          # Own and squadron carriers
+    │   │   ├── carrierServices.ts               # Service names for display
+    │   │   └── carrierTransit.ts                # Countdown arithmetic
+    │   ├── About/
+    │   │   ├── AboutPanel.tsx    # Version, author, open source credits
+    │   │   └── LicensePanel.tsx  # The licence text
+    │   ├── KeepAwake/
+    │   │   └── KeepAwakeChip.tsx # Keep-awake state, in the header
     │   └── Settings/
     │       └── SettingsPage.tsx
     ├── services/
     │   └── api.ts                # Axios client and typed API helpers
+    ├── utils/
+    │   ├── apiError.ts           # One place that turns a failure into a message
+    │   └── device.ts             # Handheld detection
     ├── stores/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
     │   └── carrierStore.ts       # Zustand store for Fleet carrier data
@@ -108,9 +130,13 @@ State is centralised in two Zustand stores:
 
 - **SiteList & SiteCard**: [`SiteList.tsx`](frontend/src/components/SiteList/SiteList.tsx:1)
 
-  - Shows a **system summary**, **system shopping list** and **per‑station cards**.
+  - Shows a **system summary** (`SystemSummary`), a **system shopping list**
+    (`SystemShoppingList`) and **per‑station cards** (`SiteCard`). `SiteList`
+    itself is now only the tab: selection, loading and error states.
   - Reads `systemData` from `colonisationStore`:
-    - Uses an internal `aggregateCommodities` helper to re‑aggregate commodities for the **System Shopping List**.
+    - Uses `siteAggregation.ts` to re‑aggregate commodities for the **System
+      Shopping List**. The arithmetic lives there rather than inside the
+      components, which is what let each of them come back under the size limit.
     - Displays per‑commodity progress and **per‑site overall delivery progress** with MUI progress bars and chips.
     - Per‑site progress bar semantics:
       - Labelled **Commodities Delivered** in the UI.
@@ -122,25 +148,40 @@ State is centralised in two Zustand stores:
 
   - “Fleet Carriers” tab in the UI.
   - Uses `carrierStore` to:
-    - Load `currentCarrierInfo` and `currentCarrierState` (only while docked at a Fleet carrier).
+    - Load `currentCarrierInfo` and `currentCarrierState`. The state is loaded
+      whether or not the commander is aboard, because where they are standing
+      does not change what the carrier holds. `commander_aboard` is what the
+      header labels, the only thing that changes when they leave.
     - Load `myCarriers` (inferred from journal `CarrierStats` + `CarrierLocation`).
   - Presents:
-    - Current docked carrier identity and services.
-    - Derived cargo snapshot and buy/sell orders from `CarrierTradeOrder` events (with `Market.json` snapshot merge handled by the backend).
+    - Carrier identity and services, via `CurrentCarrierHeader`.
+    - A `CarrierTransitChip` when a jump is booked, naming the destination and
+      counting down to departure. Arrival clears it; cancelling returns the
+      carrier to holding station.
     - A single “Free after all buy orders” metric derived from carrier capacity usage:
       - Uses `CarrierStats.SpaceUsage` breakdown (TotalCapacity, Crew/ModulePacks, Cargo) and
       - Uses the live summed BUY order outstanding tonnage for reservation (so UI reacts immediately to buy-order tweaks).
-    - A list of known owned/squadron carriers.
+    - A list of known owned/squadron carriers, via `CarrierIdentityList`.
 
-  Fleet carrier detail sub-tabs:
+  Fleet carrier detail sub-tabs, one component each:
 
-  - The carrier detail view uses two sub-tabs: **Market** (left) and **Cargo** (right).
-  - Default selected sub-tab is **Market** (stored in `carrierStore`).
+  - **Market** (`CarrierMarketSection`): buy and sell orders from
+    `CarrierTradeOrder` events, with the `Market.json` merge handled by the
+    backend. A cancelled order stops being advertised.
+  - **Cargo** (`CarrierCargoSection`): the per-commodity hold, with how old the
+    export it is anchored on is and any tonnage it cannot account for.
+  - **Status** (`CarrierStatusSection` plus `CarrierBalanceHistorySection`):
+    fuel and jump range, finances and tax rates, crew and every movement in the
+    balance over the observed window. A reading the journal did not carry is
+    omitted rather than drawn as a zero.
+  - The selected sub-tab is `carrierViewTab` in `carrierStore` and defaults to
+    **Market**.
 
 - **SettingsPage**: [`SettingsPage.tsx`](frontend/src/components/Settings/SettingsPage.tsx:1)
 
   - Uses `/api/settings` to:
-    - Read and update journal directory.
+    - Override the journal directory. The backend detects it, so this is an
+      override for an unusual installation rather than a setup step.
     - Configure Inara/commander settings.
   - Writes back to the backend, which persists to YAML.
 
@@ -148,6 +189,11 @@ State is centralised in two Zustand stores:
 
   - Compose the overall layout and route tabs/screens.
   - Initialise stores and start the AJAX long-poll live update loop.
+  - App holds no state of its own beyond composition: it moved into the hooks
+    (`useThemeMode`, `useKeepAwakePreference`, `useBackendMeta`, `useLiveUpdates`)
+    and its copy into the components it renders.
+  - Theme is one control rather than two: a single toggle that switches between
+    the two themes in `theme.ts`, persisted by `useThemeMode`.
 
 ---
 
@@ -276,11 +322,28 @@ Key classes:
   - Uses a custom `_QuietUvicornConfig` that disables uvicorn’s own logging configuration (to avoid conflicts in certain frozen environments).
   - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the EXE.
   - `probe_ready()` runs a single non‑blocking readiness probe of `/api/health` and `/app/`; `wait_until_ready(timeout=...)` is the blocking wrapper around it for callers that need a synchronous wait.
+  - The port is chosen rather than assumed. [`ports.py`](backend/src/utils/ports.py:1)
+    probes against the same host the server will bind, because a port free on the
+    loopback can still be taken on the wildcard address. The order is: the port a
+    previous run recorded, then the configured one, then the remaining known
+    candidates, then whatever the operating system will give. A known address is
+    worth more than a random one, since it keeps the web UI somewhere a bookmark
+    can still find; the chosen port is recorded so the next run and any second
+    instance land on the same place. Windows reserves whole ranges, so a port can
+    be unbindable while appearing unused, which is what this exists for.
 
-- `StartupSplashWindow` and `StartupMonitor` ([`splash.py`](backend/src/runtime/splash.py:1)): first‑run feedback in frozen mode:
+- `StartupSplashWindow` ([`splash.py`](backend/src/runtime/splash.py:1)),
+  `StartupMonitor` ([`startup_monitor.py`](backend/src/runtime/startup_monitor.py:1))
+  and `StartupReport` ([`startup_report.py`](backend/src/runtime/startup_report.py:1)):
+  first‑run feedback in frozen mode:
 
-  - The splash shows the app icon, “by Oliver Ernster”, the version (from the top‑level `VERSION` file via `src.__version__`) and a live status line.
+  - The splash shows the app icon, “by Oliver Ernster”, the version (from the top‑level `VERSION` file via `src.__version__`), a live status line and a progress bar.
   - `StartupMonitor` polls `BackendServerController.probe_ready()` on a Qt timer, so the UI thread never blocks; status progresses from “Starting the local backend...” to “Preparing the web interface...” to “Ready”.
+  - `StartupReport` reads the `startup` block back off the health response the
+    monitor is already fetching, so the splash can say **what** the first run is
+    doing and how far through it is rather than sitting on one message for
+    minutes. It names the stage and draws the bar by bytes read, not files, since
+    journal files vary hugely in size and a file count makes the bar lurch.
   - The browser is opened only when both endpoints actually respond; on timeout the splash reports the problem and closes while the tray stays available.
   - Silent starts (`--no-browser`, used for login autostart) show no splash and open no browser.
 
@@ -362,24 +425,37 @@ It is one script rather than one per distribution. The package manager is detect
 
 ## 4. Frontend and runtime testing
 
-- Frontend tests:
+- Frontend tests, Vitest plus Testing Library, with
+  [`test/setup.ts`](frontend/src/test/setup.ts:1) as the shared setup:
 
-  - [`App.test.tsx`](frontend/src/App.test.tsx:1)
-  - [`test/setup.ts`](frontend/src/test/setup.ts:1)
-
-  use Vitest + Testing Library to validate UI behaviour and integration with API helpers.
+  - [`App.test.tsx`](frontend/src/App.test.tsx:1): layout, tabs and API wiring.
+  - [`SiteList.test.tsx`](frontend/src/components/SiteList/SiteList.test.tsx:1)
+  - [`FleetCarriersPanel.test.tsx`](frontend/src/components/FleetCarriers/FleetCarriersPanel.test.tsx:1)
+    and [`CarrierStatusSection.test.tsx`](frontend/src/components/FleetCarriers/CarrierStatusSection.test.tsx:1)
+  - [`carrierTransit.test.ts`](frontend/src/components/FleetCarriers/carrierTransit.test.ts:1):
+    the countdown arithmetic, tested as a function rather than through a component.
+  - [`useKeepAwake.test.ts`](frontend/src/hooks/useKeepAwake.test.ts:1) and
+    [`keepAwakeStrategies.test.ts`](frontend/src/hooks/keepAwakeStrategies.test.ts:1):
+    the hook arrived with these when it was split by wake-lock strategy, having
+    had none before.
 
 - Runtime tests:
 
   - [`test_runtime_components.py`](backend/tests/unit/test_runtime_components.py:1)
+    and [`test_runtime_components_launcher.py`](backend/tests/unit/test_runtime_components_launcher.py:1)
+  - [`test_backend_server_readiness.py`](backend/tests/unit/test_backend_server_readiness.py:1)
+  - [`test_splash.py`](backend/tests/unit/test_splash.py:1)
   - [`test_runtime_entry.py`](backend/tests/unit/test_runtime_entry.py:1)
   - [`test_launcher.py`](backend/tests/unit/test_launcher.py:1)
+  - [`test_app_singleton.py`](backend/tests/unit/test_app_singleton.py:1)
   - [`test_tray_app.py`](backend/tests/unit/test_tray_app.py:1)
+  - [`test_help_menu.py`](backend/tests/unit/test_help_menu.py:1)
 
   exercise:
 
-  - Launcher window behaviour.
+  - Launcher orchestration against a recording `LaunchView`, with no QApplication.
   - Tray controller starting/stopping backend/frontend processes.
+  - Readiness probing and the status line it produces.
   - Single‑instance enforcement via `ApplicationInstanceLock`.
   - Frozen/runtime entry behaviour under error and success conditions.
 

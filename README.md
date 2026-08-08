@@ -15,6 +15,10 @@ Replaces manual tracking with automatic, journal-driven state.
 - Tracks colonisation construction sites directly from your journal data  
 - Shows what your fleet carrier is actually holding, commodity by commodity  
 - Shows fleet carrier buy and sell orders in one place  
+- Reports what the carrier runs on: fuel and jump range, balance and tax
+  rates, the balance movements over time and who is crewing each service  
+- Says when the carrier has a jump booked, where to and how long until it
+  leaves  
 - Updates automatically as you play  
 - Runs entirely locally (no external services, no accounts) 
 
@@ -49,7 +53,15 @@ Your browser will open automatically at:
 
 http://127.0.0.1:47021/app/
 
-EDCA will begin reading your journal files immediately.
+That is the usual address. The port is a preference rather than a promise: if
+something else on the machine has taken it or Windows has reserved it, EDCA
+serves on the next address it can bind and remembers it for next time. The tray
+icon's **Open Web UI** always goes to the right one.
+
+The first launch reads every journal already on your machine, once, so that you
+start with the colonisation history you have actually flown rather than from
+empty. The splash says so while it happens, naming the file it is on and how
+far through it is. Later launches skip straight past it.
 
 ### Upgrading and removing
 
@@ -66,12 +78,17 @@ install directory, the shortcuts and the sign-in entry.
 
 ## Fleet carrier data and journal updates
 
-EDCA's Fleet Carrier view (the hold plus market orders) is built from your local Elite Dangerous journal data.
+EDCA's Fleet Carrier view (the hold, the market orders, what the carrier runs
+on and where it is heading) is built from your local Elite Dangerous journal
+data. Where you are standing does not change what your carrier is holding, so
+the view is shown whether or not you are aboard and says plainly which of the
+two it is.
 
 Internally, EDCA:
 
 - Parses a **window of recent** `Journal.*.log` files (not just the single newest file), because carrier-related events are not guaranteed to be present in the latest journal.
-- Reconstructs carrier identity/state primarily from `Docked`, `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` events.
+- Reconstructs carrier identity/state primarily from `Docked`, `Undocked`, `CarrierLocation`, `CarrierStats` and `CarrierTradeOrder` events.
+- Reads `CarrierJumpRequest` and `CarrierJumpCancelled` for a booked jump and treats the matching `CarrierLocation` as the arrival that clears it.
 - Uses `Market.json` as a **snapshot source** for carrier market configuration when the journal only contains partial `CarrierTradeOrder` updates (or none at all).
 
 This has two important consequences:
@@ -94,6 +111,25 @@ Two things follow from that:
 
 - The breakdown only refreshes when you **dock at the carrier and open its commodity market**, because that is when the game rewrites the export. The tab shows how old that reading is rather than presenting it as live.
 - Cargo can also move by routes your journal never records, for example another commander trading at your carrier. `CarrierStats` reports the carrier's own total independently, so where that total disagrees with the summed breakdown, the tab reports the difference instead of quietly showing a wrong number.
+
+### What the carrier runs on
+
+The **Status** tab reports the carrier itself rather than its trade: tritium in
+the tank with the current jump range against the maximum, the balance with its
+reserve and the tax each service charges visitors, every movement in the
+balance over the window it was observed and who is crewing each service.
+
+A reading your journal has not carried is left out rather than shown as a
+zero, so an empty gauge always means empty. The balance history attaches no
+cause to any movement: the journal records no upkeep event; nothing in it
+separates upkeep from a tritium purchase or from trade income.
+
+### Where the carrier is going
+
+A carrier is never docked. It holds station in a star system or it has a jump
+booked and has not left yet. Booking a jump names the destination and counts
+down to departure; the arrival clears the countdown; cancelling it returns the
+carrier to holding station.
 
 > **Note:** Because this is not a code‑signed commercial product, Windows SmartScreen
 > (and some antivirus tools) may warn that the installer or runtime is from an
@@ -146,7 +182,12 @@ If you run Elite via Steam Proton or Wine on Linux, the journal directory is usu
 ~/.steam/steam/steamapps/compatdata/359320/pfx/drive_c/users/steamuser/Saved Games/Frontier Developments/Elite Dangerous
 ```
 
-You can point EDCA at a different journal directory via the Settings page in the web UI (`Journal directory` field). The backend will monitor whatever path is configured there for `Journal.*.log` files.
+You do not have to tell EDCA where any of this is. It works the directory out
+for itself from your Saved Games folder on first use, so a normal installation
+needs no configuration at all. If yours is somewhere unusual, point EDCA at it
+via the Settings page in the web UI (`Journal directory` field) and the backend
+will monitor whatever path is configured there for `Journal.*.log` files
+instead.
 
 ---
 
@@ -195,6 +236,8 @@ On your tablet/phone (connected to the same Wi‑Fi/LAN):
    ```
 
 This works **only on your local network**; EDCA is not intended to be exposed directly to the internet.
+
+If the page does not load, check which port EDCA actually chose rather than assuming `47021`: open the UI from the tray icon on the PC and read it out of the address bar.
 
 ### Keep the tablet screen awake (Android/Chrome)
 

@@ -8,11 +8,10 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ## Looks like debt, not worth touching
 
-- The fourteen `test_coverage_*.py` modules being named after the gate rather than after behaviour. Ugly and honest. Enforcing what they achieve matters more than renaming them; redistributing them into behaviour-named modules is a later tidy. The installer suite does not repeat the pattern: its files are named after the module under test.
-- `backend/tools/check_live_carrier_api.py` and `debug_carrier_orders.py` printing to stdout. Development instruments, correctly separated into `tools/`.
+- The eighteen `test_coverage_*.py` modules being named after the gate rather than after behaviour. Ugly and honest. Enforcing what they achieve matters more than renaming them; redistributing them into behaviour-named modules is a later tidy. Newer suites do not repeat the pattern: the carrier and installer files are named after the behaviour or the module under test.
+- The four scripts in `backend/tools/` printing to stdout. Development instruments, correctly separated into `tools/` and outside the coverage gate.
 - The three architecture documents (`ARCHITECTURE.md` plus a backend and a frontend companion). A split-stack project legitimately needs more than one; the root file indexes them.
 - `PROJECT_SETUP.md` and `GameGlass-Integration.md` alongside `DEVELOPMENT-README.md`. Distinct subjects.
-- `buildinstaller.py` at 396 lines. Delivery script, deliberately outside the structural suite's scan.
 
 ## Not debt (do not "fix" these)
 

@@ -33,7 +33,7 @@ import edcaIcon from './assets/edca-icon.png';
 // The header badge sits beside the h3 title, so it is sized to that line rather
 // than to the asset: the file is written at twice this so it stays sharp on a
 // high-DPI display or a tablet.
-const HEADER_ICON_PX = 64;
+const HEADER_ICON_PX = 96;
 
 const THEME_BUTTON_SX = {
   minWidth: 36,

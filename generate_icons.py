@@ -58,7 +58,7 @@ SITE_ICON_SIZE = 256
 WEB_ICON = PROJECT_ROOT / "frontend" / "src" / "assets" / "edca-icon.png"
 
 # Displayed at half this, so it stays sharp on a high-DPI display or a tablet.
-WEB_ICON_SIZE = 128
+WEB_ICON_SIZE = 192
 
 # The card social platforms unfurl for a link to the site. It is the badge on
 # the site's own background rather than a cropped screenshot of the running

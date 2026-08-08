@@ -31,6 +31,7 @@ from ..models.carriers import (
 from ..models.journal_events import (
     CarrierTradeOrderEvent,
     JournalEvent,
+    MarketTransactionEvent,
 )
 from ..utils.logger import get_logger
 
@@ -46,6 +47,7 @@ from .carrier_events import (
     find_latest_docked_carrier,
 )
 from .carrier_fleet import build_my_carriers_response
+from .carrier_hold import derive_carrier_hold
 from .carrier_identity import build_identity_from_journal
 from .carrier_market import derive_space_usage, merge_market_export
 from .carrier_naming import (
@@ -229,9 +231,23 @@ def build_current_carrier_state_response(
     free_space_tonnage = metrics.free_space_tonnage
     space_usage_model = metrics.space_usage
 
+    # The hold is anchored on the same export the merge above already read, then
+    # carried forward by the commander's own trades against this carrier. It is
+    # deliberately independent of trade_orders_scope: what the carrier holds is
+    # not the same question as what it is currently offering.
+    hold = derive_carrier_hold(
+        snapshot=merged.market_snapshot,
+        transactions=[e for e in events if isinstance(e, MarketTransactionEvent)],
+        carrier_market_id=docked_carrier.market_id,
+        reported_tonnage=total_cargo_tonnage,
+        fallback_items=cargo,
+    )
+
     state = CarrierState(
         identity=identity,
-        cargo=cargo,
+        cargo=hold.items,
+        cargo_snapshot_time=hold.snapshot_time,
+        cargo_unaccounted_tonnage=hold.unaccounted_tonnage,
         total_cargo_tonnage=total_cargo_tonnage,
         total_capacity_tonnage=total_capacity_tonnage,
         free_space_tonnage=free_space_tonnage,

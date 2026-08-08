@@ -30,7 +30,7 @@ const OWN_CARRIER: CarrierIdentity = {
   role: 'own',
   docking_access: 'squadron',
   last_seen_system: 'Lupus Dark Region BQ-Y d66',
-  // Deliberately unsorted, and carrying two services the panel hides.
+  // Deliberately unsorted, carrying two services the panel hides.
   services: ['voucherredemption', 'flightcontroller', 'autodock', 'stationmenu'],
 }
 
@@ -193,7 +193,7 @@ describe('FleetCarriersPanel', () => {
     expect(screen.getByText('Capacity: 25,000 t')).toBeTruthy()
   })
 
-  it('shows per-commodity stock when the carrier has sell stock', () => {
+  it('shows the per-commodity hold when a market export has been read', () => {
     setStore({
       currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
       currentCarrierState: CARRIER_STATE,
@@ -202,9 +202,87 @@ describe('FleetCarriersPanel', () => {
 
     render(<FleetCarriersPanel />)
 
-    expect(screen.getByText(/Market-stock snapshot/i)).toBeTruthy()
+    expect(screen.getByText(/Carrier hold, heaviest first/i)).toBeTruthy()
     expect(screen.getByText('(Buy order)')).toBeTruthy()
     expect(screen.getByText('12 t reserved')).toBeTruthy()
+  })
+
+  it('says when the hold is read from the carrier market and still agrees with it', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: {
+        ...CARRIER_STATE,
+        cargo_snapshot_time: '2026-06-21T17:51:30Z',
+        cargo_unaccounted_tonnage: 0,
+      },
+      carrierViewTab: 'cargo',
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.getByText(/Hold read from the carrier market at/i)).toBeTruthy()
+    expect(screen.getByText('Matches carrier total')).toBeTruthy()
+  })
+
+  it('reports tonnage the journal cannot account for rather than hiding it', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: {
+        ...CARRIER_STATE,
+        cargo_snapshot_time: '2026-06-21T17:51:30Z',
+        cargo_unaccounted_tonnage: 446,
+      },
+      carrierViewTab: 'cargo',
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.getByText('Carrier reports 446 t more')).toBeTruthy()
+  })
+
+  it('claims nothing about agreement when there is no carrier total to check', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: {
+        ...CARRIER_STATE,
+        cargo_snapshot_time: '2026-06-21T17:51:30Z',
+        cargo_unaccounted_tonnage: null,
+      },
+      carrierViewTab: 'cargo',
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.queryByText('Matches carrier total')).toBeNull()
+    expect(screen.queryByText(/Carrier reports/)).toBeNull()
+  })
+
+  it('reports a hold that has shrunk since the export just as plainly', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: {
+        ...CARRIER_STATE,
+        cargo_snapshot_time: '2026-06-21T17:51:30Z',
+        cargo_unaccounted_tonnage: -80,
+      },
+      carrierViewTab: 'cargo',
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.getByText('Carrier reports 80 t less')).toBeTruthy()
+  })
+
+  it('tells you how to get a breakdown when no export has been read', () => {
+    setStore({
+      currentCarrierInfo: { docked_at_carrier: true, carrier: OWN_CARRIER },
+      currentCarrierState: { ...CARRIER_STATE, cargo: [] },
+      carrierViewTab: 'cargo',
+    })
+
+    render(<FleetCarriersPanel />)
+
+    expect(screen.getByText(/open its commodity market once/i)).toBeTruthy()
   })
 
   it('marks the carrier you are standing on in the known-carriers list', () => {

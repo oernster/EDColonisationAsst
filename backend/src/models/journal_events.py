@@ -159,3 +159,30 @@ class CarrierTradeOrderEvent(JournalEvent):
         description="Remaining units to be fulfilled for this order (Outstanding)",
     )
     price: int = Field(default=0, description="Price per unit in credits")
+
+
+class MarketTransactionEvent(JournalEvent):
+    """
+    MarketBuy or MarketSell - the commander trading commodities at a market.
+
+    These matter to the carrier domain for one reason. Against the commander's
+    own fleet carrier they are the only journal lines that move its hold, so
+    they are what carries a Market.json snapshot forward between refreshes.
+    Buying takes tonnage out of the carrier; selling puts tonnage in.
+
+    Direction is a flag rather than the event name so that the hold derivation
+    never has to know journal spellings.
+    """
+
+    market_id: int | None = Field(
+        default=None, description="Market the transaction took place at"
+    )
+    commodity: str = Field(default="", description="Internal commodity name")
+    commodity_localised: str | None = Field(
+        default=None, description="Localized commodity name for display"
+    )
+    count: int = Field(default=0, ge=0, description="Tonnes traded")
+    is_purchase: bool = Field(
+        default=False,
+        description="True when the commander bought, which removes carrier stock",
+    )

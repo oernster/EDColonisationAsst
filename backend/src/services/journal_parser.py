@@ -40,6 +40,7 @@ from .commander_event_parser import (
     parse_fsd_jump,
     parse_location,
 )
+from .market_event_parser import parse_market_transaction
 
 logger = get_logger(__name__)
 
@@ -56,6 +57,8 @@ _EVENT_PARSERS: dict[str, EventParser] = {
     "CarrierLocation": parse_carrier_location,
     "CarrierStats": parse_carrier_stats,
     "CarrierTradeOrder": parse_carrier_trade_order,
+    "MarketBuy": parse_market_transaction,
+    "MarketSell": parse_market_transaction,
 }
 
 
@@ -92,6 +95,10 @@ class JournalParser(IJournalParser):
         "CarrierLocation",
         "CarrierStats",
         "CarrierTradeOrder",
+        # Market transactions. Only those against the commander's own carrier
+        # are used, purely to carry a Market.json hold snapshot forward.
+        "MarketBuy",
+        "MarketSell",
     }
 
     def parse_file(self, file_path: Path) -> list[JournalEvent]:

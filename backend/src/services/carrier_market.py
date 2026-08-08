@@ -18,7 +18,7 @@ from ..models.carriers import (
 )
 from ..models.journal_events import CarrierStatsEvent, DockedEvent
 from ..utils.logger import get_logger
-from .market_export_service import load_market_export
+from .market_export_service import MarketExportSnapshot, load_market_export
 
 logger = get_logger(__name__)
 
@@ -32,6 +32,9 @@ class MarketMergeResult:
     sell_orders: list[CarrierOrder]
     snapshot_time: datetime
     trade_orders_scope: str
+    # The export this merge read, carried out so the hold derivation can anchor
+    # on the same one rather than reading the file a second time.
+    market_snapshot: MarketExportSnapshot | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +69,8 @@ def merge_market_export(
     # Market.json is a snapshot and is typically updated when the carrier market
     # changes, so we merge it in to fill any missing commodities.
     #
+    snap: MarketExportSnapshot | None = None
+
     # trade_orders_scope is assigned only the three values tested here, so this
     # guard is exhaustive; the false arc is excluded from branch coverage.
     if trade_orders_scope in ("none", "stale", "since_docked"):  # pragma: no branch
@@ -188,6 +193,7 @@ def merge_market_export(
         sell_orders=sell_orders,
         snapshot_time=snapshot_time,
         trade_orders_scope=trade_orders_scope,
+        market_snapshot=snap,
     )
 
 

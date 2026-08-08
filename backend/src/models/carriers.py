@@ -180,9 +180,30 @@ class CarrierState(BaseModel):
     cargo: list[CarrierCargoItem] = Field(
         default_factory=list,
         description=(
-            "Best-effort per-commodity cargo view for the carrier. Currently derived "
-            "from CarrierTradeOrder SELL orders (market stock) rather than a full "
-            "storage snapshot."
+            "Per-commodity carrier hold, largest tonnage first. Anchored on the "
+            "Market.json Stock column, which is the carrier's real hold rather "
+            "than only what is listed for sale, then carried forward by the "
+            "commander's own market transactions against the carrier. Falls back "
+            "to CarrierTradeOrder SELL stock when no export is available."
+        ),
+    )
+    cargo_snapshot_time: datetime | None = Field(
+        default=None,
+        description=(
+            "When the Market.json export the hold is anchored on was written. "
+            "The game rewrites it on docking and opening the carrier's commodity "
+            "market, so this is how old the per-commodity view is. None when the "
+            "hold came from trade orders rather than an export."
+        ),
+    )
+    cargo_unaccounted_tonnage: int | None = Field(
+        default=None,
+        description=(
+            "CarrierStats.SpaceUsage.Cargo minus the summed per-commodity hold. "
+            "Zero means the snapshot still agrees with the carrier's own total. "
+            "Anything else is tonnage that moved by a route the commander's "
+            "journal does not record, so the breakdown is that far out of date. "
+            "None when no total is available to check against."
         ),
     )
     total_cargo_tonnage: int | None = Field(

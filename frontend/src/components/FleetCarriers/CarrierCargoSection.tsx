@@ -12,13 +12,38 @@ interface CarrierCargoSectionProps {
   freeSpaceTonnage: number | null;
   spaceUsage: CarrierSpaceUsage | null;
   snapshotTime: string;
+  holdSnapshotTime: string | null;
+  unaccountedTonnage: number | null;
   buyOrders: CarrierOrder[];
 }
 
 /**
+ * How the per-commodity hold stands against the carrier's own total.
+ *
+ * The breakdown comes from the market export, which the game rewrites only when
+ * you dock and open the carrier's commodity market. CarrierStats reports the
+ * total continuously, so a difference between them is tonnage that moved by a
+ * route the journal does not record. Saying so is the point: a stale breakdown
+ * that looks current is worse than one that admits its age.
+ */
+const reconciliation = (
+  unaccountedTonnage: number | null,
+): { label: string; colour: 'success' | 'warning' } | null => {
+  if (unaccountedTonnage == null) return null;
+  if (unaccountedTonnage === 0) {
+    return { label: 'Matches carrier total', colour: 'success' };
+  }
+  const verb = unaccountedTonnage > 0 ? 'more' : 'less';
+  return {
+    label: `Carrier reports ${Math.abs(unaccountedTonnage).toLocaleString()} t ${verb}`,
+    colour: 'warning',
+  };
+};
+
+/**
  * Tonnage still outstanding across every buy order.
  *
- * Remaining amounts should be non-negative, but be defensive: if the
+ * Remaining amounts should be non-negative; be defensive anyway, since if the
  * backend/journals ever yield a negative, treat it as 0.
  */
 const outstandingTonnage = (buyOrders: CarrierOrder[]): number =>
@@ -63,11 +88,11 @@ const freeAfterBuyOrders = (
 };
 
 /**
- * What is in the hold, and how much room is left.
+ * What is in the hold, plus how much room is left.
  *
- * Two shapes, because the per-commodity list is only populated from active
- * SELL stock: with no such stock there are still tonnage totals worth
- * showing, and the empty case says why the list below it is empty.
+ * Two shapes, because the per-commodity breakdown needs a market export the
+ * commander may never have produced: with none there are still tonnage totals
+ * worth showing; the empty case says exactly what to do about it.
  */
 export const CarrierCargoSection = ({
   cargo,
@@ -76,6 +101,8 @@ export const CarrierCargoSection = ({
   freeSpaceTonnage,
   spaceUsage,
   snapshotTime,
+  holdSnapshotTime,
+  unaccountedTonnage,
   buyOrders,
 }: CarrierCargoSectionProps) => {
   const buyOrderCommodities = new Set((buyOrders || []).map((o) => o.commodity_name));
@@ -85,6 +112,7 @@ export const CarrierCargoSection = ({
     freeSpaceTonnage,
     outstandingBuyTonnage,
   );
+  const reconciled = reconciliation(unaccountedTonnage);
 
   if (!cargo || cargo.length === 0) {
     return (
@@ -128,10 +156,10 @@ export const CarrierCargoSection = ({
         )}
 
         <Typography variant="body2" color="text.secondary">
-          No per-commodity carrier inventory snapshot is available locally.
-          The list below only shows per-commodity rows when the carrier market has active SELL stock
-          (Market.json Stock &gt; 0 / journal Stock/Outstanding).
-          If you have cargo in the hold but no active sell orders, this list will be empty.
+          No per-commodity breakdown is available yet. Elite Dangerous writes no carrier
+          inventory event, so the breakdown comes from the carrier&apos;s own market export.
+          Dock at the carrier and open its commodity market once; the hold below then
+          lists every commodity aboard, whether or not it carries a sell order.
         </Typography>
 
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
@@ -144,11 +172,36 @@ export const CarrierCargoSection = ({
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Market-stock snapshot (SELL orders).
+        Carrier hold, heaviest first.
       </Typography>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+        {totalCargoTonnage != null && (
+          <Chip
+            label={`Total cargo in hold: ${totalCargoTonnage.toLocaleString()} t`}
+            variant="outlined"
+            size="small"
+          />
+        )}
+        {freeAfterBuyOrdersTonnage != null && (
+          <Chip
+            label={`Free after all buy orders: ${freeAfterBuyOrdersTonnage.toLocaleString()} t`}
+            variant="outlined"
+            size="small"
+          />
+        )}
+        {reconciled != null && (
+          <Chip
+            label={reconciled.label}
+            variant="outlined"
+            size="small"
+            color={reconciled.colour}
+          />
+        )}
+      </Stack>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-        Snapshot: {new Date(snapshotTime).toLocaleString()}
-        {totalCargoTonnage != null ? ` • Total cargo: ${totalCargoTonnage.toLocaleString()} t` : ''}
+        {holdSnapshotTime != null
+          ? `Hold read from the carrier market at ${new Date(holdSnapshotTime).toLocaleString()}, plus your trades since`
+          : `Snapshot: ${new Date(snapshotTime).toLocaleString()}`}
       </Typography>
       <Divider sx={{ mb: 1 }} />
       <Stack spacing={1.5}>

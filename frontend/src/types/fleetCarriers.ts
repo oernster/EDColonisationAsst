@@ -63,7 +63,25 @@ export interface CarrierSpaceUsage {
 
 export interface CarrierState {
   identity: CarrierIdentity;
+  /**
+   * Per-commodity carrier hold, largest tonnage first. Anchored on the
+   * Market.json Stock column, which is the real hold rather than only what is
+   * listed for sale, then carried forward by the commander's own market
+   * transactions against the carrier.
+   */
   cargo: CarrierCargoItem[];
+  /**
+   * When the Market.json export the hold is anchored on was written. The game
+   * rewrites it on docking and opening the carrier's commodity market, so this
+   * is how old the per-commodity view is. Null when no export was usable.
+   */
+  cargo_snapshot_time?: string | null;
+  /**
+   * total_cargo_tonnage minus the summed per-commodity hold. Zero means the
+   * breakdown still agrees with the carrier's own total. Anything else is
+   * tonnage moved by a route the journal does not record.
+   */
+  cargo_unaccounted_tonnage?: number | null;
 
   /**
    * Raw CarrierStats.SpaceUsage breakdown (when available).
@@ -71,8 +89,8 @@ export interface CarrierState {
   space_usage?: CarrierSpaceUsage | null;
   /**
    * Total cargo tonnage in the carrier hold, taken from CarrierStats.SpaceUsage.Cargo
-   * when available. This may exceed the sum of per‑commodity market stock shown in
-   * the cargo array, which only reflects commodities currently assigned to SELL orders.
+   * when available. This is the carrier's own total and is what the per-commodity
+   * hold is checked against.
    */
   total_cargo_tonnage?: number | null;
   /**

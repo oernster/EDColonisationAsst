@@ -177,7 +177,7 @@ cython_debug/
 
 # Abstra
 # Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
+# Ignore directories containing user credentials, local state and settings.
 # Learn more at https://abstra.io/docs
 .abstra/
 
@@ -217,8 +217,6 @@ frontend/dist/
 # above); the final EXEs land in the dist-* directories.
 dist-runtime/
 dist-installer/
-EDColonizationAsstInstaller.exe
-EDColonizationAsst.exe
 
 # Local scratch notes (release-note material, never shipped)
 NOTES.md
@@ -236,9 +234,7 @@ yarn-error.log*
 backend/commander.yaml
 
 # Colonisation database (local dev/runtime state)
-# Note: both spellings may exist depending on historical builds.
 backend/src/colonisation.db
-backend/src/colonization.db
 
 # installation files
 EDColonisationAsstInstaller.exe
@@ -246,6 +242,6 @@ EDColonisationAsst.exe
 
 # Build marker: buildexe.py rewrites it on every build, so tracking it means
 # every build dirties the tree. The package resolves it at runtime and copes
-# with it being absent, and the packaged app gets a freshly written copy.
+# with it being absent; the packaged app gets a freshly written copy.
 /BUILD_ID
 

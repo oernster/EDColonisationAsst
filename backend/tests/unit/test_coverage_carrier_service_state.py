@@ -206,8 +206,16 @@ def test_state_market_export_fills_missing_orders_only(tmp_path: Path) -> None:
     assert state.snapshot_time == trade.timestamp
 
 
-def test_state_market_export_does_not_overwrite_journal_cargo(tmp_path: Path) -> None:
-    """Existing journal cargo rows survive the Market.json merge."""
+def test_state_hold_follows_the_export_while_orders_keep_journal_values(
+    tmp_path: Path,
+) -> None:
+    """What the carrier holds and what it is offering are separate questions.
+
+    A sell order's Stock is the tonnage attached to that order, so the journal
+    line stays authoritative for the order. The hold is the Market.json Stock
+    column, which covers every commodity aboard whether or not it is on sale.
+    Reading one as the other is what hid cargo that carried no sell order.
+    """
     docked = _docked(minute=0)
     trade = _trade(minute=2, commodity="titanium", sale=5, stock=5)
     _write_market(
@@ -245,8 +253,11 @@ def test_state_market_export_does_not_overwrite_journal_cargo(tmp_path: Path) ->
     assert sells["titanium"].stock == 5
     assert sells["silver"].stock == 3
 
+    # The hold is the export: titanium at its held tonnage rather than the
+    # tonnage on offer, with silver present despite carrying no journal order.
     cargo = {c.commodity_name: c.stock for c in state.cargo}
-    assert cargo == {"titanium": 5}
+    assert cargo == {"titanium": 8, "silver": 3}
+    assert state.cargo_snapshot_time is not None
 
 
 def test_state_space_usage_rounds_floats_and_skips_bad_values(tmp_path: Path) -> None:

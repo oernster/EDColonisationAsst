@@ -18,7 +18,7 @@ import { CurrentCarrierHeader } from './CurrentCarrierHeader';
 /**
  * How often the docked carrier snapshot is refetched.
  *
- * Market and cargo changes are written to the journal by the game, but the
+ * Market and cargo changes are written to the journal by the game; the
  * commander can also change them from inside the carrier menu without any
  * event this application would see, so this poll is what keeps the numbers
  * honest while docked. It stops the moment you undock.
@@ -65,7 +65,7 @@ export const FleetCarriersPanel = () => {
   }, [loadCurrentCarrier, loadMyCarriers]);
 
   // Respond immediately to backend ingestion changes (AJAX long-poll in App.tsx
-  // updates system data, but carriers are separate endpoints).
+  // updates system data; carriers are separate endpoints).
   useEffect(() => {
     const onBackendChanged = () => {
       void refreshCurrentCarrier();
@@ -147,6 +147,8 @@ export const FleetCarriersPanel = () => {
                 freeSpaceTonnage={currentCarrierState.free_space_tonnage ?? null}
                 spaceUsage={currentCarrierState.space_usage ?? null}
                 snapshotTime={currentCarrierState.snapshot_time}
+                holdSnapshotTime={currentCarrierState.cargo_snapshot_time ?? null}
+                unaccountedTonnage={currentCarrierState.cargo_unaccounted_tonnage ?? null}
                 buyOrders={currentCarrierState.buy_orders}
               />
             )}

@@ -19,9 +19,10 @@ from typing import TYPE_CHECKING
 import webbrowser
 
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .common import logger
+from .dialogs import ask_yes_no
 from .environment import RuntimeEnvironment
 
 # Shared Help menu (About + Check for Updates) used by the tray UI.
@@ -122,15 +123,16 @@ class TrayUIController:
 
     def _on_exit(self) -> None:
         logger.info("Exit requested from tray menu.")
-        # Confirm with the user to avoid accidental shutdown.
-        reply = QMessageBox.question(
-            None,
+        # Confirm with the user to avoid accidental shutdown. This goes through
+        # `ask_yes_no` rather than QMessageBox.question because there is no
+        # parent window to give it: a bare question box opens behind the game
+        # and the user, seeing nothing happen, decides Exit is broken.
+        if not ask_yes_no(
             _EXIT_DIALOG_TITLE,
             _EXIT_DIALOG_QUESTION,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        if reply != QMessageBox.Yes:
+            icon_path=self._env.icon_path,
+        ):
+            logger.info("Exit cancelled at the confirmation.")
             return
 
         try:

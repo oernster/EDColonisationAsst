@@ -191,8 +191,12 @@ def test_help_menu_about_action_shows_dialog(
 ) -> None:
     """
     Triggering About must construct the dialog with the resolved version and
-    icon path, then exec() it. A recording dummy stands in for the real
-    Qt dialog.
+    icon path, then present it in front. A recording dummy stands in for the
+    real Qt dialog.
+
+    Presented, not merely exec'd: this menu hangs off a tray icon, so the
+    dialog has no parent and no active window to sit over. A bare exec() opens
+    it behind whatever the user is looking at.
     """
     created: List[dict] = []
 
@@ -207,12 +211,25 @@ def test_help_menu_about_action_shows_dialog(
                 "version": version,
                 "icon_path": icon_path,
                 "parent": parent,
-                "exec_called": False,
+                "calls": [],
             }
             created.append(self._record)
 
+        def setWindowFlag(self, flag: Any, on: bool) -> None:  # noqa: N802
+            self._record["calls"].append("setWindowFlag")
+            self._record["stays_on_top"] = on
+
+        def show(self) -> None:
+            self._record["calls"].append("show")
+
+        def raise_(self) -> None:
+            self._record["calls"].append("raise_")
+
+        def activateWindow(self) -> None:  # noqa: N802
+            self._record["calls"].append("activateWindow")
+
         def exec(self) -> int:
-            self._record["exec_called"] = True
+            self._record["calls"].append("exec")
             return 0
 
     monkeypatch.setattr(help_menu_mod, "AboutDialog", DummyAboutDialog)
@@ -233,7 +250,14 @@ def test_help_menu_about_action_shows_dialog(
     assert len(created) == 1
     assert created[0]["version"] == "4.5.6"
     assert created[0]["icon_path"] == icon
-    assert created[0]["exec_called"] is True
+    assert created[0]["stays_on_top"] is True
+    assert created[0]["calls"] == [
+        "setWindowFlag",
+        "show",
+        "raise_",
+        "activateWindow",
+        "exec",
+    ]
 
 
 def test_add_help_menu_defaults_to_package_version(
@@ -255,6 +279,18 @@ def test_add_help_menu_defaults_to_package_version(
             parent: Any = None,
         ) -> None:
             captured.append(version)
+
+        def setWindowFlag(self, flag: Any, on: bool) -> None:  # noqa: N802
+            """Presentation is asserted above; this test is about the version."""
+
+        def show(self) -> None:
+            """See setWindowFlag."""
+
+        def raise_(self) -> None:
+            """See setWindowFlag."""
+
+        def activateWindow(self) -> None:  # noqa: N802
+            """See setWindowFlag."""
 
         def exec(self) -> int:
             return 0

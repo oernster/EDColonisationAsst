@@ -49,6 +49,12 @@ except ImportError:
     # importing is a real defect and should surface.
     from backend.src import __version__  # type: ignore[import-error]
 
+try:
+    from .dialogs import present  # type: ignore[import-not-found]
+except ImportError:
+    # Same top-level-script case as the version import above.
+    from backend.src.runtime.dialogs import present  # type: ignore[import-error]
+
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 APP_AUTHOR = "Oliver Ernster"
@@ -211,7 +217,10 @@ def add_help_menu(
 
     def _show_about() -> None:
         dialog = AboutDialog(resolved_version, icon_path=icon_path, parent=parent)
-        dialog.exec()
+        # Opened from the tray, this has no parent and no active window to sit
+        # over, so a bare exec() can leave it behind a full-screen game. See
+        # dialogs.present for what that costs and why the order matters.
+        present(dialog)
 
     about_action.triggered.connect(_show_about)
 

@@ -356,6 +356,20 @@ Key classes:
     - “Exit” (with confirmation).
   - Clicking/double‑clicking the tray icon also opens the web UI.
 
+  Every dialog this menu opens goes through
+  [`dialogs.present`](backend/src/runtime/dialogs.py:1) rather than a bare
+  `exec()`. A packaged EDCA has no main window, so a dialog raised from the
+  tray has no parent and the application has no active window for it to sit
+  over; Windows then leaves it wherever the z-order puts it, which with a
+  full-screen game in front is somewhere the user never sees. The Exit
+  confirmation opened there, so pressing Exit looked like nothing happening and
+  read as a refusal to quit. `present` sets `WindowStaysOnTopHint` **before**
+  the window exists (changing it afterwards recreates the window and drops it
+  back down), then shows, raises, activates and only then runs the modal loop.
+  Activation can still be refused, since Windows will not let a process that
+  does not own the foreground steal it, which is exactly why the flag rather
+  than the activation is what carries the fix.
+
 - `RuntimeApplication`: top‑level orchestrator:
 
   - `run()`:

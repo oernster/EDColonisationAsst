@@ -67,6 +67,7 @@ backend/
 │   │   ├── environment.py             # Runtime environment detection
 │   │   ├── launcher_components.py     # Dev launcher orchestration and steps
 │   │   ├── launcher_view.py           # LaunchView interface and Qt window
+│   │   ├── dialogs.py                 # Showing a dialog with no window to show it over
 │   │   ├── splash.py                  # Frozen-runtime startup splash window
 │   │   ├── startup_monitor.py         # Readiness polling and its status line
 │   │   ├── startup_report.py          # Startup progress read back off /api/health

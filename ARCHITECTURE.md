@@ -52,7 +52,6 @@ At a glance:
 - The **backend** watches and parses Elite: Dangerous journal files, persists colonisation state in SQLite, reconstructs Fleet carrier state in memory and exposes REST APIs plus an AJAX long-poll live update endpoint.
 - The **frontend** is a React/TypeScript app (MUI, Zustand, Vite) that consumes those APIs to show system progress, shopping lists, carrier state and settings.
 
-Note: EDCA previously used WebSockets for live updates; this has been replaced by AJAX long-polling via `/api/changes/longpoll`.
 - A **runtime layer** (Qt launcher, tray, packaged EXE) wraps the backend and serves the built frontend to end users, enforcing a single-instance guarantee per OS user.
 
 ---

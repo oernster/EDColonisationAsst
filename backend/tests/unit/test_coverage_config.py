@@ -184,7 +184,6 @@ def test_get_config_missing_files_uses_defaults(
     cfg = config_mod.get_config()
 
     assert cfg.server.port == DEFAULT_BACKEND_PORT
-    assert cfg.websocket.ping_interval == 30
     assert cfg.logging.level == "INFO"
 
 

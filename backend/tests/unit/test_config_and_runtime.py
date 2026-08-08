@@ -129,8 +129,6 @@ def test_get_config_loads_yaml_and_commander_and_caches(
             "server:\n"
             "  host: 127.0.0.1\n"
             "  port: 1234\n"
-            "websocket:\n"
-            "  ping_interval: 10\n"
             "logging:\n"
             "  level: DEBUG\n"
         ),
@@ -162,7 +160,6 @@ def test_get_config_loads_yaml_and_commander_and_caches(
         assert cfg1.journal.directory == os.path.expandvars("/tmp/journals")
         assert cfg1.server.host == "127.0.0.1"
         assert cfg1.server.port == 1234
-        assert cfg1.websocket.ping_interval == 10
         assert cfg1.logging.level == "DEBUG"
 
         assert cfg1.inara.api_key == "KEY"

@@ -1,9 +1,9 @@
 /**
  * The AJAX long-poll loop that keeps the UI in step with journal ingestion.
  *
- * This replaced a WebSocket mechanism. The backend holds the request open and
- * returns when its change sequence advances, so the normal case is one blocked
- * request rather than a poll storm. Two safety nets matter here: a short sleep
+ * The backend holds the request open and returns when its change sequence
+ * advances, so the normal case is one blocked request rather than a poll
+ * storm. Two safety nets matter here: a short sleep
  * when the backend returns immediately with changed=false (a misconfigured
  * proxy or a test double would otherwise spin the CPU), plus exponential
  * backoff when the request itself fails.

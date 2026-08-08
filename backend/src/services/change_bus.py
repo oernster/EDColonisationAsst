@@ -1,7 +1,5 @@
 """In-process change notification bus for AJAX long-polling.
 
-This replaces the WebSocket broadcast mechanism.
-
 The backend maintains a monotonically increasing sequence number. Whenever
 journal ingestion updates persistent state, it increments the sequence and
 wakes any clients waiting on the long-poll endpoint.
@@ -39,7 +37,7 @@ class ChangeBus:
             return self._seq
 
     async def wait_for_change(self, *, since: int, timeout_s: float) -> ChangeSnapshot:
-        """Wait until the sequence advances beyond `since`, or timeout."""
+        """Wait for the sequence to advance beyond `since`; give up at timeout."""
         if self._seq > since:
             return ChangeSnapshot(seq=self._seq, changed=True)
 

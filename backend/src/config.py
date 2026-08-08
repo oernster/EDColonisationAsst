@@ -61,17 +61,6 @@ class ServerConfig(BaseSettings):
     )
 
 
-class WebSocketConfig(BaseSettings):
-    """WebSocket configuration"""
-
-    ping_interval: int = Field(
-        default=30, description="WebSocket ping interval in seconds"
-    )
-    reconnect_attempts: int = Field(
-        default=5, description="Number of reconnection attempts"
-    )
-
-
 class LoggingConfig(BaseSettings):
     """Logging configuration"""
 
@@ -104,7 +93,6 @@ class AppConfig(BaseSettings):
 
     journal: JournalConfig = Field(default_factory=JournalConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
-    websocket: WebSocketConfig = Field(default_factory=WebSocketConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     inara: InaraConfig = Field(default_factory=InaraConfig)
 
@@ -235,7 +223,6 @@ def get_config() -> AppConfig:
         _config = AppConfig(
             journal=JournalConfig(**config_dict.get("journal", {})),
             server=ServerConfig(**config_dict.get("server", {})),
-            websocket=WebSocketConfig(**config_dict.get("websocket", {})),
             logging=LoggingConfig(**config_dict.get("logging", {})),
             inara=inara_cfg,
         )

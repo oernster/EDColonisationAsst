@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
 
     Responsible for:
     - constructing core services and repositories
-    - wiring FastAPI route and WebSocket dependencies
+    - wiring FastAPI route dependencies
     - performing a one-time initial journal import when the DB is empty
     - starting and stopping the journal file watcher
     """
@@ -177,10 +177,9 @@ async def lifespan(app: FastAPI):
         # serves; it just starts with whatever the database already holds.
         logger.exception("Failed to schedule background startup ingestion")
 
-    # Set update callback for file watcher.
-    #
-    # WebSockets have been removed. The UI now uses AJAX long-polling and
-    # refetches via REST when the backend bumps the change sequence.
+    # Set update callback for file watcher. The UI long-polls and refetches
+    # via REST when the backend bumps the change sequence, so all this has to
+    # do is bump it.
     async def _update_callback(_system_name: str) -> None:
         await notify_clients_best_effort()
 
@@ -280,8 +279,6 @@ app.include_router(settings_router)
 app.include_router(journal_router)
 app.include_router(carriers_router)
 app.include_router(changes_router)
-
-# WebSocket endpoint removed (replaced by /api/changes/longpoll).
 
 
 @app.get("/")

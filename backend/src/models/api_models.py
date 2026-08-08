@@ -107,9 +107,6 @@ class HealthResponse(BaseModel):
     )
 
 
-# WebSocket message models removed. Live updates now use AJAX long-polling.
-
-
 class AppSettings(BaseModel):
     """Application settings model"""
 

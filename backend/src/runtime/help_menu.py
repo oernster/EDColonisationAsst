@@ -81,7 +81,7 @@ _OPEN_SOURCE_CREDITS: tuple[tuple[str, str, str], ...] = (
     ("httpx", "BSD-3-Clause", "HTTP client"),
     ("PyYAML", "MIT", "configuration parsing"),
     ("watchdog", "Apache-2.0", "journal file watching"),
-    ("websockets", "BSD-3-Clause", "live updates"),
+    ("websockets", "BSD-3-Clause", "shipped with the ASGI server"),
     ("python-dotenv", "BSD-3-Clause", "environment configuration"),
     ("python-multipart", "Apache-2.0", "form parsing"),
     ("Nuitka", "Apache-2.0", "runtime packaging"),

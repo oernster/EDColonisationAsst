@@ -1,8 +1,13 @@
 """API routes for Fleet carriers.
 
 These endpoints expose a derived view of fleet carrier state to power the
-Frontend Fleet carriers tab. Data is reconstructed on demand from the
-latest Elite: Dangerous journal file; no additional persistence is used.
+Frontend Fleet carriers tab. Data is reconstructed on demand from a window of
+recent Elite: Dangerous journal files; no additional persistence is used.
+
+Two questions run through this module and are deliberately kept apart: where
+the COMMANDER is and what the CARRIER is doing. Where the commander is
+standing does not change what the carrier holds, so a commander who has walked
+away still gets their carrier's state.
 """
 
 from __future__ import annotations
@@ -52,8 +57,9 @@ def _load_recent_journal_events() -> tuple[list[JournalEvent], Path | None, str 
     and then derive the most recent carrier state from the combined stream.
 
     Returns:
-        (events, newest_file_path_str) where newest_file_path_str is None if there
-        are no journal files available.
+        (events, journal_dir, newest_file_path_str). The directory is where the
+        carrier's Market.json export is looked for; both it and the newest file
+        are None when no journal files are available.
     """
     try:
         journal_dir = get_journal_directory()
@@ -94,9 +100,13 @@ def _load_recent_journal_events() -> tuple[list[JournalEvent], Path | None, str 
 async def get_current_carrier() -> CurrentCarrierResponse:
     """Return the carrier (if any) the commander is currently docked at.
 
-    This is derived purely from the latest journal file by finding the
-    most recent Docked event whose StationType is FleetCarrier and
-    enriching it with CarrierStats/CarrierLocation where available.
+    Currently, not once. The answer comes from the newest event that settles
+    the question, out of Docked, Undocked, FSDJump and Location, so it goes
+    false the moment the commander leaves. Asking only for the last Docked at a
+    fleet carrier gives an answer that stays true forever.
+
+    The carrier is then enriched with CarrierStats/CarrierLocation where
+    available.
     """
     events, _journal_dir, _ = _load_recent_journal_events()
     return build_current_carrier_response(events, now=_now())
@@ -104,16 +114,24 @@ async def get_current_carrier() -> CurrentCarrierResponse:
 
 @router.get("/current/state", response_model=CarrierStateResponse)
 async def get_current_carrier_state() -> CarrierStateResponse:
-    """Return a reconstructed snapshot of the currently docked carrier.
+    """Return a reconstructed snapshot of the commander's carrier.
 
-    The snapshot currently includes:
-      - Identity (name, callsign, role, last-seen system)
-      - A best-effort cargo view derived from CarrierTradeOrder SELL orders
+    The snapshot includes:
+      - Identity (name, callsign, role, last-seen system) and, when a jump is
+        booked, where the carrier is heading and when it leaves
+      - The per-commodity hold, anchored on the carrier's own Market.json
+        export and carried forward by the commander's trades against it,
+        with the age of that export and any tonnage it cannot account for
       - Buy and sell orders derived from CarrierTradeOrder events
-      - Total cargo tonnage from CarrierStats.SpaceUsage.Cargo when available
+      - Capacity metrics from CarrierStats.SpaceUsage when available
+      - Fuel, jump range, finances, tax rates and crew
+      - The balance history over the window the journal covers
+      - commander_aboard, which is the only field that answers for the
+        commander rather than for the carrier
 
-    As more carrier-specific events become available (e.g. explicit cargo
-    storage snapshots), this view can be refined.
+    Being aboard is not a precondition. A 404 here means no carrier could be
+    resolved from the journal window at all, not that the commander has
+    undocked from one.
     """
     events, journal_dir, _ = _load_recent_journal_events()
     if not events:
@@ -134,10 +152,10 @@ async def get_current_carrier_state() -> CarrierStateResponse:
 async def get_my_carriers() -> MyCarriersResponse:
     """Return a list of the commander's own and squadron carriers.
 
-    This endpoint walks the latest journal file and looks for CarrierStats
-    and CarrierLocation events, grouping by carrier id. It does *not* try
-    to discover arbitrary third-party carriers beyond what the journal
-    exposes for this commander.
+    This endpoint walks the same window of recent journal files and looks for
+    CarrierStats and CarrierLocation events, grouping by carrier id. It does
+    *not* try to discover arbitrary third-party carriers beyond what the
+    journal exposes for this commander.
     """
     events, _journal_dir, _ = _load_recent_journal_events()
     return build_my_carriers_response(events, now=_now())

@@ -1,6 +1,6 @@
 journal:
   # No directory here on purpose. This file is tracked, so a path written into
-  # it is one machine's path shipped to everybody, and the one that used to be
+  # it is one machine's path shipped to everybody; the one that used to be
   # here pointed at a Linux Steam Proton prefix. Left unset, the journal
   # directory is detected from the Saved Games folder instead. Set it only to
   # override that.
@@ -14,6 +14,3 @@ server:
   - https://oernster.github.io
   host: 0.0.0.0
   port: 47021
-websocket:
-  ping_interval: 30
-  reconnect_attempts: 5

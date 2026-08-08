@@ -202,13 +202,27 @@ flake8 backend/src
 ```
 
 The pre-commit hook runs every one of these before the suite, so a clean run
-here means a clean hook. `frontend/` has no linter wired and is still outside.
+here means a clean hook.
+
+The front end is linted too, by ESLint:
+
+```bash
+cd frontend
+npm run lint
+```
+
+`frontend/eslint.config.js` is the flat config the ESLint 9 upgrade left the
+project without, which is why this script had been failing rather than
+passing. It is composed only from the plugins already in devDependencies and
+is deliberately not type-aware: `npm run type-check` (`tsc --noEmit`) already
+runs strict over the same files and is the better tool for anything needing
+types.
 
 ## Pre-commit hook
 
 With the shared hook enabled (`git config core.hooksPath .githooks`), every
-commit formats staged Python files with black and then runs a bare
-`pytest -q` from the repository root. That is the same command documented
+commit formats staged Python files with black, lints the Python surface and
+the front end, then runs a bare `pytest -q` from the repository root. That is the same command documented
 above and the same gate: both suites, 100% coverage, exit code or nothing.
 
 The interpreter is resolved once, from the root `venv/`, which is where the

@@ -79,9 +79,9 @@ _LEGACY_OVER_LIMIT = frozenset(
     {
         # Front end only: every Python file in the repository is now inside
         # the cap. useKeepAwake.ts shows the project already knows how to move
-        # state out of a component and into a hook. Note that nothing lints
-        # these three (TECH_DEBT item 2), so the line count is the only
-        # automated statement anyone is making about them.
+        # state out of a component and into a hook. All three are linted now
+        # that frontend/eslint.config.js exists, so a split here has the same
+        # kind of checker behind it that the backend splits had.
         "frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx",
         "frontend/src/components/SiteList/SiteList.tsx",
         "frontend/src/hooks/useKeepAwake.ts",

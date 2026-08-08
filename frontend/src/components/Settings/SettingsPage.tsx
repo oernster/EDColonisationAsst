@@ -53,7 +53,7 @@ export const SettingsPage = () => {
           prefer_local_for_commander_systems:
             fetchedSettings.prefer_local_for_commander_systems ?? true,
         });
-      } catch (err) {
+      } catch {
         setError('Failed to load settings.');
       } finally {
         setLoading(false);
@@ -69,11 +69,11 @@ export const SettingsPage = () => {
       setError(null);
       setSuccess(null);
       await api.updateAppSettings(settings);
-     setSuccess('Settings saved successfully!');
-     updateSettings();
-   } catch (err) {
-     setError('Failed to save settings.');
-   } finally {
+      setSuccess('Settings saved successfully!');
+      updateSettings();
+    } catch {
+      setError('Failed to save settings.');
+    } finally {
       setSaving(false);
     }
   };

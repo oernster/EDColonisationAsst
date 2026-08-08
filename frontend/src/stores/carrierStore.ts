@@ -5,6 +5,15 @@ import {
   MyCarriersResponse,
 } from '../types/fleetCarriers';
 import { api } from '../services/api';
+import {
+  apiErrorDetail,
+  apiErrorStatus,
+  apiErrorText,
+} from '../utils/apiError';
+
+// Docking state is fetched optimistically: a 404 is the normal answer when
+// the commander is not docked at a carrier, not a failure worth reporting.
+const NOT_FOUND = 404;
 
 interface CarrierStoreState {
   // Current docked carrier (real-time, based on latest journal events)
@@ -87,12 +96,11 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
         lastKnownCarrierState: state ?? prev.lastKnownCarrierState,
         currentCarrierLoading: false,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 404 from /carriers/current/state just means "not docked at a carrier".
-      const status = error?.response?.status;
-      if (status === 404) {
-        // "Not docked at a carrier" – keep any existing lastKnownCarrierState,
-        // but clear the live currentCarrierState.
+      if (apiErrorStatus(error) === NOT_FOUND) {
+        // "Not docked at a carrier": keep any existing lastKnownCarrierState
+        // while clearing the live currentCarrierState.
         set((prev) => ({
           currentCarrierState: null,
           lastKnownCarrierState: prev.lastKnownCarrierState,
@@ -105,8 +113,8 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
       set({
         currentCarrierLoading: false,
         currentCarrierError:
-          error?.response?.data?.detail ||
-          error?.message ||
+          apiErrorDetail(error) ||
+          apiErrorText(error) ||
           'Failed to load current carrier information',
       });
     }
@@ -159,12 +167,12 @@ export const useCarrierStore = create<CarrierStoreState>((set) => ({
         myCarriers: data,
         myCarriersLoading: false,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       set({
         myCarriersLoading: false,
         myCarriersError:
-          error?.response?.data?.detail ||
-          error?.message ||
+          apiErrorDetail(error) ||
+          apiErrorText(error) ||
           'Failed to load carrier list',
       });
     }

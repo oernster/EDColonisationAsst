@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { useColonisationStore } from '../../stores/colonisationStore';
 import { api } from '../../services/api';
+import { apiErrorDetail } from '../../utils/apiError';
 
 export const SystemSelector = () => {
   const { 
@@ -53,6 +54,12 @@ export const SystemSelector = () => {
    };
 
    loadSystems();
+   // handleSystemSelect is redefined every render, so listing it here would
+   // re-run this effect on every render and refetch the system list each
+   // time. The store setters are stable. This is a load-on-mount effect that
+   // re-runs only when the settings version changes. That is the whole
+   // dependency it has.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [settingsVersion]);
 
  const handleSystemSelect = async (systemName: string | null) => {
@@ -69,9 +76,9 @@ export const SystemSelector = () => {
       
       const data = await api.getSystemData(systemName);
       setSystemData(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load system data:', error);
-      setError(error.response?.data?.detail || 'Failed to load system data');
+      setError(apiErrorDetail(error) || 'Failed to load system data');
       setSystemData(null);
     } finally {
       setLoading(false);

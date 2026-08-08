@@ -6,7 +6,8 @@ set -euo pipefail
 # This hook automatically:
 #   1. Formats staged Python files with black.
 #   2. Re-stages any reformatted files.
-#   3. Runs the full gated suite and blocks the commit if it fails.
+#   3. Lints the Python surface (ruff, flake8) and the front end (eslint).
+#   4. Runs the full gated suite and blocks the commit if any step fails.
 #
 # To enable this hook, run once in the repo root:
 #   git config core.hooksPath .githooks
@@ -81,7 +82,7 @@ fi
 #
 # backend/src joined this list once its sweep finished; it now passes both
 # linters with zero findings; the point of gating it here is that it stays
-# that way. frontend/ has no linter wired at all and is still outside.
+# that way. The front end joined below, once it had a linter at all.
 #
 # ruff runs twice because the two halves resolve different configuration:
 # backend/src is linted against backend/pyproject.toml, named explicitly so the
@@ -100,6 +101,42 @@ echo "[pre-commit] Linting: ${LINT_PATHS[*]} backend/src"
 "${PY[@]}" -m flake8 "${LINT_PATHS[@]}" backend/src
 
 echo "[pre-commit] Linters clean."
+
+# ---------------------------------------------------------------------------
+# 2b. Lint the front end
+# ---------------------------------------------------------------------------
+#
+# frontend/eslint.config.js is the flat config the ESLint 9 upgrade left the
+# project without, which is why `npm run lint` had been failing rather than
+# passing and why nothing had ever checked this half of the codebase. It runs
+# in about two seconds, so it belongs here rather than in a habit.
+#
+# A missing node or a missing node_modules is a NAMED ERROR, not a skip. A
+# hook that quietly does nothing when a tool is absent is how the Python half
+# of this file used to pick a random interpreter. The whole point of gating
+# something is that its absence is loud.
+#
+# `tsc --noEmit` and the Vitest suite are deliberately NOT here: together they
+# cost around fifteen seconds against this step's two, which is a different
+# trade and one to make on purpose rather than by accretion.
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[pre-commit] ERROR: npm not found; cannot lint the front end."
+  echo "[pre-commit]        Install Node.js; otherwise run the lint yourself."
+  exit 1
+fi
+
+if [ ! -d "frontend/node_modules" ]; then
+  echo "[pre-commit] ERROR: frontend/node_modules is missing."
+  echo "[pre-commit]        Run 'npm install' in frontend/ before committing."
+  exit 1
+fi
+
+echo "[pre-commit] Linting: frontend (eslint)"
+
+(cd frontend && npm run --silent lint)
+
+echo "[pre-commit] Front-end linter clean."
 
 # ---------------------------------------------------------------------------
 # 3. Run the full gated suite and block the commit on failure

@@ -259,7 +259,20 @@ flake8 backend/src
 ```
 
 The pre-commit hook runs all of these, so a clean run here means a clean hook.
-`frontend/` has no linter wired and is still outside.
+
+The front end is linted too, by ESLint:
+
+```bash
+cd frontend
+npm run lint
+```
+
+`frontend/eslint.config.js` is the flat config the ESLint 9 upgrade left the
+project without, which is why this script had been failing rather than
+passing. It is composed only from the plugins already in devDependencies and
+is deliberately not type-aware: `npm run type-check` (`tsc --noEmit`) already
+runs strict over the same files and is the better tool for anything needing
+types.
 
 ### Git hooks
 
@@ -271,9 +284,9 @@ git config core.hooksPath .githooks
 chmod +x .githooks/pre-commit
 ```
 
-It formats staged Python files with black and then runs a bare `pytest -q`
-from the repository root, which is the full gate: both suites under the
-100% coverage requirement. It resolves its interpreter from the root
+It formats staged Python files with black, lints the Python surface and the
+front end, then runs a bare `pytest -q` from the repository root, which is
+the full gate: both suites under the 100% coverage requirement. It resolves its interpreter from the root
 `venv/`, the environment that actually carries the tooling. If that
 environment is missing pytest or black it fails with a named error rather
 than falling through to `PATH`.

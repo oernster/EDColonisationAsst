@@ -6,7 +6,7 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ## 1. Three front-end files are over the 400-line module cap
 
-Sixteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180 `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
+Sixteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180, `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -46,7 +46,7 @@ The three identical `change_bus.bump()` guards became one `notify_clients_best_e
 
 `journal_parser.py` split on an observation its own code made: not one of the nine `_parse_*` methods touched `self`. They are now module-level functions in three modules grouped by how much work each does: `colonisation_event_parser.py` (206) holds the two events whose journal format has changed in service and therefore all the normalisation, `carrier_event_parser.py` (140) the three fleet carrier events and `commander_event_parser.py` (92) the four plain field maps. What is left in `journal_parser.py` (180) is relevance, the file walk and the dispatch.
 
-The if/elif dispatch chain became a `_EVENT_PARSERS` table, which is what removes the second restatement of every event name. `RELEVANT_EVENTS` is deliberately NOT derived from that table: a test subclass widens it and an eventual ruling on item 3 might too, so it stays a separate extension point with `parse_line` handling a name the table does not know. Nothing about the split touches item 3, which is still open. No test changed: every one of them goes through `parse_line` or `parse_file`, so coverage stayed at 100% untouched.
+The if/elif dispatch chain became a `_EVENT_PARSERS` table, which is what removes the second restatement of every event name. `RELEVANT_EVENTS` is deliberately NOT derived from that table: a test subclass widens it and an eventual ruling on item 2 might too, so it stays a separate extension point with `parse_line` handling a name the table does not know. Nothing about the split touches that ruling, which is still open. No test changed: every one of them goes through `parse_line` or `parse_file`, so coverage stayed at 100% untouched.
 
 `colonisation_repository.py` was the one to be careful with, because it is the only file in this list holding a lock and a transaction boundary. The cut was chosen so that neither moved: `colonisation_db.py` (225) takes the file location, the schema version and the connection, all of which run once in the constructor before any lock exists; `colonisation_mapping.py` (76) takes the row-to-model rebuild and the commodity-key normalisation, both pure. What is left in `colonisation_repository.py` (288) is the queries and the locking, untouched.
 
@@ -54,17 +54,9 @@ The lock rule is now stated at the top of the module rather than only on the one
 
 `launcher_components.py` split along an interface it already had. `LaunchView` declares four methods and names no Qt type, which is why `Launcher` can be driven end to end by a recording stand-in with no QApplication in the test. `launcher_view.py` (194) now holds that interface and its one real implementation, `QtLaunchWindow`; `launcher_components.py` (321) keeps the steps, the subprocess plumbing and the log. It imports the view module and re-exports it under `__all__`, so `launcher.py` and the tests still reach the whole stack through one name and nothing outside the package changed.
 
-**Every Python file in the repository is now inside the cap.** What is left is three front-end files. Nothing lints any of them: item 2 below is why, and until it is done the line count in the structural suite is the only automated statement anyone is making about the front end. `FleetCarriersPanel.tsx` at 752 is the largest and the last component of real size.
+**Every Python file in the repository is now inside the cap.** What is left is three front-end files. All three are now linted: `frontend/eslint.config.js` arrived with the flat config the ESLint 9 upgrade had left the project without; the pre-commit hook runs it. `FleetCarriersPanel.tsx` at 752 is the largest and the last component of real size.
 
-## 2. `npm run lint` cannot run: there is no ESLint configuration
-
-`frontend/package.json` defines `lint` as `eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0`. It fails immediately with "ESLint couldn't find an eslint.config.(js|mjs|cjs) file". There is no `eslint.config.*` and no `.eslintrc*` anywhere in `frontend/`. ESLint 9.39 is installed and requires flat config, so the script has not worked since that major version landed.
-
-This is why the front end appears in no lint report: not because it is clean; nothing has ever checked it. `tsc --noEmit` and the Vitest suite both pass, so the type layer is honest; the style and correctness layer is simply absent.
-
-Two steps, in order. Add a flat `eslint.config.js` with the TypeScript and React plugins the project already depends on, then read what it reports before deciding whether `--max-warnings 0` is reachable in one pass or wants an allowlist the way the module cap does. The `--ext` flag is also obsolete under flat config and wants removing from the script at the same time.
-
-## 3. The US spelling of the colonisation events is documented but not implemented
+## 2. The US spelling of the colonisation events is documented but not implemented
 
 The parser says it twice over: `RELEVANT_EVENTS` in `journal_parser.py` is commented "accept both US and UK spellings"; `parse_construction_depot` in `colonisation_event_parser.py` lists "US/UK spellings (handled by RELEVANT_EVENTS / dispatch)" among the formats its docstring claims to handle. It said it a third time through a dispatch chain whose set literals were shaped to hold more than one name each; that chain is now a lookup table, so the claim no longer has a place to hide.
 

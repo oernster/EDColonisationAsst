@@ -11,11 +11,19 @@ Two paths, chosen by whether the database already holds anything:
   reinstall, so the full history is already there and only the tail can be
   stale. Re-reading everything on every launch would cost minutes for nothing.
 
-Both run as a detached task off the readiness path, which is why both are
-written to degrade rather than raise: startup ingestion failing must never
-stop the server answering `/api/health`. Both drive the same
-`JournalFileHandler` the live watcher uses, so the merge rules that stop a
-stale snapshot regressing progress apply identically here.
+Both run as a detached task, which is why both are written to degrade rather
+than raise: startup ingestion failing must never stop the server answering
+`/api/health`. Both drive the same `JournalFileHandler` the live watcher uses,
+so the merge rules that stop a stale snapshot regressing progress apply
+identically here.
+
+Detached from the lifespan is NOT detached from the event loop; the
+first-run path is not free: measured against a real 72-file, 67 MB journal
+folder it takes 137 s and blocks the loop for 137 of them in one unbroken
+stall, so `/api/health` cannot be answered for the duration and the startup
+splash sits there. The cost is not parsing (0.3 s); it is one SQLite commit
+per depot event, roughly 4,000 of them, each on its own new connection. See
+TECH_DEBT.md.
 
 `lifespan` in backend/src/main.py owns the choice between them.
 """

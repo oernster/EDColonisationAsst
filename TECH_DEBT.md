@@ -1,8 +1,18 @@
 # Colonisation Assistant: Technical Debt
 
-A standing reference to the project's outstanding technical debt. It records what is still open, weighs whether each item is worth doing and gives the rationale. Every item is a behaviour-preserving internal concern: nothing here proposes reverting a feature or changing any UI or UX behaviour. Scope is the whole repository (the FastAPI backend under `backend/`, the React front end under `frontend/`, the runtime and launcher, the bespoke installer, the delivery scripts and the GitHub Pages site) read against `ARCHITECTURE.md` and its two companion documents.
+A standing reference to the project's outstanding technical debt. It records what is still open, weighs whether each item is worth doing and gives the rationale. Nothing here proposes reverting a feature or changing any UI or UX behaviour, though the open item below is user-visible in its effect: it is a measured startup stall rather than an internal tidy. Scope is the whole repository (the FastAPI backend under `backend/`, the React front end under `frontend/`, the runtime and launcher, the bespoke installer, the delivery scripts and the GitHub Pages site) read against `ARCHITECTURE.md` and its two companion documents.
 
-**Nothing is open.** What follows is the standing decisions that keep it that way: what only looks like debt and what is correct as it stands.
+**One item is open.** It is recorded first, followed by the standing decisions: what only looks like debt and what is correct as it stands.
+
+---
+
+## Open
+
+1. **The first-run journal backfill holds the event loop for the whole of its run.** `prime_colonisation_database_if_empty` in `backend/src/services/startup_ingestion.py` is scheduled with `asyncio.create_task`, so it does not block the ASGI lifespan; the comment in `main.py` reads as though that settles it. It does not. A detached task still owns the single event loop while it runs; this one never yields it. Measured against a real 72-file, 67 MB journal folder, the backfill takes 137.5 s and blocks the loop for 137.4 s in one unbroken stall, so neither `/api/health` nor `/app/` can be answered for the duration. That is what the startup splash reports as "Starting the local backend..." on a first launch. It also sits only 43 s inside the 180 s readiness budget in `runtime/splash.py`, so a slower machine or a larger journal folder turns the stall into a readiness timeout.
+
+   The cost is not parsing. Profiled over the six largest files (29.3 MB, 39.3 s total), `sqlite3.Connection.commit` accounts for 30.3 s of it, 77%, across 4,068 calls at roughly 7.4 ms each: one commit per depot event, each preceded by a fresh `sqlite3.connect` and an `nt.mkdir`. JSON decoding totals 0.27 s across the same run.
+
+   The repair is a transaction and connection strategy for the backfill (either one transaction across the import or a connection held open for its duration), not a faster parser and not a worker thread: the work is fsync-bound, so moving it off the loop without changing the commit pattern would preserve the cost and add a threading problem to it. Because it changes persistence semantics on the path every other write shares, it wants its own unit of work with its own tests rather than being folded into an unrelated change.
 
 ---
 

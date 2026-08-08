@@ -101,6 +101,21 @@ except ImportError:
         ApplicationInstanceLockError,
     )
 
+# The environment supplies the running instance's web UI address, so the
+# already-running branch below opens the port actually in use rather than a
+# hardcoded one that a configured port would silently invalidate.
+try:
+    from .runtime.environment import (  # type: ignore[import-not-found]
+        RuntimeEnvironment,
+    )
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script, which
+    # the frozen Nuitka build does. That is an ImportError; anything else raised while
+    # importing is a real defect and should surface.
+    from backend.src.runtime.environment import (  # type: ignore[import-error]
+        RuntimeEnvironment,
+    )
+
 # Import the core runtime application orchestrator. This lives in
 # backend.src.runtime.app_runtime so that this module can remain small and
 # focused on process-level concerns.
@@ -152,7 +167,7 @@ def main() -> int:
                 )
                 if not no_browser:
                     try:
-                        webbrowser.open("http://127.0.0.1:8000/app/")
+                        webbrowser.open(RuntimeEnvironment.detect().frontend_url)
                     except Exception:  # noqa: BLE001, S110
                         # Browser launch failures must not crash the runtime.
                         pass

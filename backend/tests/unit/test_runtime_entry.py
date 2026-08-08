@@ -23,7 +23,9 @@ def test_main_exits_early_when_lock_already_held(
     In this case we expect:
 
     - No RuntimeApplication to be constructed.
-    - The function to attempt to open the existing web UI in the browser.
+    - The function to attempt to open the existing web UI in the browser, at
+      the address the detected environment reports rather than a hardcoded
+      port that a configured one would silently invalidate.
     - main() to return 0.
     """
 
@@ -51,7 +53,7 @@ def test_main_exits_early_when_lock_already_held(
     code = runtime_entry.main()
 
     assert code == 0
-    assert opened["url"] == "http://127.0.0.1:8000/app/"
+    assert opened["url"] == runtime_entry.RuntimeEnvironment.detect().frontend_url
 
 
 def test_main_continues_when_lock_error(monkeypatch: pytest.MonkeyPatch) -> None:

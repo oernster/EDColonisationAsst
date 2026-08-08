@@ -23,6 +23,13 @@ import os
 from pathlib import Path
 from typing import IO, ClassVar, Self
 
+# The byte region every instance contends for. msvcrt.locking() operates on a
+# region relative to the CURRENT file position rather than an absolute offset,
+# so both the acquire and release paths must seek here first: see
+# _acquire_windows_lock() for what happens when they do not.
+_LOCK_REGION_OFFSET = 0
+_LOCK_REGION_BYTES = 1
+
 
 class ApplicationInstanceLockError(Exception):
     """Raised when the application instance lock cannot be created or used."""
@@ -204,9 +211,18 @@ class ApplicationInstanceLock:
         import msvcrt  # type: ignore[import-not-found]
 
         try:
-            # Lock the first byte of the file; the specific region is arbitrary
-            # as long as all instances use the same region.
-            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            # Seek first. msvcrt.locking() locks a region starting at the
+            # current file position; the lock file is opened in append mode,
+            # which starts at end of file. The file holds the previous holder's
+            # PID, so without this seek the byte an instance locks is decided
+            # by that PID's digit count: a holder whose own PID is a different
+            # length rewrites the file to a different size, so the next
+            # instance locks a DIFFERENT, free byte and wrongly acquires.
+            # Measured with two real processes: a 4-byte file against a 5-digit
+            # PID let both in, while 5 against 5 correctly refused. That is how
+            # two copies of the runtime came to race for port 8000.
+            fh.seek(_LOCK_REGION_OFFSET)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, _LOCK_REGION_BYTES)
             return True
         except OSError:
             # Another process is holding the lock.
@@ -218,8 +234,9 @@ class ApplicationInstanceLock:
         import msvcrt  # type: ignore[import-not-found]
 
         try:
-            fh.seek(0)
-            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            # The same region the acquire path locked, for the same reason.
+            fh.seek(_LOCK_REGION_OFFSET)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, _LOCK_REGION_BYTES)
         except OSError:
             # Best-effort unlock; ignore errors.
             return

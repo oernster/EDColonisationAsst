@@ -256,11 +256,22 @@ class RuntimeApplication:
             if splash is not None:
                 QTimer.singleShot(SPLASH_FAILURE_CLOSE_DELAY_MS, splash.close)
 
+        def _on_failure(reason: str) -> None:
+            # The backend has already failed, so there is nothing left to wait
+            # for: show the cause rather than a generic "taking longer than
+            # expected" the user cannot act on.
+            _debug_log(f"[RuntimeApplication] backend startup failed: {reason}")
+            _set_status(reason)
+            if splash is not None:
+                QTimer.singleShot(SPLASH_FAILURE_CLOSE_DELAY_MS, splash.close)
+
         return StartupMonitor(
             probe=self._backend.probe_ready,
             on_status=_set_status,
             on_ready=_on_ready,
             on_timeout=_on_timeout,
+            failure_reason=self._backend.startup_failure,
+            on_failure=_on_failure,
         )
 
 

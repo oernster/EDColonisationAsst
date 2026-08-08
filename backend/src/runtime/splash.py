@@ -119,11 +119,15 @@ class StartupMonitor:
       the latest result and drives the status/ready/timeout callbacks, so
       each UI tick costs microseconds and the event loop stays fluid.
 
-    When both probes pass the monitor stops and calls ``on_ready`` exactly
-    once; if the timeout budget elapses first it calls ``on_timeout``
-    instead. The clock is injectable and ``probe_once()``/``poll_once()``
-    can be driven directly, so tests need neither threads nor a running
-    Qt event loop.
+    Waiting has exactly three ends. When both probes pass the monitor stops
+    and calls ``on_ready`` exactly once. When ``failure_reason`` returns a
+    reason, the backend is known to be unable to answer and ``on_failure``
+    reports that named cause immediately. Only when neither happens inside
+    the budget does ``on_timeout`` fire, which is then an honest "still
+    starting" rather than a stand-in for every other way startup can fail.
+    The clock is injectable and ``probe_once()``/``poll_once()`` can be
+    driven directly, so tests need neither threads nor a running Qt event
+    loop.
     """
 
     def __init__(
@@ -132,6 +136,8 @@ class StartupMonitor:
         on_status: Callable[[str], None],
         on_ready: Callable[[], None],
         on_timeout: Callable[[], None],
+        failure_reason: Callable[[], str | None],
+        on_failure: Callable[[str], None],
         timeout_seconds: float = READINESS_TIMEOUT_SECONDS,
         interval_ms: int = POLL_INTERVAL_MS,
         monotonic: Callable[[], float] = time.monotonic,
@@ -140,6 +146,8 @@ class StartupMonitor:
         self._on_status = on_status
         self._on_ready = on_ready
         self._on_timeout = on_timeout
+        self._failure_reason = failure_reason
+        self._on_failure = on_failure
         self._timeout_seconds = timeout_seconds
         self._interval_ms = interval_ms
         self._monotonic = monotonic
@@ -201,6 +209,12 @@ class StartupMonitor:
         if backend_ok and frontend_ok:
             self._finish()
             self._on_ready()
+            return
+
+        reason = self._failure_reason()
+        if reason is not None:
+            self._finish()
+            self._on_failure(reason)
             return
 
         if self._monotonic() >= self._deadline:

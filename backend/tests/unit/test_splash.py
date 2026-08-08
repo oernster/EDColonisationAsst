@@ -19,7 +19,6 @@ from typing import Iterator, List, Tuple
 
 import src.runtime.splash as splash_mod
 
-
 # ---------------------------------------------------------------------------
 # startup_status_message
 # ---------------------------------------------------------------------------
@@ -55,6 +54,10 @@ class MonitorHarness:
         self.statuses: List[str] = []
         self.ready_calls = 0
         self.timeout_calls = 0
+        self.failures: list[str] = []
+        # What the backend controller would report; None means "no failure
+        # known", which is the state during a normal slow start.
+        self.reason: str | None = None
 
     def on_status(self, message: str) -> None:
         self.statuses.append(message)
@@ -64,6 +67,12 @@ class MonitorHarness:
 
     def on_timeout(self) -> None:
         self.timeout_calls += 1
+
+    def on_failure(self, reason: str) -> None:
+        self.failures.append(reason)
+
+    def failure_reason(self) -> str | None:
+        return self.reason
 
 
 def make_monitor(
@@ -89,6 +98,8 @@ def make_monitor(
         on_status=harness.on_status,
         on_ready=harness.on_ready,
         on_timeout=harness.on_timeout,
+        failure_reason=harness.failure_reason,
+        on_failure=harness.on_failure,
         timeout_seconds=timeout_seconds,
         monotonic=monotonic,
     )
@@ -177,6 +188,8 @@ def test_monitor_treats_probe_exception_as_not_ready() -> None:
         on_status=harness.on_status,
         on_ready=harness.on_ready,
         on_timeout=harness.on_timeout,
+        failure_reason=harness.failure_reason,
+        on_failure=harness.on_failure,
         timeout_seconds=10.0,
         monotonic=lambda: clock_value[0],
     )
@@ -188,6 +201,55 @@ def test_monitor_treats_probe_exception_as_not_ready() -> None:
     assert harness.ready_calls == 0
     assert harness.timeout_calls == 0
     assert monitor.finished is False
+
+
+def test_monitor_reports_named_failure_without_waiting_out_the_budget() -> None:
+    """A backend known to have failed is reported at once, with its cause.
+
+    Before this, a failed bind was indistinguishable from a slow start: the
+    splash sat on "Starting the local backend..." for the full budget and then
+    blamed slowness, for a backend that had already died.
+    """
+    harness = MonitorHarness()
+
+    def never_ready() -> Iterator[tuple[bool, bool]]:
+        while True:
+            yield (False, False)
+
+    # The clock stays far inside the 10s budget throughout.
+    clock = iter([0.0, 1.0, 1.0, 2.0])
+    monitor = make_monitor(never_ready(), harness, clock, timeout_seconds=10.0)
+
+    step(monitor)
+    assert harness.failures == []
+    assert monitor.finished is False
+
+    harness.reason = "The local backend could not start: port 8000 is in use."
+    step(monitor)
+
+    assert harness.failures == [harness.reason]
+    assert harness.timeout_calls == 0
+    assert harness.ready_calls == 0
+    assert monitor.finished is True
+
+    # Terminal: a further poll reports nothing more.
+    monitor.poll_once()
+    assert harness.failures == [harness.reason]
+
+
+def test_monitor_prefers_ready_over_a_failure_reason() -> None:
+    """A backend that answered is ready, whatever a stale reason says."""
+    harness = MonitorHarness()
+    harness.reason = "The local backend crashed: RuntimeError()"
+    clock = iter([0.0, 0.0])
+
+    monitor = make_monitor(iter([(True, True)]), harness, clock)
+
+    step(monitor)
+
+    assert harness.ready_calls == 1
+    assert harness.failures == []
+    assert monitor.finished is True
 
 
 def test_monitor_probe_loop_stops_when_ready_or_stopped() -> None:
@@ -205,6 +267,8 @@ def test_monitor_probe_loop_stops_when_ready_or_stopped() -> None:
         on_status=harness.on_status,
         on_ready=harness.on_ready,
         on_timeout=harness.on_timeout,
+        failure_reason=harness.failure_reason,
+        on_failure=harness.on_failure,
         timeout_seconds=10.0,
         interval_ms=1,
         monotonic=lambda: 0.0,

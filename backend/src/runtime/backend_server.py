@@ -12,6 +12,7 @@ interface to [`RuntimeApplication`](backend/src/runtime/app_runtime.py:1).
 
 from __future__ import annotations
 
+import socket
 import threading
 import time
 
@@ -30,6 +31,17 @@ _SHUTDOWN_JOIN_TIMEOUT_SECONDS = 10.0
 _HTTP_OK = 200
 _HTTP_ERROR = 400
 
+# Named startup failures. A backend that will never answer is reported with its
+# cause the moment it is known, rather than as an unexplained wait that runs the
+# readiness budget out and then blames slowness.
+STARTUP_FAILURE_PORT_IN_USE = (
+    "The local backend could not start: port {port} is already in use by "
+    "another program. Close that program, then start the assistant again."
+)
+STARTUP_FAILURE_SERVER_STOPPED = "The local backend {what}: {detail}"
+_FAILURE_EXITED = "exited during startup"
+_FAILURE_CRASHED = "crashed"
+
 
 class BackendServerController:
     """
@@ -45,6 +57,7 @@ class BackendServerController:
         self._env = env
         self._server: uvicorn.Server | None = None
         self._thread: threading.Thread | None = None
+        self._startup_failure: str | None = None
 
     # ------------------------------- public API -----------------------------
 
@@ -80,6 +93,15 @@ class BackendServerController:
             self._thread.join(timeout=_SHUTDOWN_JOIN_TIMEOUT_SECONDS)
         logger.info("In-process uvicorn server stopped.")
         _debug_log("[BackendServerController] in-process uvicorn server stopped")
+
+    def startup_failure(self) -> str | None:
+        """The named reason the backend will never become ready, if there is one.
+
+        The startup monitor reads this alongside the readiness probe, so a
+        backend that failed to bind or died on its way up is reported at once
+        with its cause instead of being indistinguishable from a slow start.
+        """
+        return self._startup_failure
 
     def probe_ready(self) -> tuple[bool, bool]:
         """
@@ -175,6 +197,23 @@ class BackendServerController:
 
         host = self._resolve_host()
 
+        if not self._port_available(host):
+            self._startup_failure = STARTUP_FAILURE_PORT_IN_USE.format(
+                port=self._env.backend_port,
+            )
+            logger.error(
+                "Port %d on %s is already in use; the in-process server was "
+                "not started.",
+                self._env.backend_port,
+                host,
+            )
+            _debug_log(
+                "[BackendServerController] port "
+                f"{self._env.backend_port} on {host} already in use; "
+                "in-process uvicorn not started",
+            )
+            return
+
         _debug_log(
             "[BackendServerController] starting in-process uvicorn on "
             f"{host}:{self._env.backend_port}",
@@ -198,6 +237,20 @@ class BackendServerController:
         self._thread = thread
         thread.start()
         _debug_log("[BackendServerController] uvicorn-inprocess thread started")
+
+    def _port_available(self, host: str) -> bool:
+        """Whether the configured backend port can still be bound on this host.
+
+        Deliberately without SO_REUSEADDR, because asyncio does not set it on
+        Windows either: this bind therefore sees exactly what uvicorn's own
+        bind is about to see, which is the point of asking early.
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            try:
+                probe.bind((host, self._env.backend_port))
+            except OSError:
+                return False
+        return True
 
     def _resolve_host(self) -> str:
         """
@@ -246,17 +299,33 @@ class BackendServerController:
                 _debug_log(
                     "[BackendServerController] uvicorn.Server.run() returned normally",
                 )
+            except SystemExit as exc:
+                # Caught separately from Exception below because this is the one
+                # that bit. uvicorn calls sys.exit(1) when it cannot bind the
+                # port; SystemExit is a BaseException, so `except Exception`
+                # does not catch it and Python discards it silently when it is
+                # raised on a thread. The thread just vanished, with no log
+                # line at all; the splash then sat on "Starting the local
+                # backend..." for the entire readiness budget.
+                self._record_startup_failure(exc, _FAILURE_EXITED)
             except Exception as exc:  # noqa: BLE001
                 # Deliberately broad, around the uvicorn server's whole run. Anything
                 # escaping here would kill the thread silently and leave the tray icon
                 # sitting over a dead backend; logging it is what makes that visible.
-                logger.exception("In-process uvicorn server crashed.")
-                _debug_log(
-                    "[BackendServerController] In-process uvicorn server crashed: "
-                    f"{exc!r}",
-                )
+                self._record_startup_failure(exc, _FAILURE_CRASHED)
 
         return _run
+
+    def _record_startup_failure(self, exc: BaseException, what: str) -> None:
+        """Log a failed server run and store its cause for the startup monitor."""
+        self._startup_failure = STARTUP_FAILURE_SERVER_STOPPED.format(
+            what=what,
+            detail=repr(exc),
+        )
+        logger.exception("In-process uvicorn server %s.", what)
+        _debug_log(
+            f"[BackendServerController] in-process uvicorn server {what}: {exc!r}",
+        )
 
 
 __all__ = ["BackendServerController"]

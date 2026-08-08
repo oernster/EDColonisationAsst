@@ -1,11 +1,14 @@
 """Tests for the backend readiness probes in src.runtime.backend_server.
 
-Covers the non-blocking single probe used by the startup splash monitor and
-the blocking wait_until_ready() wrapper that now delegates to it.
+Covers the non-blocking single probe used by the startup splash monitor, the
+blocking wait_until_ready() wrapper that now delegates to it and the named
+startup failures that let the splash say why a backend will never answer
+instead of waiting out its readiness budget and calling it slow.
 """
 
 from __future__ import annotations
 
+import socket
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -21,6 +24,16 @@ from src.runtime.environment import RuntimeEnvironment
 def make_controller(tmp_path: Path) -> backend_server_mod.BackendServerController:
     env = RuntimeEnvironment(mode=RuntimeMode.DEV, project_root=tmp_path)
     return backend_server_mod.BackendServerController(env)
+
+
+class StubServer:
+    """A uvicorn.Server stand-in whose run() fails the way the real one does."""
+
+    def __init__(self, error: BaseException) -> None:
+        self._error = error
+
+    def run(self) -> None:
+        raise self._error
 
 
 class DummyResponse:
@@ -99,3 +112,93 @@ def test_wait_until_ready_times_out_when_probe_never_passes(
     monkeypatch.setattr(backend_server_mod.time, "sleep", lambda _secs: None)
 
     assert controller.wait_until_ready(timeout=60.0) is False
+
+
+# ---------------------------------------------------------------------------
+# Named startup failures
+# ---------------------------------------------------------------------------
+
+
+def test_startup_failure_is_none_until_something_fails(tmp_path: Path) -> None:
+    assert make_controller(tmp_path).startup_failure() is None
+
+
+def test_start_reports_port_in_use_and_starts_no_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A taken port is named at once; no uvicorn thread is started.
+
+    This is the second-instance case from the field: the runtime came up, could
+    not bind and gave the user three minutes of "Starting the local backend..."
+    with no way to tell what was wrong.
+    """
+    host = "127.0.0.1"
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupier:
+        occupier.bind((host, 0))
+        port = occupier.getsockname()[1]
+
+        env = RuntimeEnvironment(
+            mode=RuntimeMode.FROZEN,
+            project_root=tmp_path,
+            backend_port=port,
+        )
+        controller = backend_server_mod.BackendServerController(env)
+        monkeypatch.setattr(controller, "_resolve_host", lambda: host)
+
+        controller.start()
+
+    reason = controller.startup_failure()
+    assert reason is not None
+    assert str(port) in reason
+    # Nothing was started, so there is nothing to stop or wait on.
+    assert controller._server is None
+    assert controller._thread is None
+
+
+def test_port_available_is_true_for_a_free_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    host = "127.0.0.1"
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind((host, 0))
+        free_port = probe.getsockname()[1]
+    # The socket is closed, so the port is free again.
+
+    env = RuntimeEnvironment(
+        mode=RuntimeMode.FROZEN,
+        project_root=tmp_path,
+        backend_port=free_port,
+    )
+    controller = backend_server_mod.BackendServerController(env)
+
+    assert controller._port_available(host) is True
+
+
+def test_runner_records_a_systemexit_as_a_named_failure(tmp_path: Path) -> None:
+    """uvicorn calls sys.exit(1) when it cannot bind.
+
+    SystemExit is a BaseException, so `except Exception` never saw it and
+    Python discards it silently on a thread: the server thread vanished with no
+    log line at all. It must now leave a named cause behind.
+    """
+    controller = make_controller(tmp_path)
+    runner = controller._make_runner(StubServer(SystemExit(1)), "127.0.0.1")
+
+    runner()
+
+    reason = controller.startup_failure()
+    assert reason is not None
+    assert backend_server_mod._FAILURE_EXITED in reason
+    assert "SystemExit(1)" in reason
+
+
+def test_runner_records_a_crash_as_a_named_failure(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+    runner = controller._make_runner(StubServer(RuntimeError("boom")), "127.0.0.1")
+
+    runner()
+
+    reason = controller.startup_failure()
+    assert reason is not None
+    assert backend_server_mod._FAILURE_CRASHED in reason
+    assert "boom" in reason

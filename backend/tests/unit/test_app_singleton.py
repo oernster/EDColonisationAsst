@@ -181,6 +181,48 @@ def test_acquire_propagates_internal_lock_errors(
         lock.acquire()
 
 
+def test_windows_lock_region_does_not_depend_on_file_contents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The locked byte must be the same one for every instance.
+
+    msvcrt.locking() locks a region starting at the CURRENT file position; the
+    lock file is opened in append mode, which starts at end of file. The file
+    holds the previous holder's PID, so a lock taken without seeking first
+    lands at an offset decided by that PID's digit count: two instances whose
+    PIDs differ in length lock DIFFERENT bytes and both acquire. That was
+    reproduced with two real processes; it is what let a second copy of the
+    runtime start and then fail to bind port 8000.
+
+    Note that the same-process tests above cannot catch this: they are short
+    circuited by the _held_paths guard and never reach the OS-level lock.
+    """
+    if os.name != "nt":
+        pytest.skip("Windows-specific locking behaviour")
+
+    import msvcrt  # type: ignore[import-not-found]
+
+    lock = _make_isolated_lock(tmp_path, monkeypatch)
+    lock_path = lock._resolve_lock_path()  # type: ignore[attr-defined]
+    # A stale PID whose length differs from this process's, which is the
+    # condition that broke exclusion.
+    stale_pid = "1" * (len(str(os.getpid())) + 2)
+    lock_path.write_text(stale_pid, encoding="utf-8")
+
+    locked_positions: list[int] = []
+
+    def recording_locking(fd: int, _mode: int, _nbytes: int) -> None:
+        locked_positions.append(os.lseek(fd, 0, os.SEEK_CUR))
+
+    monkeypatch.setattr(msvcrt, "locking", recording_locking)
+
+    try:
+        assert lock.acquire() is True
+        assert locked_positions == [app_singleton_mod._LOCK_REGION_OFFSET]
+    finally:
+        lock.release()
+
+
 def test_resolve_lock_path_raises_when_directory_cannot_be_created(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

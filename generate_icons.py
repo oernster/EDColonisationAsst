@@ -50,6 +50,16 @@ ICO_FILE = PROJECT_ROOT / "EDColonisationAsst.ico"
 SITE_ICON = PROJECT_ROOT / "docs" / "assets" / "edca-icon.png"
 SITE_ICON_SIZE = 256
 
+# The web UI's own copy: the header badge on every tab, and the browser tab
+# icon. Written from here for the same reason as the site's copy, so replacing
+# the artwork cannot leave the running application showing the previous icon.
+# It is imported by App.tsx rather than dropped in public/, so Vite fingerprints
+# it and a missing file fails the build instead of rendering as a broken image.
+WEB_ICON = PROJECT_ROOT / "frontend" / "src" / "assets" / "edca-icon.png"
+
+# Displayed at half this, so it stays sharp on a high-DPI display or a tablet.
+WEB_ICON_SIZE = 128
+
 # The card social platforms unfurl for a link to the site. It is the badge on
 # the site's own background rather than a cropped screenshot of the running
 # application: a screenshot is unreadable at the size these are shown and goes
@@ -256,6 +266,13 @@ def write_ico(image: Image.Image) -> None:
     )
 
 
+def _write_web_icon(badge: Image.Image) -> None:
+    """Write the copy the web UI imports, creating its assets dir if needed."""
+    WEB_ICON.parent.mkdir(parents=True, exist_ok=True)
+    _scaled(badge, WEB_ICON_SIZE).save(WEB_ICON, format="PNG", optimize=True)
+    print(f"Wrote {WEB_ICON.relative_to(PROJECT_ROOT)} at {WEB_ICON_SIZE}px")
+
+
 def _strapline_font() -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     """Return the card's text font, falling back to Pillow's own."""
     for candidate in SOCIAL_FONT_CANDIDATES:
@@ -342,6 +359,7 @@ def main() -> int:
         _scaled(master, SITE_ICON_SIZE).save(SITE_ICON, format="PNG", optimize=True)
         print(f"Wrote {SITE_ICON.relative_to(PROJECT_ROOT)} at {SITE_ICON_SIZE}px")
 
+        _write_web_icon(master)
         write_social_card(master)
         card_width, card_height = SOCIAL_CARD_SIZE
         print(

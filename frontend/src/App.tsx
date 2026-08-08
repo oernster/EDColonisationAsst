@@ -25,6 +25,15 @@ import { ThemeMode, useThemeMode } from './hooks/useThemeMode';
 import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { useBackendMeta } from './hooks/useBackendMeta';
 import { darkTheme, lightTheme } from './theme';
+// Generated from the single master badge by generate_icons.py at the repo root.
+// Imported rather than read from public/ so Vite fingerprints it and a missing
+// file fails the build instead of rendering as a broken image at runtime.
+import edcaIcon from './assets/edca-icon.png';
+
+// The header badge sits beside the h3 title, so it is sized to that line rather
+// than to the asset: the file is written at twice this so it stays sharp on a
+// high-DPI display or a tablet.
+const HEADER_ICON_PX = 64;
 
 const THEME_BUTTON_SX = {
   minWidth: 36,
@@ -93,18 +102,30 @@ function App() {
               gap: 2,
             }}
           >
-            <Box>
-              <Typography
-                variant="h3"
-                component="h1"
-                gutterBottom
-                sx={{ color: 'primary.main', fontWeight: 'bold' }}
-              >
-                Elite: Dangerous Colonisation Assistant
-              </Typography>
-              <Typography variant="subtitle1" color="text.secondary">
-                Real-time tracking for colonisation efforts
-              </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                component="img"
+                src={edcaIcon}
+                alt=""
+                sx={{
+                  width: HEADER_ICON_PX,
+                  height: HEADER_ICON_PX,
+                  flexShrink: 0,
+                }}
+              />
+              <Box>
+                <Typography
+                  variant="h3"
+                  component="h1"
+                  gutterBottom
+                  sx={{ color: 'primary.main', fontWeight: 'bold' }}
+                >
+                  Elite: Dangerous Colonisation Assistant
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Real-time tracking for colonisation efforts
+                </Typography>
+              </Box>
             </Box>
             <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
               <Typography variant="body2" sx={{ color: 'primary.main' }}>

@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Two front-end files are over the 400-line module cap
+## 1. One front-end file is over the 400-line module cap
 
-Seventeen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180, `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
+Eighteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267, `main.py` from 494 to 306, `journal_parser.py` from 488 to 180, `colonisation_repository.py` from 470 to 288 and `launcher_components.py` from 425 to 321. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,11 +22,10 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Two entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+One entry remains in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
-| 598 | `frontend/src/components/SiteList/SiteList.tsx` |
 | 406 | `frontend/src/hooks/useKeepAwake.ts` |
 
 The cap is asserted, so nothing new joins them; a staleness test fails on any entry whose file is no longer over the limit, which is what removed `carrier_service.py` from the list. The list can only shrink and this item closes when it is empty.
@@ -59,7 +58,11 @@ The lock rule is now stated at the top of the module rather than only on the one
 
 This is the first split in the sweep with no existing tests behind it, since the five Vitest tests render `<App />` and never reach this panel. It arrives with eight characterisation tests covering the not-docked copy, the docked header and its chips, the service filtering and ordering, both market columns, the cargo totals and the free-space arithmetic. Those were checked against three mutations (drop the sort, drop the service filter, drop the buy-order reservation), each of which failed exactly one test.
 
-What is left is two front-end files. `SiteList.tsx` at 598 is the larger. Unlike the panel it has no characterisation suite yet, so writing one is part of splitting it rather than an optional extra.
+`SiteList.tsx` came apart the same way, into `SiteCard.tsx` (194), `SystemShoppingList.tsx` (136), `SystemSummary.tsx` (80) and `siteAggregation.ts` (193), leaving `SiteList.tsx` at 118 to own the filtering, the empty states and which site the tabs select. The three derivations that were tangled into the components are now pure functions in `siteAggregation.ts`: the shopping-list aggregation, the completed-station rule and the per-site delivery progress. `isStationCompleted` moving to module scope also settles a question its old position raised, since it was declared in the component body and used inside a `useMemo` that did not list it.
+
+It arrives with 14 tests, six of them driving the arithmetic directly rather than through a render, which is the point of having pulled it out. Four mutations were used to check they were not vacuous (drop the outstanding-sites guard, reverse the sort order, drop a clause from the completed rule, drop the progress clamp) and each failed exactly the test that claims that behaviour. The one pre-existing SiteList test in `App.test.tsx` is left where it is and still passes, which is what shows the extracted progress calculation is unchanged.
+
+What is left is `useKeepAwake.ts` at 406. It is a hook rather than a component, so it will not come apart the way the two panels did: its length is the sequence of wake-lock strategies it falls through, not layout. Every other file that left this list took a characterisation suite with it. That one has none either.
 
 ## 2. The US spelling of the colonisation events is documented but not implemented
 

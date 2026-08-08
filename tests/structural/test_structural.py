@@ -20,11 +20,10 @@ Three things are asserted here.
 * **Module size.** No file over `_MAX_LINES` lines outside an explicit
   allowlist of the files that were already over it when this rule arrived.
 
-The size scan covers TypeScript as well as Python. That now carries the whole
-allowlist: every file still over the limit is front-end, so a scan that
-walked `*.py` only would report a clean repository while
-`FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is measured but not
-parsed: the import rules are Python only.
+The size scan covers TypeScript as well as Python, which is what caught the
+front end at all: a scan walking `*.py` only would have reported a clean
+repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is
+measured but not parsed: the import rules are Python only.
 
 Delivery scripts (`buildexe.py`, `buildinstaller.py`) are deliberately outside
 every scan here. They are linear recipes read top to bottom, where splitting a
@@ -77,14 +76,11 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Front end only: every Python file in the repository is now inside
-        # the cap. useKeepAwake.ts shows the project already knows how to move
-        # state out of a component and into a hook. Both are linted now that
-        # frontend/eslint.config.js exists, so a split here has the same kind
-        # of checker behind it that the backend splits had; FleetCarriersPanel
-        # also picked up a characterisation suite on the way out of this list,
-        # which SiteList.tsx has no equivalent of yet.
-        "frontend/src/components/SiteList/SiteList.tsx",
+        # One file left. useKeepAwake.ts is a hook rather than a component, so
+        # it will not come apart the way the two panels did; its length is the
+        # wake-lock strategies it falls through, not layout. It is linted;
+        # every other file that left this list took a characterisation suite
+        # with it, so it should too.
         "frontend/src/hooks/useKeepAwake.ts",
     }
 )

@@ -58,6 +58,36 @@ class ErrorResponse(BaseModel):
     status_code: int = Field(description="HTTP status code")
 
 
+class StartupProgressResponse(BaseModel):
+    """How far backend startup has got, for the splash to draw.
+
+    The splash already polls health to decide when to open the browser, so
+    this rides along on the same request rather than adding an endpoint.
+    """
+
+    stage: str = Field(description="Coarse phase of startup, e.g. importing_journals")
+    files_done: int = Field(default=0, description="Journal files read so far")
+    files_total: int = Field(default=0, description="Journal files to read in total")
+    bytes_done: int = Field(default=0, description="Bytes of journal read so far")
+    bytes_total: int = Field(default=0, description="Bytes of journal to read")
+    percent: int | None = Field(
+        default=None,
+        description=(
+            "Completion by bytes, or null when no total is known yet. Bytes "
+            "rather than files, because journal files vary hugely in size and "
+            "counting files makes the bar lurch."
+        ),
+    )
+    message: str | None = Field(
+        default=None,
+        description="Status line for this stage, or null to keep the current one.",
+    )
+    explanation: str | None = Field(
+        default=None,
+        description="Why this stage is slow, when there is a reason worth giving.",
+    )
+
+
 class HealthResponse(BaseModel):
     """Health check response"""
 
@@ -70,6 +100,10 @@ class HealthResponse(BaseModel):
     journal_directory: str = Field(description="Configured journal directory")
     journal_accessible: bool = Field(
         description="Whether journal directory is accessible"
+    )
+    startup: StartupProgressResponse | None = Field(
+        default=None,
+        description="Startup progress, for the splash screen to report.",
     )
 
 

@@ -12,6 +12,7 @@ import pytest_asyncio
 import src.config as config_module
 from fastapi import FastAPI, HTTPException
 from src.api import routes as routes_api
+from src.api.health import router as health_router
 from src.api.routes import router as routes_router, set_dependencies
 from src.models.colonisation import Commodity, ConstructionSite
 from src.models.journal_events import DockedEvent
@@ -48,6 +49,8 @@ async def api_app(
     set_dependencies(repository, aggregator, system_tracker)
 
     app = FastAPI()
+    # Health lives on its own router now, and the tests below cover both.
+    app.include_router(health_router)
     app.include_router(routes_router)
     yield app
 

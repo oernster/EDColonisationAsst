@@ -19,6 +19,7 @@ import uvicorn
 
 from .common import RuntimeMode, _debug_log, fastapi_app, logger
 from .environment import RuntimeEnvironment
+from .startup_report import StartupReport, read_body_report
 
 try:
     from ..utils.ports import (  # type: ignore[import-not-found]
@@ -72,6 +73,7 @@ class BackendServerController:
         self._server: uvicorn.Server | None = None
         self._thread: threading.Thread | None = None
         self._startup_failure: str | None = None
+        self._latest_startup: StartupReport | None = None
 
     # ------------------------------- public API -----------------------------
 
@@ -117,6 +119,15 @@ class BackendServerController:
         """
         return self._startup_failure
 
+    def latest_startup(self) -> StartupReport | None:
+        """What the last health probe said about startup progress.
+
+        None until a probe has read a health response carrying it, which
+        covers both a backend still coming up and an older one that does not
+        report progress at all.
+        """
+        return self._latest_startup
+
     def probe_ready(self) -> tuple[bool, bool]:
         """
         Run one readiness probe of the health and web UI endpoints.
@@ -124,6 +135,11 @@ class BackendServerController:
         Returns a (backend_ok, frontend_ok) tuple. Each probe uses a short
         connection timeout so a single call never stalls the caller for
         long; the startup monitor invokes this repeatedly from a Qt timer.
+
+        The health response also carries how far startup has got, which is
+        read here and left on `latest_startup()` for the splash. Doing it on
+        this call rather than on one of its own keeps the splash to a single
+        round trip per tick.
         """
         import urllib.error
         import urllib.request
@@ -132,17 +148,20 @@ class BackendServerController:
         health_url = f"{base}/api/health"
         frontend_url = f"{base}/app/"
 
-        def _probe(url: str) -> bool:
+        def _probe(url: str, *, read_startup: bool = False) -> bool:
             try:
                 with urllib.request.urlopen(
                     url, timeout=_PROBE_TIMEOUT_SECONDS
                 ) as resp:
                     code = resp.getcode()
-                    return _HTTP_OK <= code < _HTTP_ERROR
+                    ok = _HTTP_OK <= code < _HTTP_ERROR
+                    if ok and read_startup:
+                        self._latest_startup = read_body_report(resp)
+                    return ok
             except urllib.error.URLError:
                 return False
 
-        return _probe(health_url), _probe(frontend_url)
+        return _probe(health_url, read_startup=True), _probe(frontend_url)
 
     def wait_until_ready(self, timeout: float = 60.0) -> bool:
         """

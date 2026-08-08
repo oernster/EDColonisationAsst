@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .api.carriers import router as carriers_router
 from .api.changes import router as changes_router
+from .api.health import router as health_router
 from .api.journal import router as journal_router
 from .api.routes import router as colonisation_router, set_dependencies
 from .api.settings import router as settings_router
@@ -273,6 +274,7 @@ else:
     )
 
 # Include routers
+app.include_router(health_router)
 app.include_router(colonisation_router)
 app.include_router(settings_router)
 app.include_router(journal_router)

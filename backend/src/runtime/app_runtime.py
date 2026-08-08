@@ -265,6 +265,18 @@ class RuntimeApplication:
             if splash is not None:
                 QTimer.singleShot(SPLASH_FAILURE_CLOSE_DELAY_MS, splash.close)
 
+        def _on_startup_report(report: object) -> None:
+            # Whatever the backend is doing beats the generic "starting the
+            # local backend", because it is the part that actually takes time
+            # and the only part that can explain itself.
+            if splash is None:
+                return
+            message = getattr(report, "message", None)
+            if message:
+                splash.set_status(message)
+            splash.set_progress(getattr(report, "percent", None))
+            splash.set_detail(getattr(report, "explanation", None))
+
         return StartupMonitor(
             probe=self._backend.probe_ready,
             on_status=_set_status,
@@ -272,6 +284,8 @@ class RuntimeApplication:
             on_timeout=_on_timeout,
             failure_reason=self._backend.startup_failure,
             on_failure=_on_failure,
+            startup_report=self._backend.latest_startup,
+            on_startup_report=_on_startup_report,
         )
 
 

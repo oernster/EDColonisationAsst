@@ -41,6 +41,7 @@ from ..utils.logger import get_logger
 from .change_bus import change_bus
 from .journal_ingestion import JournalFileHandler
 from .journal_parser import JournalParser
+from .startup_progress import startup_progress
 from .system_tracker import SystemTracker
 
 logger = get_logger(__name__)
@@ -60,6 +61,18 @@ def _journal_files_oldest_first(journal_dir: Path) -> list[Path]:
     the later reading is the one that wins the merge.
     """
     return sorted(journal_dir.glob(_JOURNAL_GLOB), key=lambda p: p.stat().st_mtime)
+
+
+def _file_size(path: Path) -> int:
+    """The file's size, or zero when it cannot be read.
+
+    Only used to weight a progress bar, so a file that disappeared between
+    being listed and being measured contributes nothing, which is honest.
+    """
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
 
 
 def _build_handler(
@@ -148,8 +161,15 @@ async def prime_colonisation_database_if_empty(
         parser, system_tracker, repository, asyncio.get_running_loop()
     )
 
+    # Sizes are taken once, before any reading, so the splash can show a real
+    # total rather than a bar that grows its own denominator as it goes. A
+    # file that vanishes between listing and reading counts as nothing, which
+    # is also what it contributes.
+    file_sizes = [_file_size(path) for path in journal_files]
+    startup_progress.begin_import(file_sizes)
+
     processed_files = 0
-    for journal_file in journal_files:
+    for journal_file, file_size in zip(journal_files, file_sizes, strict=True):
         # Hand the loop back between files. Every await inside _process_file
         # resolves without suspending, so without this the whole import runs as
         # one uninterrupted block and the server cannot answer /api/health for
@@ -168,6 +188,13 @@ async def prime_colonisation_database_if_empty(
                 journal_file,
                 exc,
             )
+        finally:
+            # Counted whether or not it parsed: an unreadable file still took
+            # its share of the wait, so a bar that stalled on one would be
+            # reporting the wrong thing.
+            startup_progress.file_imported(file_size)
+
+    startup_progress.finish()
 
     logger.info(
         "Initial journal preload completed: processed %s journal file(s) from %s",
@@ -210,6 +237,8 @@ async def sync_latest_journals_best_effort(
         # Process only the tail of history to keep startup cost bounded.
         tail = journal_files[-_TAIL_JOURNAL_FILE_COUNT:]
 
+        startup_progress.begin_catch_up()
+
         handler = _build_handler(parser, system_tracker, repository, loop)
         for journal_file in tail:
             await handler._process_file(journal_file)
@@ -221,6 +250,10 @@ async def sync_latest_journals_best_effort(
         # is a best-effort catch-up over game-written files and must never
         # take startup down with it. Logged with a traceback, then dropped.
         logger.exception("Best-effort latest journal sync failed")
+    finally:
+        # Whichever way the catch-up ended, startup is no longer waiting on
+        # it, and a splash left reading "catching up" would say otherwise.
+        startup_progress.finish()
 
 
 async def notify_clients_best_effort() -> None:

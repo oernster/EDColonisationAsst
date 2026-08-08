@@ -1,14 +1,12 @@
 """REST API routes"""
 
 from pathlib import Path
-import platform
 
 from fastapi import APIRouter, HTTPException, Query
 
 from ..config import get_config
 from ..models.api_models import (
     CommodityAggregateResponse,
-    HealthResponse,
     SiteListResponse,
     SiteResponse,
     SystemListResponse,
@@ -41,24 +39,6 @@ def set_dependencies(
     _repository = repository
     _aggregator = aggregator
     _system_tracker = system_tracker
-
-
-@router.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
-    """Health check endpoint"""
-    config = get_config()
-    journal_dir = Path(config.journal.directory)
-
-    from .. import __build_id__, __version__
-
-    return HealthResponse(
-        status="healthy",
-        version=__version__,
-        build_id=__build_id__ or "",
-        python_version=platform.python_version(),
-        journal_directory=str(journal_dir),
-        journal_accessible=journal_dir.exists(),
-    )
 
 
 @router.get("/watcher/status", response_model=dict)

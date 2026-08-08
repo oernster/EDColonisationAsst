@@ -340,3 +340,20 @@ async def test_notify_clients_swallows_a_failing_bump(
     monkeypatch.setattr(startup_ingestion, "change_bus", RaisingChangeBus())
 
     await notify_clients_best_effort()
+
+
+def test_a_measurable_file_reports_its_size(tmp_path: Path) -> None:
+    """The weight each file contributes to the startup progress bar."""
+    journal = tmp_path / "Journal.001.log"
+    journal.write_bytes(b"x" * 1234)
+
+    assert startup_ingestion._file_size(journal) == 1234
+
+
+def test_a_file_that_cannot_be_measured_weighs_nothing(tmp_path: Path) -> None:
+    """Sizes are taken before reading, so a file can vanish in between.
+
+    It contributes nothing to the total, which is exactly what it will
+    contribute to the import as well.
+    """
+    assert startup_ingestion._file_size(tmp_path / "gone.log") == 0

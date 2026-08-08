@@ -14,12 +14,14 @@ The backend is a FastAPI service that exposes:
 - **REST endpoints** under the `/api` prefix
 - **AJAX long-poll endpoint** at `/api/changes/longpoll` for live updates
 
-By default the service listens on `http://localhost:<port>`, where the port is configured in the backend configuration (see the main application README / config). When developing a GameGlass shard on the same machine, the typical base URLs are:
+By default the service listens on `http://localhost:47021`. That port is a preference rather than a promise: it is probed first, then the port a previous run recorded, then the remaining candidates in `backend/src/constants.py`, then whatever the operating system will give, because Windows reserves whole ranges and can make a port unbindable while it looks unused. A shard has no way to discover the chosen port, so hardcode the default and correct it by hand in the rare case it moves. The tray icon's **Open Web UI** opens the address actually in use.
+
+When developing a GameGlass shard on the same machine, the typical base URLs are:
 
 - `http://localhost:<port>/api/...` for HTTP requests
 - `http://localhost:<port>/api/changes/longpoll` for long-poll live updates
 
-CORS is configured to allow browser-based clients, so calls from the shard’s embedded web view are permitted as long as they target the correct origin and port.
+**CORS is deliberately narrow.** `cors_origins` in `backend/config.yaml` lists only the frontend dev server, because every entry is a standing grant over the commander's own data to whatever is running on that origin. If your shard's web view enforces the same-origin policy, add its origin to that list yourself; nothing is allowed in advance on the chance that it might be needed.
 
 
 ## 2. Key REST Endpoints for GameGlass

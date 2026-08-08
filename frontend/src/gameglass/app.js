@@ -1,7 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const inProgressList = document.getElementById('in-progress-list');
     const completedList = document.getElementById('completed-list');
-    // Must match DEFAULT_BACKEND_PORT in backend/src/utils/ports.py.
+    // Must match DEFAULT_BACKEND_PORT in backend/src/constants.py. That is the
+    // port the backend asks for and not the one it is guaranteed to get: if the
+    // machine will not give it up the backend serves elsewhere. A shard cannot
+    // discover that, so in the rare case it moves this address is corrected by
+    // hand; the tray icon's Open Web UI reports the real one.
     const API_URL = 'http://127.0.0.1:47021/api/sites';
 
     const fetchData = async () => {

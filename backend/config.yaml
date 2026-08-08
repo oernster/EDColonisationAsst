@@ -9,8 +9,12 @@ logging:
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
   level: INFO
 server:
+  # Origins allowed to read this backend from a browser. Every entry is a grant
+  # over the commander's own data, so the list holds only origins that actually
+  # call the API. The Vite dev server is the one that does. The project's
+  # GitHub Pages site never did; neither does the site it moved to, whose only
+  # fetch goes to the GitHub releases API, which is the other direction.
   cors_origins:
   - http://localhost:5173
-  - https://oernster.github.io
   host: 0.0.0.0
   port: 47021

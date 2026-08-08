@@ -76,19 +76,16 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. carrier_service.py is the one to take first: it is the
-        # largest non-installer file in the repository and the seams are already
-        # implied by its own tests.
-        "backend/src/services/journal_ingestion.py",
+        # Backend source. app_runtime.py is the one to take next: it is the
+        # largest remaining file here and the seams are already implied by its
+        # own tests.
         "backend/src/runtime/app_runtime.py",
         "backend/src/services/journal_parser.py",
         "backend/src/repositories/colonisation_repository.py",
         "backend/src/main.py",
         "backend/src/runtime/launcher_components.py",
-        # Backend tests. The cap applies to test files exactly as to source.
-        # Front end. App.tsx is a root component holding state that belongs in
-        # hooks; useKeepAwake.ts shows the project already knows how to write
-        # them.
+        # Front end. useKeepAwake.ts shows the project already knows how to
+        # move state out of a component and into a hook.
         "frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx",
         "frontend/src/components/SiteList/SiteList.tsx",
         "frontend/src/hooks/useKeepAwake.ts",

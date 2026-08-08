@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Nine files are over the 400-line module cap
+## 1. Eight files are over the 400-line module cap
 
-Ten are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. All eight oversized test modules were then split by the surface each set of tests exercises.
+Eleven are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,13 +22,12 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Eighteen entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-07:
+Eight entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
-| 575 | `backend/src/services/journal_ingestion.py` |
 | 542 | `backend/src/runtime/app_runtime.py` |
 | 494 | `backend/src/main.py` |
 | 488 | `backend/src/services/journal_parser.py` |
@@ -42,7 +41,9 @@ What came out of `App.tsx`, with why each piece is one: `theme.ts` (62) because 
 
 `useLiveUpdates` is the one worth reading before changing. The long-poll loop subscribes once and never again, so it reads the selected system through a ref rather than closing over a value that would go stale immediately. Its two safety nets are load-bearing: a short sleep when the backend returns `changed=false` straight away, which a misconfigured proxy or a test double will do and which would otherwise spin the CPU; and exponential backoff when the request itself fails.
 
-What is left is six backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `journal_ingestion.py` at 575 is the largest on the backend and the one whose seams are least obvious, since a single method carries the incremental tail parse.
+`journal_ingestion.py` came apart along the two concerns its one long method was carrying. `journal_tail_reader.py` (174) owns the byte offset and partial-line buffer that make an append-only file safe to re-read; `colonisation_projection.py` (291) owns the repository merge rules that stop a stale depot snapshot regressing progress. What is left in `journal_ingestion.py` (256) is the watchdog boundary and event routing, plus one `_record_diagnostics` guard in place of the six copies of the same try/except the file used to hold. The tests that reached for the moved methods now call them on the collaborator that owns them.
+
+What is left is five backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `app_runtime.py` at 542 is the largest on the backend.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 

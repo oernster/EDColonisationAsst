@@ -155,13 +155,13 @@ async def test_process_file_truncated_file_resets_offset(tmp_path: Path) -> None
     path.write_text(location_line + "\n", encoding="utf-8")
 
     key = str(path)
-    handler._file_offsets_bytes[key] = path.stat().st_size + 999
-    handler._file_partial_bytes[key] = b"stale partial"
+    handler._tail_reader.offsets[key] = path.stat().st_size + 999
+    handler._tail_reader.partials[key] = b"stale partial"
 
     await handler._process_file(path)
 
-    assert handler._file_offsets_bytes[key] == path.stat().st_size
-    assert handler._file_partial_bytes[key] == b""
+    assert handler._tail_reader.offsets[key] == path.stat().st_size
+    assert handler._tail_reader.partials[key] == b""
     assert len(tracker.locations) == 1
 
 
@@ -194,7 +194,7 @@ async def test_process_file_incremental_tail_parse(tmp_path: Path) -> None:
 
     # First pass performs a full parse and records the EOF offset.
     await handler._process_file(path)
-    assert handler._file_offsets_bytes[key] == path.stat().st_size
+    assert handler._tail_reader.offsets[key] == path.stat().st_size
     assert len(tracker.locations) == 1
 
     depot_line = json.dumps(
@@ -244,7 +244,7 @@ async def test_process_file_incremental_tail_parse(tmp_path: Path) -> None:
 
     await handler._process_file(path)
 
-    assert handler._file_partial_bytes[key] == jump_head
+    assert handler._tail_reader.partials[key] == jump_head
     assert 777 in repo.sites
     assert "Tail System" in callback.calls
     assert len(tracker.jumps) == 0
@@ -255,7 +255,7 @@ async def test_process_file_incremental_tail_parse(tmp_path: Path) -> None:
 
     await handler._process_file(path)
 
-    assert handler._file_partial_bytes[key] == b""
+    assert handler._tail_reader.partials[key] == b""
     assert len(tracker.jumps) == 1
     assert tracker.jumps[0].star_system == "Jump System"
 
@@ -270,12 +270,12 @@ async def test_process_file_incremental_decode_failure(tmp_path: Path) -> None:
     path.write_bytes(first + b"second line\n")
 
     key = str(path)
-    handler._file_offsets_bytes[key] = len(first)
-    handler._file_partial_bytes[key] = _UndecodableBuffer(b"")
+    handler._tail_reader.offsets[key] = len(first)
+    handler._tail_reader.partials[key] = _UndecodableBuffer(b"")
 
     await handler._process_file(path)
 
-    assert handler._file_offsets_bytes[key] == path.stat().st_size
+    assert handler._tail_reader.offsets[key] == path.stat().st_size
     assert handler.last_events_parsed == 0
 
 
@@ -292,12 +292,12 @@ async def test_process_file_incremental_open_failure_falls_back(
 
     fake_path = SequencedStatPath("Journal.fake.log", [100, 100])
     key = str(fake_path)
-    handler._file_offsets_bytes[key] = 10
+    handler._tail_reader.offsets[key] = 10
 
     await handler._process_file(fake_path)
 
-    assert handler._file_offsets_bytes[key] == 100
-    assert handler._file_partial_bytes[key] == b""
+    assert handler._tail_reader.offsets[key] == 100
+    assert handler._tail_reader.partials[key] == b""
     assert tracker.locations == [event]
 
 
@@ -308,9 +308,9 @@ async def test_process_file_incremental_open_and_stat_failure(tmp_path: Path) ->
 
     fake_path = SequencedStatPath("Journal.fake2.log", [64])
     key = str(fake_path)
-    handler._file_offsets_bytes[key] = 10
+    handler._tail_reader.offsets[key] = 10
 
     await handler._process_file(fake_path)
 
-    assert handler._file_offsets_bytes[key] == 64
-    assert handler._file_partial_bytes[key] == b""
+    assert handler._tail_reader.offsets[key] == 64
+    assert handler._tail_reader.partials[key] == b""

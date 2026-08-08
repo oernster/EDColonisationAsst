@@ -74,7 +74,7 @@ async def test_depot_with_unresolved_system_skips_notification(
 
     # Hand-written override of the helper; the real implementation always
     # returns a non-empty system name so this defensive branch needs a fake.
-    handler._process_construction_depot = unresolved_depot  # type: ignore[method-assign]
+    handler._projector.project_depot = unresolved_depot  # type: ignore[method-assign]
 
     await handler._process_file(tmp_path / "Journal.unresolved.log")
 
@@ -147,7 +147,7 @@ async def test_depot_merges_new_and_stale_commodities() -> None:
         ],
     )
 
-    system = await handler._process_construction_depot(event)
+    system = await handler._projector.project_depot(event)
 
     assert system == "Merge System"
     merged = {c.name: c for c in repo.sites[99].commodities}
@@ -173,7 +173,7 @@ async def test_depot_fallbacks_when_tracker_raises() -> None:
         commodities=[],
     )
 
-    system = await handler._process_construction_depot(event)
+    system = await handler._projector.project_depot(event)
 
     assert system == "Unknown System"
     site = repo.sites[808]
@@ -190,7 +190,7 @@ async def test_docked_updates_station_type_only() -> None:
     repo.sites[500] = seeded_site()
     handler = make_handler(loop, repo=repo)
 
-    await handler._process_docked_at_construction_site(
+    await handler._projector.project_docked(
         docked_event(station_type="Construction Depot")
     )
 
@@ -206,9 +206,7 @@ async def test_docked_updates_system_name_only() -> None:
     repo.sites[500] = seeded_site()
     handler = make_handler(loop, repo=repo)
 
-    await handler._process_docked_at_construction_site(
-        docked_event(star_system="Renamed System")
-    )
+    await handler._projector.project_docked(docked_event(star_system="Renamed System"))
 
     assert len(repo.added) == 1
     assert repo.sites[500].system_name == "Renamed System"
@@ -221,7 +219,7 @@ async def test_docked_updates_system_address_only() -> None:
     repo.sites[500] = seeded_site()
     handler = make_handler(loop, repo=repo)
 
-    await handler._process_docked_at_construction_site(docked_event(system_address=901))
+    await handler._projector.project_docked(docked_event(system_address=901))
 
     assert len(repo.added) == 1
     assert repo.sites[500].system_address == 901
@@ -234,6 +232,6 @@ async def test_docked_with_identical_metadata_is_a_no_op() -> None:
     repo.sites[500] = seeded_site()
     handler = make_handler(loop, repo=repo)
 
-    await handler._process_docked_at_construction_site(docked_event())
+    await handler._projector.project_docked(docked_event())
 
     assert repo.added == []

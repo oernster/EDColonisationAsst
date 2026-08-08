@@ -25,7 +25,7 @@ from tests.unit._test_file_watcher_support import (
 async def test_process_construction_depot_creates_site(
     repository: ColonisationRepository,
 ):
-    """_process_construction_depot should create a ConstructionSite with commodities."""
+    """project_depot should create a ConstructionSite with commodities."""
     system_tracker = SystemTracker()
     handler = JournalFileHandler(
         parser=_DummyParser(),
@@ -58,7 +58,7 @@ async def test_process_construction_depot_creates_site(
         raw_data={},
     )
 
-    await handler._process_construction_depot(event)
+    await handler._projector.project_depot(event)
 
     site = await repository.get_site_by_market_id(1)
     assert site is not None
@@ -117,7 +117,7 @@ async def test_process_construction_depot_reuses_existing_metadata(
         raw_data={},
     )
 
-    await handler._process_construction_depot(event)
+    await handler._projector.project_depot(event)
 
     site = await repository.get_site_by_market_id(42)
     assert site is not None
@@ -133,7 +133,7 @@ async def test_process_construction_depot_reuses_existing_metadata(
 async def test_process_contribution_updates_commodity(
     repository: ColonisationRepository,
 ):
-    """_process_contribution should update commodity provided_amount via repository.update_commodity."""
+    """project_contribution should update commodity provided_amount via repository.update_commodity."""
     # Seed repository with a site that has a single commodity
     site = ConstructionSite(
         market_id=7,
@@ -178,7 +178,7 @@ async def test_process_contribution_updates_commodity(
         raw_data={},
     )
 
-    await handler._process_contribution(event)
+    await handler._projector.project_contribution(event)
 
     updated_site = await repository.get_site_by_market_id(7)
     assert updated_site is not None
@@ -231,7 +231,7 @@ async def test_process_docked_at_construction_site_updates_existing_metadata(
         raw_data={},
     )
 
-    await handler._process_docked_at_construction_site(dock_event)
+    await handler._projector.project_docked(dock_event)
 
     updated_site = await repository.get_site_by_market_id(999)
     assert updated_site is not None
@@ -270,7 +270,7 @@ async def test_process_docked_at_construction_site_creates_placeholder_when_miss
         raw_data={},
     )
 
-    await handler._process_docked_at_construction_site(dock_event)
+    await handler._projector.project_docked(dock_event)
 
     site = await repository.get_site_by_market_id(12345)
     assert site is not None

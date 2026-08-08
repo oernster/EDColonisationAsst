@@ -61,7 +61,9 @@ backend/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── journal_parser.py          # Parses Journal.*.log events
-│   │   ├── journal_ingestion.py       # Ingestion pipeline using JournalParser
+│   │   ├── journal_ingestion.py       # Watchdog boundary; routes parsed events
+│   │   ├── journal_tail_reader.py     # Incremental byte-offset reads of a journal
+│   │   ├── colonisation_projection.py # Colonisation events into the repository
 │   │   ├── carrier_service.py         # Carrier response builders (public surface)
 │   │   ├── carrier_events.py          # Latest-event lookups over a journal stream
 │   │   ├── carrier_fleet.py           # Own and squadron carriers
@@ -111,7 +113,7 @@ On startup, the lifespan context manager `lifespan(app)`:
 
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
-   - **First run (empty DB):** `_prime_colonisation_database_if_empty` walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:109) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
+   - **First run (empty DB):** `_prime_colonisation_database_if_empty` walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:153) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
    - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync (`_sync_latest_journals_best_effort`, newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
 
 5. Configures the `FileWatcher`:
@@ -318,28 +320,33 @@ Concurrency:
 
 ### 6.2 Ingestion and system tracking
 
-[`JournalFileHandler`](backend/src/services/journal_ingestion.py:39) orchestrates ingestion:
+Ingestion is three collaborators, split so that the watchdog boundary, the reading of a file being written and the repository merge rules are each testable on their own.
+
+[`JournalFileHandler`](backend/src/services/journal_ingestion.py:62) is the watchdog boundary and the router:
 
 - Hooks into `watchdog` events:
 
   - `on_created`, `on_modified` schedule `_process_file(path)` on the event loop for any `Journal.*.log`.
+  - `on_modified` also fires the `__exports__` refresh for the companion exports (`Market.json`, `Cargo.json`, `Status.json`), which are never parsed here.
 
 - `_process_file(file_path: Path) -> None`:
 
-  1. Calls `parser.parse_file(file_path)` to get `JournalEvent` instances.
-  2. Updates [`SystemTracker`](backend/src/services/system_tracker.py:1) for:
+  1. Asks [`JournalTailReader`](backend/src/services/journal_tail_reader.py:34) for the events appended since the last pass.
+  2. Routes each one through `_route_event`, updating [`SystemTracker`](backend/src/services/system_tracker.py:1) for:
      - `LocationEvent`
      - `FSDJumpEvent`
      - `DockedEvent`
-  3. For `DockedEvent` at colonisation sites:
-     - Invokes `_process_docked_at_construction_site` to create or enrich a `ConstructionSite`.
-  4. For `ColonisationConstructionDepotEvent`:
-     - Invokes `_process_construction_depot` to:
-       - Convert raw commodity payloads into `Commodity` models.
-       - Merge new snapshot state with any existing site, ensuring we never regress progress values.
-  5. For `ColonisationContributionEvent`:
-     - Invokes `_process_contribution` to call `repository.update_commodity`.
-  6. Tracks which systems were updated and invokes the optional `update_callback(system_name)`; in production this bumps the in-process change sequence used by AJAX long-polling.
+  3. Hands every colonisation event to [`ColonisationProjector`](backend/src/services/colonisation_projection.py:40).
+  4. Tracks which systems were updated and invokes the optional `update_callback(system_name)`; in production this bumps the in-process change sequence used by AJAX long-polling.
+  5. Records best-effort diagnostics through `_record_diagnostics`, the single guarded write behind `/api/watcher/status`. A failure there never interrupts ingestion.
+
+[`JournalTailReader`](backend/src/services/journal_tail_reader.py:34) keeps a byte offset and a partial-line buffer per file, so the first sight of a file is a whole-file parse and every pass after it reads only what the game has appended. A partial final line (the game mid-write) is retained and retried rather than parsed as truncated JSON; a file that has shrunk has been rotated, so its state is discarded and the file re-read.
+
+[`ColonisationProjector`](backend/src/services/colonisation_projection.py:40) owns the repository writes:
+
+- `project_docked` creates a placeholder `ConstructionSite` or upgrades an existing one's metadata, which is what reflects a renamed site.
+- `project_depot` converts raw commodity payloads into `Commodity` models and merges the snapshot with any existing site, ensuring progress values never regress. It returns the resolved system name, since depot events frequently omit `StarSystem`.
+- `project_contribution` calls `repository.update_commodity`.
 
 ### 6.3 First‑run vs incremental ingestion
 

@@ -1,15 +1,23 @@
-"""Journal ingestion helpers for Elite Dangerous colonisation data.
+"""Journal ingestion for Elite Dangerous colonisation data.
 
 This module contains the JournalFileHandler class which:
 
-- Parses Journal.*.log files using an injected IJournalParser.
-- Updates the SystemTracker with location/jump/docked events.
-- Projects colonisation-related events into the ColonisationRepository.
+- Filters watchdog events down to Journal.*.log files and companion exports.
+- Schedules asynchronous ingestion on the main event loop.
+- Reads the newly appended lines through a JournalTailReader.
+- Updates the SystemTracker from location, jump and docked events.
+- Projects colonisation events through a ColonisationProjector.
 - Notifies an optional callback with the set of systems that changed.
 
+The handler is the watchdog boundary and little else. Incremental reading
+lives in src.services.journal_tail_reader and the repository merge rules in
+src.services.colonisation_projection, so what remains here is routing each
+parsed event to its collaborator, plus the diagnostics that back the
+/api/watcher/status endpoint.
+
 The FileWatcher in src.services.file_watcher wires filesystem events
-(watchdog Observer) to this handler; keeping the ingestion logic here
-helps keep file_watcher.py focused on watcher lifecycle concerns.
+(watchdog Observer) to this handler; keeping the ingestion logic here helps
+keep file_watcher.py focused on watcher lifecycle concerns.
 """
 
 from __future__ import annotations
@@ -21,29 +29,43 @@ from pathlib import Path
 
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEventHandler
 
-from ..models.colonisation import Commodity, ConstructionSite
 from ..models.journal_events import (
     ColonisationConstructionDepotEvent,
     ColonisationContributionEvent,
     DockedEvent,
     FSDJumpEvent,
+    JournalEvent,
     LocationEvent,
 )
 from ..repositories.colonisation_repository import IColonisationRepository
 from ..utils.logger import get_logger
+from .colonisation_projection import ColonisationProjector
 from .journal_parser import IJournalParser
+from .journal_tail_reader import JournalTailReader
 from .system_tracker import ISystemTracker
 
 logger = get_logger(__name__)
+
+_JOURNAL_PREFIX = "Journal."
+_JOURNAL_SUFFIX = ".log"
+
+# Files the game exports alongside the journal. They are not parsed here; a
+# change to one still means the interface has something new to show.
+_COMPANION_EXPORTS = frozenset({"Market.json", "Cargo.json", "Status.json"})
+_COMPANION_REFRESH_KEY = "__exports__"
+
+# Substrings that mark a docked station type as a colonisation build site.
+_COLONISATION_MARKER = "Colonisation"
+_CONSTRUCTION_MARKER = "Construction"
 
 
 class JournalFileHandler(FileSystemEventHandler):
     """Handler for journal file system events.
 
     Responsibilities:
-    - Filter watchdog events down to Journal.*.log files.
-    - Schedule asynchronous parsing and ingestion on the main event loop.
-    - Update the system tracker and repository based on parsed events.
+    - Filter watchdog events down to the files worth acting on.
+    - Schedule asynchronous ingestion on the main event loop.
+    - Route each parsed event to the tracker or the projector.
     - Invoke an optional update callback for each affected system.
     """
 
@@ -55,23 +77,11 @@ class JournalFileHandler(FileSystemEventHandler):
         update_callback: Callable | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
-        self.parser = parser
-        self.system_tracker = system_tracker
-        self.repository = repository
+        self._system_tracker = system_tracker
+        self._repository = repository
         self.update_callback = update_callback
-        # Legacy field kept for backward compatibility; we now track per-file
-        # offsets for incremental processing instead.
-        self._processed_files: set[str] = set()
-        # Incremental processing state:
-        # - remember how many BYTES we have already read from each journal file
-        # - keep any trailing partial line bytes (when the writer hasn't yet
-        #   terminated the JSON line with a newline).
-        #
-        # This prevents losing events when we read mid-write.
-        self._file_offsets_bytes: dict[str, int] = {}
-        self._file_partial_bytes: dict[str, bytes] = {}
-        # Prevent concurrent incremental reads of the same file.
-        self._process_lock = asyncio.Lock()
+        self._tail_reader = JournalTailReader(parser)
+        self._projector = ColonisationProjector(system_tracker, repository)
         # Event loop used to schedule async processing from watchdog threads
         self._loop = loop or asyncio.get_event_loop()
 
@@ -95,52 +105,23 @@ class JournalFileHandler(FileSystemEventHandler):
 
         file_path = Path(event.src_path)
 
-        # Process either:
-        # - Journal.*.log (ingestion)
-        # - Companion exports (trigger UI refresh via change bus)
-        is_journal = file_path.name.startswith("Journal.") and file_path.name.endswith(
-            ".log"
-        )
-        is_companion_export = file_path.name in {
-            "Market.json",
-            "Cargo.json",
-            "Status.json",
-        }
-
-        if not is_journal and not is_companion_export:
-            return
-
-        if is_companion_export:
+        if file_path.name in _COMPANION_EXPORTS:
             logger.debug("Companion export modified: %s", file_path.name)
-
-            # Companion exports are not journals and are not parsed/ingested here,
-            # but they should still trigger a UI refresh (carrier market relies on
-            # Market.json).
+            # Companion exports are not journals and are not parsed here;
+            # they should still trigger an interface refresh (the carrier
+            # market relies on Market.json).
             if self.update_callback is not None:
                 asyncio.run_coroutine_threadsafe(
-                    self.update_callback("__exports__"),
+                    self.update_callback(_COMPANION_REFRESH_KEY),
                     self._loop,
                 )
             return
 
+        if not _is_journal(file_path):
+            return
+
         logger.debug("Journal file modified: %s", file_path.name)
-
-        # Diagnostics
-        try:
-            self.last_watchdog_event_at = datetime.now(UTC).isoformat()
-            self.last_watchdog_event_type = "modified"
-            self.last_watchdog_event_path = str(file_path)
-        except Exception:  # noqa: BLE001, S110
-            # Deliberately broad. This is diagnostic bookkeeping for the status
-            # endpoint, not ingestion. Losing a field there is invisible to the user;
-            # raising here would abandon journal processing that had already succeeded.
-            pass
-
-        # Schedule processing on the main event loop from the watchdog thread
-        asyncio.run_coroutine_threadsafe(
-            self._process_file(file_path),
-            self._loop,
-        )
+        self._schedule_processing(file_path, event_type="modified")
 
     def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
         """Handle file creation events."""
@@ -148,26 +129,19 @@ class JournalFileHandler(FileSystemEventHandler):
             return
 
         file_path = Path(event.src_path)
-
-        # Only process journal files
-        if not file_path.name.startswith("Journal.") or not file_path.name.endswith(
-            ".log"
-        ):
+        if not _is_journal(file_path):
             return
 
         logger.info("New journal file created: %s", file_path.name)
+        self._schedule_processing(file_path, event_type="created")
 
-        # Diagnostics
-        try:
-            self.last_watchdog_event_at = datetime.now(UTC).isoformat()
-            self.last_watchdog_event_type = "created"
-            self.last_watchdog_event_path = str(file_path)
-        except Exception:  # noqa: BLE001, S110
-            # Deliberately broad. This is diagnostic bookkeeping for the status
-            # endpoint, not ingestion. Losing a field there is invisible to the user;
-            # raising here would abandon journal processing that had already succeeded.
-            pass
-
+    def _schedule_processing(self, file_path: Path, event_type: str) -> None:
+        """Record the watchdog event and queue the file on the event loop."""
+        self._record_diagnostics(
+            last_watchdog_event_at=datetime.now(UTC).isoformat(),
+            last_watchdog_event_type=event_type,
+            last_watchdog_event_path=str(file_path),
+        )
         # Schedule processing on the main event loop from the watchdog thread
         asyncio.run_coroutine_threadsafe(
             self._process_file(file_path),
@@ -183,393 +157,100 @@ class JournalFileHandler(FileSystemEventHandler):
             file_path: path to the journal file to parse.
         """
         try:
-            # Diagnostics
-            try:
-                self.last_processed_file = str(file_path)
-                self.last_processed_at = datetime.now(UTC).isoformat()
-                self.last_error = None
-            except Exception:  # noqa: BLE001, S110
-                # Deliberately broad. This is diagnostic bookkeeping for the status
-                # endpoint, not ingestion. Losing a field there is invisible to the
-                # user; raising here would abandon journal processing that had already
-                # succeeded.
-                pass
+            self._record_diagnostics(
+                last_processed_file=str(file_path),
+                last_processed_at=datetime.now(UTC).isoformat(),
+                last_error=None,
+            )
 
-            # Parse the file incrementally (append-only journal semantics).
-            # - First time we see a file: parse entire file via parse_file.
-            # - Subsequent calls: only parse newly appended lines via parse_line.
-            async with self._process_lock:
-                key = str(file_path)
-                offset = int(self._file_offsets_bytes.get(key, 0))
-                partial = self._file_partial_bytes.get(key, b"")
-
-                try:
-                    current_size = file_path.stat().st_size
-                except OSError:
-                    current_size = 0
-
-                # Handle truncation/rotation edge case.
-                if current_size < offset:
-                    offset = 0
-                    partial = b""
-
-                events = []
-                if offset <= 0:
-                    events = self.parser.parse_file(file_path)
-                    # After full parse, mark offset at EOF.
-                    try:
-                        self._file_offsets_bytes[key] = file_path.stat().st_size
-                    except OSError:
-                        self._file_offsets_bytes[key] = current_size
-                    self._file_partial_bytes[key] = b""
-                else:
-                    # Incremental tail parse from byte offset.
-                    # IMPORTANT: journals are appended line-by-line. If we read
-                    # while Elite is still writing the final JSON line, we will
-                    # see a partial line without a trailing newline. We MUST
-                    # retain that partial and retry it on the next pass.
-                    try:
-                        # Blocking and flagged as such; this is the
-                        # INCREMENTAL branch: it seeks to the stored byte
-                        # offset and reads only what the game has appended
-                        # since the last pass, which is a handful of lines.
-                        # The whole-file branch above goes through
-                        # parser.parse_file, which ruff cannot see and which
-                        # is the one that would actually be worth moving off
-                        # the loop if this ever becomes a problem.
-                        with open(file_path, "rb") as f:  # noqa: ASYNC230
-                            f.seek(offset)
-                            chunk = f.read()
-                            new_offset = offset + len(chunk)
-
-                        buf = partial + chunk
-                        parts = buf.split(b"\n")
-                        complete_parts = parts[:-1]
-                        new_partial = parts[-1]  # may be b"" when newline-terminated
-
-                        for part in complete_parts:
-                            if not part:
-                                continue
-                            # Decode a single line; tolerate any weird bytes.
-                            try:
-                                line = part.decode("utf-8", errors="replace").strip()
-                            except Exception:  # noqa: BLE001, S112
-                                # errors="replace" already absorbs bad
-                                # bytes, so reaching here means the line
-                                # is unusable rather than merely odd. One
-                                # bad line must not abandon the rest of
-                                # the chunk; logging every one would
-                                # flood the log during a live tail.
-                                continue
-                            if not line:
-                                continue
-                            try:
-                                ev = self.parser.parse_line(line)
-                                if ev is not None:
-                                    events.append(ev)
-                            except Exception:  # noqa: BLE001, S112
-                                # Keep processing. The parser logs the
-                                # cause itself, so logging again here
-                                # would duplicate every parse failure,
-                                # and one unparseable line must not stop
-                                # the remaining events in the chunk.
-                                continue
-
-                        self._file_offsets_bytes[key] = new_offset
-                        self._file_partial_bytes[key] = new_partial
-                    except OSError:
-                        # If we can't open/seek, fall back to full parse.
-                        events = self.parser.parse_file(file_path)
-                        try:
-                            self._file_offsets_bytes[key] = file_path.stat().st_size
-                        except OSError:
-                            self._file_offsets_bytes[key] = current_size
-                        self._file_partial_bytes[key] = b""
-
-            # Diagnostics
-            try:
-                self.last_events_parsed = len(events)
-            except Exception:  # noqa: BLE001, S110
-                # Deliberately broad. This is diagnostic bookkeeping for the status
-                # endpoint, not ingestion. Losing a field there is invisible to the
-                # user; raising here would abandon journal processing that had already
-                # succeeded.
-                pass
-
+            events = await self._tail_reader.read_events(file_path)
+            self._record_diagnostics(last_events_parsed=len(events))
             if not events:
                 return
 
-            # Process each event
             updated_systems: set[str] = set()
             depot_market_ids: set[int] = set()
 
             for event in events:
-                # Update system tracker
-                if isinstance(event, LocationEvent):
-                    self.system_tracker.update_from_location(event)
-                elif isinstance(event, FSDJumpEvent):
-                    self.system_tracker.update_from_jump(event)
-                elif isinstance(event, DockedEvent):
-                    self.system_tracker.update_from_docked(event)
-                    # Also check if this is a colonisation site
-                    if (
-                        "Colonisation" in event.station_type
-                        or "Construction" in event.station_type
-                    ):
-                        await self._process_docked_at_construction_site(event)
-                        updated_systems.add(event.star_system)
+                await self._route_event(event, updated_systems, depot_market_ids)
 
-                # Process colonisation events
-                if isinstance(event, ColonisationConstructionDepotEvent):
-                    depot_market_ids.add(event.market_id)
-                    resolved_system = await self._process_construction_depot(event)
-                    # Depot events often omit StarSystem; use the resolved system
-                    # name (from existing site / tracker fallbacks) for updates.
-                    if resolved_system:
-                        updated_systems.add(resolved_system)
-                elif isinstance(event, ColonisationContributionEvent):
-                    await self._process_contribution(event)
-                    site = await self.repository.get_site_by_market_id(event.market_id)
-                    if site:
-                        updated_systems.add(site.system_name)
-
-            # Notify about updates
             if updated_systems and self.update_callback:
                 for system_name in updated_systems:
                     await self.update_callback(system_name)
 
-            # Diagnostics: record which systems/market IDs were updated.
-            try:
-                self.last_updated_systems = sorted(updated_systems)
-                self.last_depot_market_ids = sorted(depot_market_ids)
-            except Exception:  # noqa: BLE001, S110
-                # Deliberately broad. This is diagnostic bookkeeping for the status
-                # endpoint, not ingestion. Losing a field there is invisible to the
-                # user; raising here would abandon journal processing that had already
-                # succeeded.
-                pass
+            self._record_diagnostics(
+                last_updated_systems=sorted(updated_systems),
+                last_depot_market_ids=sorted(depot_market_ids),
+            )
 
         except Exception as exc:  # noqa: BLE001
-            # Deliberately broad, per file. This is the whole ingestion of one journal
-            # file: reading it while the game writes it, parsing lines across years of
-            # format changes and persisting the results. One bad file must not stop the
-            # watcher.
+            # Deliberately broad, per file. This is the whole ingestion of one
+            # journal file: reading it while the game writes it, parsing lines
+            # across years of format changes and persisting the results. One
+            # bad file must not stop the watcher.
             logger.error("Error processing file %s: %s", file_path, exc)
-            try:
-                self.last_error = f"{type(exc).__name__}: {exc}"
-            except Exception:  # noqa: BLE001, S110
-                # Deliberately broad. This is diagnostic bookkeeping for the status
-                # endpoint, not ingestion. Losing a field there is invisible to the
-                # user; raising here would abandon journal processing that had already
-                # succeeded.
-                pass
+            self._record_diagnostics(last_error=f"{type(exc).__name__}: {exc}")
 
-    async def _process_construction_depot(
+    async def _route_event(
         self,
-        event: ColonisationConstructionDepotEvent,
-    ) -> str:
-        """Process ColonisationConstructionDepot event.
+        event: JournalEvent,
+        updated_systems: set[str],
+        depot_market_ids: set[int],
+    ) -> None:
+        """Send one parsed event to the tracker, the projector or both.
 
-        Notes:
-            - Elite can emit many snapshot events while you sit on the
-              construction screen. They all share the same MarketID and
-              mostly identical data. We treat them as *updates* of a single
-              site, not separate sites.
-            - Some ColonisationConstructionDepot events omit station/system
-              fields; in that case we reuse metadata from any existing site
-              with the same market_id (typically created from a Docked event),
-              or fall back to the SystemTracker's current system/station.
-            - New snapshots must never *lose* progress that was previously
-              observed in either:
-                • earlier depot snapshots or
-                • ColonisationContribution events.
-              To ensure this we merge commodity progress with any existing
-              site and take the maximum observed provided_amount/required_amount
-              per commodity.
+        `updated_systems` collects the systems whose data changed, which the
+        caller notifies once per file rather than once per event.
         """
-        # Try to reuse existing site metadata and commodity state if we have it.
-        existing_site = await self.repository.get_site_by_market_id(event.market_id)
+        if isinstance(event, LocationEvent):
+            self._system_tracker.update_from_location(event)
+        elif isinstance(event, FSDJumpEvent):
+            self._system_tracker.update_from_jump(event)
+        elif isinstance(event, DockedEvent):
+            self._system_tracker.update_from_docked(event)
+            if _is_construction_station(event):
+                await self._projector.project_docked(event)
+                updated_systems.add(event.star_system)
 
-        # Convert commodities from raw data to Commodity objects from the current
-        # snapshot payload.
-        snapshot_commodities: dict[str, Commodity] = {}
-        for comm_data in event.commodities:
-            name = comm_data.get("Name", "")
-            commodity = Commodity(
-                name=name,
-                name_localised=comm_data.get("Name_Localised", name),
-                required_amount=comm_data.get("Total", 0),
-                provided_amount=comm_data.get("Delivered", 0),
-                payment=comm_data.get("Payment", 0),
-            )
-            snapshot_commodities[name] = commodity
+        if isinstance(event, ColonisationConstructionDepotEvent):
+            depot_market_ids.add(event.market_id)
+            # Depot events often omit StarSystem, so the notification uses the
+            # system the projector resolved from the site and the tracker.
+            resolved_system = await self._projector.project_depot(event)
+            if resolved_system:
+                updated_systems.add(resolved_system)
+        elif isinstance(event, ColonisationContributionEvent):
+            await self._projector.project_contribution(event)
+            site = await self._repository.get_site_by_market_id(event.market_id)
+            if site:
+                updated_systems.add(site.system_name)
 
-        # Also fall back to the currently tracked system/station when event
-        # fields are missing.
-        try:
-            current_system = self.system_tracker.get_current_system()
-        except Exception:  # noqa: BLE001
-            # Deliberately broad. The tracker is an injected collaborator, so its
-            # failure modes belong to the implementation behind the interface. None
-            # means 'unknown system', which the callers below already handle.
-            current_system = None
+    def _record_diagnostics(self, **fields: object) -> None:
+        """Best-effort bookkeeping for the /api/watcher/status endpoint.
 
-        try:
-            # get_current_station only returns a value when docked
-            current_station = self.system_tracker.get_current_station()
-        except Exception:  # noqa: BLE001
-            # Deliberately broad, as above, for the station.
-            current_station = None
-
-        # For depot snapshots, prefer any existing site metadata where present.
-        # These events can be incomplete (missing station/system), so we do not
-        # blindly overwrite good values with placeholders. Renames are handled
-        # primarily via Docked events.
-        station_name = (
-            (existing_site.station_name if existing_site else event.station_name)
-            or current_station
-            or "Unknown Station"
-        )
-        station_type = (
-            existing_site.station_type if existing_site else event.station_type
-        ) or "Unknown"
-        system_name = (
-            (existing_site.system_name if existing_site else event.system_name)
-            or current_system
-            or "Unknown System"
-        )
-        system_address = (
-            existing_site.system_address if existing_site else event.system_address
-        ) or 0
-
-        # Merge commodity progress with any existing site so that we never regress
-        # provided_amount/required_amount due to a partial or stale snapshot.
-        merged_commodities: list[Commodity] = []
-        if existing_site is not None and existing_site.commodities:
-            existing_by_name = {c.name: c for c in existing_site.commodities}
-
-            # First, merge commodities that appear in the new snapshot.
-            for name, snap_comm in snapshot_commodities.items():
-                prev = existing_by_name.get(name)
-                if prev is not None:
-                    merged_commodities.append(
-                        Commodity(
-                            name=name,
-                            name_localised=snap_comm.name_localised
-                            or prev.name_localised,
-                            required_amount=max(
-                                prev.required_amount, snap_comm.required_amount
-                            ),
-                            provided_amount=max(
-                                prev.provided_amount, snap_comm.provided_amount
-                            ),
-                            payment=snap_comm.payment or prev.payment,
-                        )
-                    )
-                else:
-                    merged_commodities.append(snap_comm)
-
-            # Then, keep any commodities that were previously known but no longer
-            # appear in the snapshot payload. This is defensive: journals should
-            # normally continue to report all commodities but we never want to
-            # silently drop progress from the database.
-            for name, prev in existing_by_name.items():
-                if name not in snapshot_commodities:
-                    merged_commodities.append(prev)
-        else:
-            merged_commodities = list(snapshot_commodities.values())
-
-        # Persist to repository.
-        await self.repository.add_construction_site(
-            ConstructionSite(
-                market_id=event.market_id,
-                station_name=station_name,
-                station_type=station_type,
-                system_name=system_name,
-                system_address=system_address,
-                construction_progress=event.construction_progress,
-                construction_complete=event.construction_complete,
-                construction_failed=event.construction_failed,
-                commodities=merged_commodities,
-            )
-        )
-
-        return system_name
-
-    async def _process_contribution(self, event: ColonisationContributionEvent) -> None:
-        """Process ColonisationContribution event."""
-        await self.repository.update_commodity(
-            market_id=event.market_id,
-            commodity_name=event.commodity,
-            provided_amount=event.total_quantity,
-        )
-
-        logger.info(
-            "Contribution recorded: %s %s (total: %s, credits: %s)",
-            event.quantity,
-            event.commodity_localised or event.commodity,
-            event.total_quantity,
-            event.credits_received,
-        )
-
-    async def _process_docked_at_construction_site(self, event: DockedEvent) -> None:
-        """Process a Docked event that occurs at a construction site.
-
-        If a site already exists for this MarketID but has placeholder
-        metadata (e.g. 'Unknown Station' / 'Unknown System'), we upgrade
-        that metadata from the Docked event instead of returning early.
-        Otherwise this creates a placeholder ConstructionSite.
+        Deliberately broad: one guard for every diagnostic write in the class.
+        This is not ingestion. Losing a field here is invisible to the user,
+        whereas raising would abandon journal processing that had already
+        succeeded. Fields are applied in order, so a failure leaves the ones
+        after it untouched.
         """
-        existing_site = await self.repository.get_site_by_market_id(event.market_id)
-        if existing_site:
-            updated = False
+        try:
+            for name, value in fields.items():
+                setattr(self, name, value)
+        except Exception:  # noqa: BLE001, S110
+            pass
 
-            # Always trust the latest Docked metadata; this also allows renamed
-            # construction sites to be reflected correctly.
-            if event.station_name and event.station_name != existing_site.station_name:
-                existing_site.station_name = event.station_name
-                updated = True
 
-            if event.station_type and event.station_type != existing_site.station_type:
-                existing_site.station_type = event.station_type
-                updated = True
+def _is_journal(file_path: Path) -> bool:
+    """Whether the path names a journal file rather than anything else."""
+    return file_path.name.startswith(_JOURNAL_PREFIX) and file_path.name.endswith(
+        _JOURNAL_SUFFIX
+    )
 
-            if event.star_system and event.star_system != existing_site.system_name:
-                existing_site.system_name = event.star_system
-                updated = True
 
-            if (
-                event.system_address
-                and event.system_address != existing_site.system_address
-            ):
-                existing_site.system_address = event.system_address
-                updated = True
-
-            if updated:
-                await self.repository.add_construction_site(existing_site)
-                logger.info(
-                    "Updated construction site metadata from Docked event: %s in %s",
-                    existing_site.station_name,
-                    existing_site.system_name,
-                )
-            return  # Either updated or already matched the latest metadata
-
-        # No existing site: create placeholder from Docked data
-        site = ConstructionSite(
-            market_id=event.market_id,
-            station_name=event.station_name,
-            station_type=event.station_type,
-            system_name=event.star_system,
-            system_address=event.system_address,
-            # We do not have progress or commodity data from a simple Docked event.
-            construction_progress=0,
-            construction_complete=False,
-            construction_failed=False,
-            commodities=[],
-        )
-        await self.repository.add_construction_site(site)
-        logger.info(
-            "Discovered new construction site from Docked event: %s in %s",
-            site.station_name,
-            site.system_name,
-        )
+def _is_construction_station(event: DockedEvent) -> bool:
+    """Whether a Docked event landed at a colonisation construction site."""
+    return (
+        _COLONISATION_MARKER in event.station_type
+        or _CONSTRUCTION_MARKER in event.station_type
+    )

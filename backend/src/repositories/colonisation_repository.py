@@ -228,7 +228,7 @@ class ColonisationRepository(IColonisationRepository):
               version.
 
         On first run (or after reset), the FastAPI lifespan helper
-        `_prime_colonisation_database_if_empty` is responsible for repopulating
+        `prime_colonisation_database_if_empty` is responsible for repopulating
         the fresh DB from the user's journal files.
         """
         # If the DB file does not exist at all, just create it and stamp the

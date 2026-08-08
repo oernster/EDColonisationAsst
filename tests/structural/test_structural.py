@@ -76,10 +76,10 @@ _SIZE_SCAN_SUFFIXES = (".py", ".ts", ".tsx")
 # over the limit or no longer exists, so an entry cannot outlive its file.
 _LEGACY_OVER_LIMIT = frozenset(
     {
-        # Backend source. main.py is the one to take next: it is the largest
-        # remaining file here; it is also a composition root that has
-        # accumulated startup work belonging to the pieces it wires together.
-        "backend/src/main.py",
+        # Backend source. journal_parser.py is the one to take next: it is the
+        # largest remaining file here and its per-event parsers are already
+        # separate functions. Splitting it does not settle the open question in
+        # TECH_DEBT item 3 about the US spellings; leave that ruling alone.
         "backend/src/services/journal_parser.py",
         "backend/src/repositories/colonisation_repository.py",
         "backend/src/runtime/launcher_components.py",

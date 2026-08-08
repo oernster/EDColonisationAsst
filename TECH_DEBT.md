@@ -4,9 +4,9 @@ A standing reference to the project's outstanding technical debt. It records wha
 
 ---
 
-## 1. Seven files are over the 400-line module cap
+## 1. Six files are over the 400-line module cap
 
-Twelve are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256 and `app_runtime.py` from 542 to 267. All eight oversized test modules were then split by the surface each set of tests exercises.
+Thirteen are done. `carrier_service.py` went from 960 lines to seven modules, none over 263, along the seams its own section markers already described. `App.tsx` went from 651 to 249 by moving its state into hooks, which is what the item said it was holding. `journal_ingestion.py` went from 575 to 256, `app_runtime.py` from 542 to 267 and `main.py` from 494 to 306. All eight oversized test modules were then split by the surface each set of tests exercises.
 
 The test split follows one shape throughout. Shared scaffolding (imports, fakes, fixtures, module constants) moves to a private `_<stem>_support.py`, which pytest never collects because it does not match `test_*.py`; the tests are dealt out to sibling modules in declaration order, each importing only the support names it actually uses. `test_journal_parser.py` needed no support module at all, so it has none. The invariant that made this safe to do mechanically is the test count: 507 before and 507 after, at 100% coverage throughout.
 
@@ -22,13 +22,12 @@ The test split follows one shape throughout. Shared scaffolding (imports, fakes,
 
 `carrier_service.py` stays the public surface: `api/carriers.py` and the tests import from it unchanged, with `__all__` marking the re-exports so an auto-fixer cannot delete them. Nothing imports rightwards, so there is no cycle.
 
-Seven entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
+Six entries remain in `_LEGACY_OVER_LIMIT` in [tests/structural/test_structural.py](tests/structural/test_structural.py), measured 2026-08-08:
 
 | Lines | File |
 |---|---|
 | 752 | `frontend/src/components/FleetCarriers/FleetCarriersPanel.tsx` |
 | 598 | `frontend/src/components/SiteList/SiteList.tsx` |
-| 494 | `backend/src/main.py` |
 | 488 | `backend/src/services/journal_parser.py` |
 | 470 | `backend/src/repositories/colonisation_repository.py` |
 | 425 | `backend/src/runtime/launcher_components.py` |
@@ -44,7 +43,11 @@ What came out of `App.tsx`, with why each piece is one: `theme.ts` (62) because 
 
 `app_runtime.py` split along the three responsibilities its own docstring already listed: `backend_server.py` (262) holds the in-process uvicorn control and the readiness probes; `tray_ui.py` (149) holds the frozen runtime's tray; what is left in `app_runtime.py` (267) is `RuntimeApplication`. It stays the public surface the way `carrier_service.py` does, re-exporting both controllers under `__all__`, so `runtime_entry` imports nothing new. The readiness tests moved to `test_backend_server_readiness.py` alongside the code they exercise. This package is outside the coverage gate (`**/src/runtime/*`), so the split was verified by the suite passing and by the re-exports resolving, not by a coverage delta.
 
-What is left is four backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `main.py` at 494 is the largest on the backend.
+`main.py` gave up the two startup journal functions to `services/startup_ingestion.py` (233): the first-run backfill and the bounded repeat-run tail sync. That move is the one in this list with a coverage consequence. `main.py` is omitted from the gate (`**/src/main.py`) and both functions were only ever monkeypatched, so neither body had ever been executed by a test; the extracted module is gated like any other service, so it arrives with 13 tests covering every degradation path (unreadable stats, unparseable config, missing directory, no journals, one bad file mid-history, a failing refresh hint). The suite went 507 to 520 and stayed at 100%.
+
+The three identical `change_bus.bump()` guards became one `notify_clients_best_effort`, which is why `main.py` no longer imports `change_bus` at all.
+
+What is left is three backend source modules and three front-end files. `FleetCarriersPanel.tsx` at 752 is the largest of them and the last front-end component of real size; `journal_parser.py` at 488 is the largest on the backend. Splitting it does not settle item 3 below.
 
 `backend/tests/unit/test_coverage_repository.py` sits at 391, inside the band where the next edit pushes it over. It is within the cap today, so the structural suite passes it; whoever touches it next should take it to 350 or below rather than shave two lines off.
 

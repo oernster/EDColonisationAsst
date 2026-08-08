@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Regression guard: server readiness must not block on journal ingestion.
 
 The packaged runtime starts an in-process uvicorn server and only becomes
@@ -13,6 +11,8 @@ the import runs in the background and bumps the change bus.
 main.py is excluded from the coverage gate, so this test exists purely as a
 behavioural regression guard, not for coverage.
 """
+
+from __future__ import annotations
 
 import asyncio
 from pathlib import Path
@@ -90,7 +90,7 @@ async def test_first_run_prime_does_not_block_readiness(
         await asyncio.sleep(SLOW_PRIME_SECONDS)
         prime_done["flag"] = True
 
-    monkeypatch.setattr(main, "_prime_colonisation_database_if_empty", _slow_prime)
+    monkeypatch.setattr(main, "prime_colonisation_database_if_empty", _slow_prime)
 
     seq_before = change_bus.seq
     loop = asyncio.get_running_loop()
@@ -133,8 +133,8 @@ async def test_repeat_run_uses_bounded_tail_sync_not_full_scan(
     ) -> None:
         calls.append("tail")
 
-    monkeypatch.setattr(main, "_prime_colonisation_database_if_empty", _prime)
-    monkeypatch.setattr(main, "_sync_latest_journals_best_effort", _tail_sync)
+    monkeypatch.setattr(main, "prime_colonisation_database_if_empty", _prime)
+    monkeypatch.setattr(main, "sync_latest_journals_best_effort", _tail_sync)
 
     async with main.lifespan(main.app):
         # Let the scheduled background ingestion task run.

@@ -63,6 +63,7 @@ backend/
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── journal_parser.py          # Parses Journal.*.log events
+│   │   ├── startup_ingestion.py       # First-run backfill and repeat-run tail sync
 │   │   ├── journal_ingestion.py       # Watchdog boundary; routes parsed events
 │   │   ├── journal_tail_reader.py     # Incremental byte-offset reads of a journal
 │   │   ├── colonisation_projection.py # Colonisation events into the repository
@@ -115,8 +116,8 @@ On startup, the lifespan context manager `lifespan(app)`:
 
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
-   - **First run (empty DB):** `_prime_colonisation_database_if_empty` walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:153) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
-   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync (`_sync_latest_journals_best_effort`, newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
+   - **First run (empty DB):** [`prime_colonisation_database_if_empty`](backend/src/services/startup_ingestion.py:1) walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:153) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
+   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync ([`sync_latest_journals_best_effort`](backend/src/services/startup_ingestion.py:1), newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
 
 5. Configures the `FileWatcher`:
 
@@ -353,11 +354,11 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 ### 6.3 First‑run vs incremental ingestion
 
 - **First run / empty DB:**
-  - `_prime_colonisation_database_if_empty(...)` runs once, in a background task scheduled during startup (see section 3.1), so it never blocks server readiness.
+  - `prime_colonisation_database_if_empty(...)` runs once, in a background task scheduled during startup (see section 3.1), so it never blocks server readiness.
   - It uses `JournalFileHandler._process_file` to ingest all historical `Journal.*.log` files, bumping the change bus so the UI populates progressively.
 
 - **Repeat launch / non‑empty DB:**
-  - Only a bounded tail sync (`_sync_latest_journals_best_effort`) runs in the background; the persisted DB already holds prior history.
+  - Only a bounded tail sync (`sync_latest_journals_best_effort`) runs in the background; the persisted DB already holds prior history.
   - The watcher is started with `process_existing=False`, so no full re‑scan happens on the readiness path.
 
 - **Normal operation:**

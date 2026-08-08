@@ -16,10 +16,14 @@ from .api.routes import router as colonisation_router, set_dependencies
 from .api.settings import router as settings_router
 from .config import get_config
 from .repositories.colonisation_repository import ColonisationRepository
-from .services.change_bus import change_bus
 from .services.data_aggregator import DataAggregator
 from .services.file_watcher import FileWatcher
 from .services.journal_parser import JournalParser
+from .services.startup_ingestion import (
+    notify_clients_best_effort,
+    prime_colonisation_database_if_empty,
+    sync_latest_journals_best_effort,
+)
 from .services.system_tracker import SystemTracker
 from .utils.logger import get_logger, setup_logging
 from .utils.runtime import is_frozen
@@ -58,185 +62,6 @@ except (OSError, IndexError, TypeError):
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Application lifespan management
-
-
-async def _prime_colonisation_database_if_empty(
-    repository: ColonisationRepository,
-    parser: JournalParser,
-    system_tracker: SystemTracker,
-) -> None:
-    """
-    On first run (or after the database has been deleted), backfill the
-    colonisation database from existing journal files.
-
-    This mirrors the behaviour of the /api/debug/reload-journals endpoint but
-    is applied automatically when the database contains no sites. It ensures
-    that a fresh installation with existing Elite journals immediately shows
-    construction sites and delivered commodities without requiring a manual
-    reload step.
-    """
-    try:
-        stats = await repository.get_stats()
-    except Exception as exc:  # noqa: BLE001
-        # Deliberately broad: this is the repository interface, so the
-        # concrete failure depends on the implementation behind it (sqlite3
-        # errors today, anything tomorrow). The preload is an optimisation for
-        # a fresh install, so skipping it degrades nothing the user can see.
-        logger.warning(
-            "Initial journal preload skipped: failed to read repository stats: %s",
-            exc,
-        )
-        return
-
-    total_sites = stats.get("total_sites", 0)
-    if total_sites > 0:
-        logger.info(
-            "Initial journal preload skipped: repository already contains %s site(s)",
-            total_sites,
-        )
-        return
-
-    try:
-        config = get_config()
-        journal_dir = Path(config.journal.directory)
-    except Exception as exc:  # noqa: BLE001
-        # Deliberately broad: get_config parses user-edited YAML and builds
-        # pydantic models, so a bad value surfaces as a validation error rather
-        # than one predictable type. Without a journal directory there is
-        # nothing to preload, so returning is the whole recovery.
-        logger.warning(
-            "Initial journal preload skipped: failed to resolve journal directory: %s",
-            exc,
-        )
-        return
-
-    if not journal_dir.exists():
-        logger.info(
-            "Initial journal preload skipped: journal directory %s does not exist",
-            journal_dir,
-        )
-        return
-
-    # Reuse the same ingestion pipeline as the live FileWatcher and the
-    # /api/debug/reload-journals endpoint so behaviour is consistent.
-    import asyncio
-
-    from .services.file_watcher import (
-        JournalFileHandler,
-    )  # local import to avoid cycles
-
-    handler = JournalFileHandler(
-        parser=parser,
-        system_tracker=system_tracker,
-        repository=repository,
-        update_callback=None,
-        loop=asyncio.get_running_loop(),
-    )
-
-    journal_files = sorted(
-        journal_dir.glob("Journal.*.log"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not journal_files:
-        logger.info(
-            "Initial journal preload skipped: no Journal.*.log files found in %s",
-            journal_dir,
-        )
-        return
-
-    processed_files = 0
-    for journal_file in journal_files:
-        try:
-            await handler._process_file(journal_file)
-            processed_files += 1
-        except Exception as exc:  # noqa: BLE001
-            # Deliberately broad; per file on purpose. These are journal
-            # files written by the game across years of format changes, so one
-            # unparseable file must not abandon the remaining history. The
-            # loop continues and the count below reports what got through.
-            logger.error(
-                "Error preloading journal file %s during initial import: %s",
-                journal_file,
-                exc,
-            )
-
-    logger.info(
-        "Initial journal preload completed: processed %s journal file(s) from %s",
-        processed_files,
-        journal_dir,
-    )
-
-
-async def _sync_latest_journals_best_effort(
-    parser: JournalParser,
-    system_tracker: SystemTracker,
-    repository: ColonisationRepository,
-    journal_dir: Path,
-    loop: asyncio.AbstractEventLoop,
-) -> None:
-    """Best-effort sync of the most recent journal files.
-
-    Motivation:
-    - The packaged runtime persists its SQLite DB under %LOCALAPPDATA%.
-      Reinstalling the app does not necessarily delete that DB.
-    - If the DB is stale (e.g. older depot snapshot values) and watchdog events
-      are unavailable, users can see old numbers until a manual reload.
-
-    Strategy:
-    - Process the most recently modified N journal files (oldest->newest) so
-      newer depot snapshots win.
-    - Use the same JournalFileHandler ingestion path so merge logic applies.
-    - Send a global refresh hint at the end so the UI refetches.
-
-    This is intentionally non-fatal.
-    """
-    try:
-        if not journal_dir.exists():
-            return
-
-        journal_files = sorted(
-            journal_dir.glob("Journal.*.log"),
-            key=lambda p: p.stat().st_mtime,
-        )
-        if not journal_files:
-            return
-
-        # Process only the tail of history to keep startup cost bounded.
-        tail_count = 3
-        tail = journal_files[-tail_count:]
-
-        from .services.file_watcher import JournalFileHandler  # local import
-
-        handler = JournalFileHandler(
-            parser=parser,
-            system_tracker=system_tracker,
-            repository=repository,
-            update_callback=None,
-            loop=loop,
-        )
-
-        for jf in tail:
-            await handler._process_file(jf)
-
-        # Signal UI clients (AJAX long-poll) that data may have changed.
-        try:
-            await change_bus.bump()
-        except Exception:  # noqa: BLE001, S110
-            # Deliberately broad; deliberately not narrowed. change_bus is
-            # a module-level singleton holding an asyncio.Condition. The
-            # obvious candidate (a bump from a different event loop) does not
-            # raise: measured on CPython 3.13, reusing a Condition across
-            # loops completes silently. No failure mode could be demonstrated,
-            # so there is no honest type to name here. The guard stays because
-            # the cost of being wrong is asymmetric: swallowing it loses one
-            # refresh hint that the next poll recovers, while letting it out
-            # would fail the caller.
-            pass
-    except Exception:
-        # Deliberately broad, as the docstring above says: this whole function
-        # is a best-effort catch-up over game-written files and must never
-        # take startup down with it. Logged with a traceback, then dropped.
-        logger.exception("Best-effort latest journal sync failed")
 
 
 @asynccontextmanager
@@ -324,11 +149,11 @@ async def lifespan(app: FastAPI):
         """
         try:
             if db_is_empty:
-                await _prime_colonisation_database_if_empty(
+                await prime_colonisation_database_if_empty(
                     repository, parser, system_tracker
                 )
             else:
-                await _sync_latest_journals_best_effort(
+                await sync_latest_journals_best_effort(
                     parser, system_tracker, repository, journal_dir, loop
                 )
         except Exception:
@@ -341,13 +166,7 @@ async def lifespan(app: FastAPI):
         finally:
             # Signal long-poll clients that data may have changed so the UI
             # refetches once the background ingestion has made progress.
-            try:
-                await change_bus.bump()
-            except Exception:  # noqa: BLE001, S110
-                # Deliberately broad, as above, for the same reason: no
-                # failure mode could be demonstrated, so naming a type here
-                # would be a guess. One missed refresh hint at worst.
-                pass
+            await notify_clients_best_effort()
 
     try:
         asyncio.create_task(_startup_ingestion(), name="edca-startup-ingestion")
@@ -362,14 +181,7 @@ async def lifespan(app: FastAPI):
     # WebSockets have been removed. The UI now uses AJAX long-polling and
     # refetches via REST when the backend bumps the change sequence.
     async def _update_callback(_system_name: str) -> None:
-        try:
-            await change_bus.bump()
-        except Exception:  # noqa: BLE001, S110
-            # Deliberately broad, as above. This one runs on work scheduled
-            # from the watchdog thread, so it is the callback most exposed to
-            # loop-lifetime surprises and the one least worth guessing a type
-            # for. A dropped hint costs one delayed UI refresh.
-            pass
+        await notify_clients_best_effort()
 
     file_watcher.set_update_callback(_update_callback)
 

@@ -14,7 +14,69 @@ means "not reported" and never zero.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
+
+
+class CarrierBalanceEntry(BaseModel):
+    """One movement in the carrier's balance.
+
+    A movement, not a reading: the journal repeats the same balance hundreds
+    of times across a session, and a list of unchanged numbers says nothing.
+    """
+
+    recorded_at: datetime = Field(
+        description="When the new balance was first reported."
+    )
+    balance: int = Field(description="The carrier's balance after the movement.")
+    change: int = Field(
+        description=(
+            "Signed difference from the previous reported balance. Negative is "
+            "money leaving the carrier."
+        )
+    )
+
+
+class CarrierBalanceHistory(BaseModel):
+    """The carrier's balance over time, as far as the journals saw it.
+
+    Deliberately no cause is attached to any movement. The journal records no
+    upkeep event, and nothing else in it distinguishes upkeep from a tritium
+    purchase, a crew change or trade income, so naming a cause would be
+    invention. What is here is only what was observed.
+    """
+
+    entries: list[CarrierBalanceEntry] = Field(
+        default_factory=list,
+        description="Movements, newest first, capped to the most recent few.",
+    )
+    current_balance: int | None = Field(
+        default=None,
+        description="The newest balance reported.",
+    )
+    observed_from: datetime | None = Field(
+        default=None,
+        description="When the earliest balance in the journals was reported.",
+    )
+    observed_to: datetime | None = Field(
+        default=None,
+        description="When the newest balance was reported.",
+    )
+    net_change: int | None = Field(
+        default=None,
+        description=(
+            "Newest balance less the earliest, across the whole observed "
+            "window. None when only one reading exists to compare."
+        ),
+    )
+    movements: int = Field(
+        default=0,
+        description=(
+            "How many movements were seen in total, which can exceed the "
+            "number of entries kept above."
+        ),
+    )
 
 
 class CarrierFinance(BaseModel):

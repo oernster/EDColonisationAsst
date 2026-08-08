@@ -36,6 +36,7 @@ from ..models.journal_events import (
     MarketTransactionEvent,
 )
 from ..utils.logger import get_logger
+from .carrier_balance import derive_balance_history
 
 # carrier_service is the public surface for the carrier domain: the API
 # module and the tests import from here, so the split below is invisible to
@@ -308,6 +309,9 @@ def build_current_carrier_state_response(
         sell_orders=sell_orders,
         trade_orders_scope=trade_orders_scope,
         status=derive_carrier_status(stats),
+        balance_history=derive_balance_history(
+            events, _journal_carrier_id(docked_carrier, stats)
+        ),
         commander_aboard=commander_aboard,
         snapshot_time=snapshot_time,
     )

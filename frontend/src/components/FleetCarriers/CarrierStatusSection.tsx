@@ -1,10 +1,16 @@
 import { Alert, Box, Chip, Divider, Stack, Typography } from '@mui/material';
 
-import { CarrierCrewMember, CarrierStatus } from '../../types/fleetCarriers';
+import {
+  CarrierBalanceHistory,
+  CarrierCrewMember,
+  CarrierStatus,
+} from '../../types/fleetCarriers';
+import { CarrierBalanceHistorySection } from './CarrierBalanceHistorySection';
 import { formatServiceName } from './carrierServices';
 
 interface CarrierStatusSectionProps {
   status: CarrierStatus | null;
+  balanceHistory?: CarrierBalanceHistory | null;
 }
 
 /** Jump range is reported to one decimal, which is the precision the game shows. */
@@ -57,7 +63,10 @@ const crewLabel = (member: CarrierCrewMember): string => {
  * shown as zero: a fuel gauge reading empty because the journal was quiet is
  * worse than no gauge at all.
  */
-export const CarrierStatusSection = ({ status }: CarrierStatusSectionProps) => {
+export const CarrierStatusSection = ({
+  status,
+  balanceHistory,
+}: CarrierStatusSectionProps) => {
   if (!status) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -168,6 +177,13 @@ export const CarrierStatusSection = ({ status }: CarrierStatusSectionProps) => {
               </Stack>
             )}
           </Box>
+        </>
+      )}
+
+      {balanceHistory && (
+        <>
+          <Divider sx={{ my: 2 }} />
+          <CarrierBalanceHistorySection history={balanceHistory} />
         </>
       )}
 

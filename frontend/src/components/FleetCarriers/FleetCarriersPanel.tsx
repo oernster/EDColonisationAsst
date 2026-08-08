@@ -181,7 +181,10 @@ export const FleetCarriersPanel = () => {
               />
             )}
             {carrierViewTab === 'status' && (
-              <CarrierStatusSection status={currentCarrierState.status ?? null} />
+              <CarrierStatusSection
+                status={currentCarrierState.status ?? null}
+                balanceHistory={currentCarrierState.balance_history ?? null}
+              />
             )}
           </>
         )}

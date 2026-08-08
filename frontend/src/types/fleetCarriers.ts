@@ -120,6 +120,31 @@ export interface CarrierCrewMember {
   name?: string | null;
 }
 
+/** One movement in the carrier's balance. */
+export interface CarrierBalanceEntry {
+  recorded_at: string;
+  balance: number;
+  /** Signed difference from the previous reading. Negative is money leaving. */
+  change: number;
+}
+
+/**
+ * The carrier's balance over time, as far as the journals saw it.
+ *
+ * No cause is attached to any movement, deliberately. The journal records no
+ * upkeep event, and nothing in it separates upkeep from a tritium purchase, a
+ * crew change or trade income, so a labelled cause would be invention.
+ */
+export interface CarrierBalanceHistory {
+  entries: CarrierBalanceEntry[];
+  current_balance?: number | null;
+  observed_from?: string | null;
+  observed_to?: string | null;
+  net_change?: number | null;
+  /** Total seen, which can exceed the number of entries kept. */
+  movements: number;
+}
+
 /** How the carrier is running, as opposed to what it is carrying. */
 export interface CarrierStatus {
   /** Tritium in the carrier's own tank, in tonnes. */
@@ -200,6 +225,8 @@ export interface CarrierState {
    * is never docked anywhere.
    */
   commander_aboard?: boolean;
+  /** Balance movements over time, with no cause attached to any of them. */
+  balance_history?: CarrierBalanceHistory | null;
   /**
    * Fuel, jump range, balances and crew, read from the same CarrierStats
    * event as the space usage. Null when no CarrierStats has been seen.

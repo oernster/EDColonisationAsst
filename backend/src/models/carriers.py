@@ -13,7 +13,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from .carrier_status import CarrierStatus
+from .carrier_status import CarrierBalanceHistory, CarrierStatus
 
 
 class CarrierRole(str, Enum):
@@ -311,6 +311,14 @@ class CarrierState(BaseModel):
             "False does not make the state below wrong, only older: it was "
             "rebuilt from the last time they were aboard. This describes the "
             "COMMANDER, never the carrier, which is never docked anywhere."
+        ),
+    )
+    balance_history: CarrierBalanceHistory | None = Field(
+        default=None,
+        description=(
+            "The carrier's balance over time, with no cause attached to any "
+            "movement: the journal records no upkeep event and nothing in it "
+            "distinguishes upkeep from a purchase or from trade income."
         ),
     )
     status: CarrierStatus | None = Field(

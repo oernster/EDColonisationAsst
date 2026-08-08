@@ -266,8 +266,11 @@
         "Journal-driven tracking of colonisation construction sites",
         "Per-system shopping list of commodities still needed, with progress",
         "Per-commodity fleet carrier hold, market orders and capacity in one view",
+        "Fleet carrier fuel, jump range, balances, tax rates and crew roster",
+        "Booked carrier jumps shown with a live countdown to departure",
         "Per-system station and base-landing tracking",
         "Browser HUD accessible from a tablet over the local network",
+        "Updates itself as you fly, with no page to reload",
         "Local-first with no cloud, no account and no telemetry"
       ],
       "author": {
@@ -315,7 +318,12 @@
         {
           "@type": "Question",
           "name": "What does EDCA track?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's hold, market orders and capacity, all from your journal." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Per-system colonisation construction sites and their aggregated commodity shopping lists, station state, and your fleet carrier's hold, market orders, capacity, fuel and jump range, balances and crew. It also tracks where each carrier is, including a jump you have booked but not yet made." }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does the first launch take longer?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Because it reads every journal already on your machine once, to rebuild the colonisation history you have flown so far rather than starting you from empty. The splash names the file it is reading and how much is left. It happens on the first run only." }
         },
         {
           "@type": "Question",
@@ -346,9 +354,10 @@
       <h1>EDCA</h1>
       <p class="tagline">Elite Dangerous Colonisation Assistant</p>
       <p class="pitch">
-        A local, browser-based HUD that tracks your Elite Dangerous colonisation
-        construction sites and fleet carrier logistics automatically from your
-        journal. No spreadsheets, no accounts, nothing leaves your PC.
+        Colonisation runs on one question: what still needs hauling, and where to.
+        EDCA answers it from your journal as you fly, so the shopping list, your
+        carrier's hold and where that carrier is heading are all current without
+        you tabbing out. No spreadsheets, no accounts, nothing leaves your PC.
       </p>
       <div class="cta">
         <a class="btn primary" href="#download">Download</a>
@@ -365,7 +374,7 @@
         <div class="card">
           <div class="icon">&#128211;</div>
           <h3>Journal-driven, automatic</h3>
-          <p>EDCA reads your Elite Dangerous journal as you play and keeps your colonisation state current on its own. No spreadsheets and no manual entry.</p>
+          <p>EDCA reads your Elite Dangerous journal as you play and pushes what changed straight to the page. Deliver a load and the numbers move while you are still at the pad, with nothing to refresh and nothing to type in.</p>
         </div>
         <div class="card">
           <div class="icon">&#128230;</div>
@@ -376,6 +385,16 @@
           <div class="icon">&#128752;</div>
           <h3>Fleet carrier logistics</h3>
           <p>What your carrier is actually holding, commodity by commodity, alongside its buy and sell orders plus its capacity breakdown. The hold is a real inventory rather than a list of what you happen to have on sale; it also says how current it is.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#9981;</div>
+          <h3>Carrier status at a glance</h3>
+          <p>Tritium in the tank, current and maximum jump range, the balance against the reserve, the tax your services charge visitors and who is crewing each one. Anything your journal has not reported is left out rather than shown as a zero, so an empty gauge always means empty.</p>
+        </div>
+        <div class="card">
+          <div class="icon">&#128640;</div>
+          <h3>Never merely "last seen"</h3>
+          <p>A carrier is never docked anywhere: it holds station in a system, or it has a jump booked and is about to leave. Book one and EDCA names the destination and counts down to departure, then clears itself the moment the carrier arrives.</p>
         </div>
         <div class="card">
           <div class="icon">&#128506;</div>
@@ -416,7 +435,7 @@
         <div class="step">
           <div class="n">STEP 2</div>
           <h3>Launch</h3>
-          <p>EDCA starts a local web server and opens your browser for you. There is nothing to sign in to.</p>
+          <p>EDCA starts a local web server and opens your browser for you. There is nothing to sign in to. The first launch pauses to read the journals already on your machine, and says so while it does, naming the file it is on and how much is left. Later launches skip straight past it.</p>
         </div>
         <div class="step">
           <div class="n">STEP 3</div>
@@ -458,7 +477,11 @@
         </div>
         <div class="card">
           <h3>What does EDCA track?</h3>
-          <p>Per-system colonisation construction sites and their aggregated commodity shopping lists, station state and your fleet carrier's hold, market orders and capacity, all from your journal.</p>
+          <p>Per-system colonisation construction sites and their aggregated commodity shopping lists, station state, and your fleet carrier's hold, market orders, capacity, fuel and jump range, balances and crew. It also tracks where each carrier is, including a jump you have booked but not yet made.</p>
+        </div>
+        <div class="card">
+          <h3>Why does the first launch take longer?</h3>
+          <p>Because it reads every journal already on your machine once, to rebuild the colonisation history you have flown so far rather than starting you from empty. The splash names the file it is reading and how much is left, so it is a wait you can watch rather than guess at. It happens on the first run only.</p>
         </div>
         <div class="card">
           <h3>Can I use EDCA on a tablet?</h3>

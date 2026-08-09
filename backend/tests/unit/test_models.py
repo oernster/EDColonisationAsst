@@ -1,6 +1,5 @@
 """Tests for data models"""
 
-import pytest
 from src.models.colonisation import (
     Commodity,
     CommodityStatus,

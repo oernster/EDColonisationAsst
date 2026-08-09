@@ -85,7 +85,8 @@ async def test_update_commodity_missing_site_does_not_raise(repository):
 async def test_update_commodity_missing_commodity_does_not_modify_site(
     repository, sample_construction_site
 ):
-    """update_commodity should log a warning but leave data unchanged when commodity is missing."""
+    """update_commodity should log a warning but leave data unchanged when commodity is
+    missing."""
     await repository.add_construction_site(sample_construction_site)
 
     # Attempt to update a non-existent commodity name

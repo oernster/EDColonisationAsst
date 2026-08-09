@@ -1,6 +1,7 @@
 """Market.json fallback and sold-out cargo.
 
-Split out of test_api_carriers.py; the scaffolding lives in _test_api_carriers_support.py.
+Split out of test_api_carriers.py; the scaffolding lives in
+_test_api_carriers_support.py.
 """
 
 from pathlib import Path
@@ -18,10 +19,11 @@ from tests.unit._test_api_carriers_support import (
 
 
 @pytest.mark.asyncio
-async def test_carriers_state_falls_back_to_market_json_when_no_trade_orders_since_docked(
+async def test_carriers_state_market_json_fallback_when_no_trade_orders_since_docked(
     tmp_path: Path, monkeypatch: Callable
 ):
-    """Use Market.json as authoritative market snapshot when journal trade orders are absent."""
+    """Use Market.json as authoritative market snapshot when journal trade orders are
+    absent."""
     journal_dir = tmp_path / "journals"
 
     events = [

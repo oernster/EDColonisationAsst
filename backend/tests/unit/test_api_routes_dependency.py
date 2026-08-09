@@ -6,7 +6,7 @@ Split out of test_api_routes.py; the scaffolding lives in _test_api_routes_suppo
 from pathlib import Path
 import pytest
 import src.config as config_module
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from src.api import routes as routes_api
 from src.repositories.colonisation_repository import ColonisationRepository
 
@@ -107,7 +107,9 @@ async def test_get_site_raises_500_when_repository_not_set():
 
 @pytest.mark.asyncio
 async def test_get_all_sites_raises_500_when_dependencies_not_set():
-    """get_all_sites should raise HTTP 500 if either repository or aggregator is missing."""
+    """get_all_sites should raise HTTP 500 if either repository or aggregator is
+    missing.
+    """
     orig_repo = routes_api._repository
     orig_agg = routes_api._aggregator
     try:
@@ -187,7 +189,9 @@ async def test_reload_journals_raises_500_when_repository_not_set():
 async def test_reload_journals_missing_directory_returns_404(
     repository: ColonisationRepository, tmp_path: Path
 ):
-    """reload_journals should raise 404 when configured journal directory does not exist."""
+    """reload_journals should raise 404 when configured journal directory does not
+    exist.
+    """
     missing_dir = tmp_path / "no_such_dir"
 
     class _Cfg:

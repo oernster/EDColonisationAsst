@@ -1,11 +1,12 @@
 """Debug logging and the launcher's preparation steps.
 
-Split out of test_runtime_components.py; the scaffolding lives in _test_runtime_components_support.py.
+Split out of test_runtime_components.py; the scaffolding lives in
+_test_runtime_components_support.py.
 """
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import pytest
 import src.runtime.common as runtime_common
 import src.runtime.launcher_components as launcher_mod
@@ -67,7 +68,9 @@ def test_launcher_check_python_logs_version(
 
     called: Dict[str, bool | str] = {}
 
-    def fake_run(cmd: List[str], stdout, stderr, text, check):  # type: ignore[no-untyped-def]
+    def fake_run(
+        cmd: List[str], stdout, stderr, text, check
+    ):  # type: ignore[no-untyped-def]
         called["cmd"] = " ".join(cmd)
         return DummyCompletedProcess(stdout="Python 3.13.11")
 
@@ -153,7 +156,12 @@ def test_launcher_install_backend_deps_logs_warning_on_pip_failure(
     def boom(*_args: Any, **_kwargs: Any) -> None:
         raise RuntimeError("pip exploded")
 
-    monkeypatch.setattr(launcher, "_run_subprocess", boom, raising=True)  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        launcher,
+        "_run_subprocess",
+        boom,
+        raising=True,  # type: ignore[attr-defined]
+    )
 
     launcher._install_backend_deps()  # type: ignore[attr-defined]
 

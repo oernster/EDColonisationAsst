@@ -1,6 +1,7 @@
 """Cargo rows, recent-file scans and docked-context scoping.
 
-Split out of test_api_carriers.py; the scaffolding lives in _test_api_carriers_support.py.
+Split out of test_api_carriers.py; the scaffolding lives in
+_test_api_carriers_support.py.
 """
 
 import json
@@ -18,7 +19,7 @@ from tests.unit._test_api_carriers_support import (
 
 
 @pytest.mark.asyncio
-async def test_carrier_sell_order_without_stock_or_outstanding_does_not_create_cargo_row(
+async def test_carrier_sell_order_without_stock_or_outstanding_creates_no_cargo_row(
     tmp_path: Path, monkeypatch: Callable
 ):
     """Regression: do not treat SaleOrder (configured size) as cargo stock.

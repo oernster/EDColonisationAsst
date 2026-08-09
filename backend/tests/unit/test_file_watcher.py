@@ -1,6 +1,7 @@
 """Depot, contribution and docking event processing.
 
-Split out of test_file_watcher.py; the scaffolding lives in _test_file_watcher_support.py.
+Split out of test_file_watcher.py; the scaffolding lives in
+_test_file_watcher_support.py.
 """
 
 import asyncio
@@ -13,7 +14,7 @@ from src.models.journal_events import (
     DockedEvent,
 )
 from src.repositories.colonisation_repository import ColonisationRepository
-from src.services.file_watcher import FileWatcher, JournalFileHandler
+from src.services.file_watcher import JournalFileHandler
 from src.services.system_tracker import SystemTracker
 
 from tests.unit._test_file_watcher_support import (
@@ -133,7 +134,8 @@ async def test_process_construction_depot_reuses_existing_metadata(
 async def test_process_contribution_updates_commodity(
     repository: ColonisationRepository,
 ):
-    """project_contribution should update commodity provided_amount via repository.update_commodity."""
+    """project_contribution should update commodity provided_amount via
+    repository.update_commodity."""
     # Seed repository with a site that has a single commodity
     site = ConstructionSite(
         market_id=7,

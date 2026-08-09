@@ -1,21 +1,18 @@
 """Shared scaffolding for the test_coverage_file_watcher modules.
 
-Split out of test_coverage_file_watcher.py when that file passed the module cap. Not named
+Split out of test_coverage_file_watcher.py when that file passed the module cap. Not
+named
 test_* on purpose: pytest collects only the modules that use it.
 """
 
 from __future__ import annotations
 import asyncio
 import os
-import sys
 from datetime import timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Optional
-import pytest
-import src.services.file_watcher as fw_module
-import src.services.file_watcher_polling as polling_module
-from src.services.file_watcher import FileWatcher, IFileWatcher
+from src.services.file_watcher import FileWatcher
 
 
 BASE_MTIME = 1_700_000_000.0

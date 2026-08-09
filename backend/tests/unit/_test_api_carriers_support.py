@@ -7,12 +7,6 @@ test_* on purpose: pytest collects only the modules that use it.
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Callable
-import httpx
-import pytest
-from fastapi import FastAPI
-import src.api.carriers as carriers_api
-from src.api.carriers import router as carriers_router
 
 
 def _write_journal_file(journal_dir: Path, events: list[dict]) -> Path:

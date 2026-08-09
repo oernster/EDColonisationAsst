@@ -5,21 +5,7 @@ test_* on purpose: pytest collects only the modules that use it.
 """
 
 from __future__ import annotations
-import asyncio
-from datetime import datetime, UTC
 from pathlib import Path
-import pytest
-import src.services.file_watcher as fw_module
-from src.models.colonisation import ConstructionSite, Commodity
-from src.models.journal_events import (
-    ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
-    DockedEvent,
-)
-from src.repositories.colonisation_repository import ColonisationRepository
-from src.services.file_watcher import FileWatcher, JournalFileHandler
-from src.services.journal_parser import JournalParser
-from src.services.system_tracker import SystemTracker
 
 
 class _DummyParser:
@@ -33,7 +19,7 @@ class _DummyParser:
 
 
 class _DummyObserver:
-    """Lightweight stand-in for watchdog.observers.Observer used in FileWatcher tests."""
+    """Lightweight stand-in for watchdog.observers.Observer in FileWatcher tests."""
 
     def __init__(self) -> None:
         self.scheduled: list[tuple[object, str, bool]] = []

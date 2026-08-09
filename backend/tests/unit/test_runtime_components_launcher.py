@@ -1,6 +1,7 @@
 """Launcher run, process groups and the tray.
 
-Split out of test_runtime_components.py; the scaffolding lives in _test_runtime_components_support.py.
+Split out of test_runtime_components.py; the scaffolding lives in
+_test_runtime_components_support.py.
 """
 
 from pathlib import Path
@@ -40,14 +41,30 @@ def test_launcher_run_happy_path_uses_view_and_allows_open_frontend(
 
         return _fn
 
-    monkeypatch.setattr(launcher, "_check_python", make_step("check_python"))  # type: ignore[attr-defined]
-    monkeypatch.setattr(launcher, "_ensure_venv", make_step("ensure_venv"))  # type: ignore[attr-defined]
     monkeypatch.setattr(
-        launcher, "_install_backend_deps", make_step("install_deps")  # type: ignore[attr-defined]
+        launcher,
+        "_check_python",
+        make_step("check_python"),  # type: ignore[attr-defined]
     )
-    monkeypatch.setattr(launcher, "_start_services", make_step("start_services"))  # type: ignore[attr-defined]
     monkeypatch.setattr(
-        launcher, "_wait_for_readiness", make_step("wait_for_readiness")  # type: ignore[attr-defined]
+        launcher,
+        "_ensure_venv",
+        make_step("ensure_venv"),  # type: ignore[attr-defined]
+    )
+    monkeypatch.setattr(
+        launcher,
+        "_install_backend_deps",
+        make_step("install_deps"),  # type: ignore[attr-defined]
+    )
+    monkeypatch.setattr(
+        launcher,
+        "_start_services",
+        make_step("start_services"),  # type: ignore[attr-defined]
+    )
+    monkeypatch.setattr(
+        launcher,
+        "_wait_for_readiness",
+        make_step("wait_for_readiness"),  # type: ignore[attr-defined]
     )
 
     launcher.run()
@@ -83,7 +100,9 @@ def test_process_group_terminate_variants() -> None:
     # If wait raises, kill() should be attempted. We use a specialised dummy
     # that always raises from wait() to force the error-handling branch.
     class DummyPopenWaitFail(DummyPopen):
-        def wait(self, timeout: Optional[float] = None) -> int:  # type: ignore[override]
+        def wait(
+            self, timeout: Optional[float] = None
+        ) -> int:  # type: ignore[override]
             self._wait_timeout = timeout
             raise RuntimeError("still running")
 
@@ -156,14 +175,21 @@ def test_spawn_process_handles_failure_and_logs(
     app = DummyApp()
     controller = tray_mod.TrayController(app)
 
-    monkeypatch.setattr(controller, "_log_message", fake_log, raising=True)  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        controller,
+        "_log_message",
+        fake_log,
+        raising=True,  # type: ignore[attr-defined]
+    )
 
     def boom(*_args: Any, **_kwargs: Any):
         raise OSError("no binary")
 
     monkeypatch.setattr(tray_mod.subprocess, "Popen", boom)
 
-    result = controller._spawn_process(["missing-binary"], cwd=Path("."), name="backend")  # type: ignore[attr-defined]
+    result = controller._spawn_process(  # type: ignore[attr-defined]
+        ["missing-binary"], cwd=Path("."), name="backend"
+    )
 
     assert result is None
     assert any("Failed to start backend process" in m for m in messages)
@@ -173,7 +199,8 @@ def test_on_exit_triggered_terminates_processes_and_quits_app(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    _on_exit_triggered should terminate backend and frontend processes, hide tray and quit the app.
+    _on_exit_triggered should terminate backend and frontend processes, hide tray and
+    quit the app.
     """
     monkeypatch.setattr(tray_mod, "QSystemTrayIcon", DummyTrayIcon)
     monkeypatch.setattr(tray_mod, "QMenu", DummyMenu)

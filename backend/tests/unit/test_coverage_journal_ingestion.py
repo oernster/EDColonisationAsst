@@ -1,19 +1,14 @@
 """Diagnostics and incremental tail parsing.
 
-Split out of test_coverage_journal_ingestion.py; the scaffolding lives in _test_coverage_journal_ingestion_support.py.
+Split out of test_coverage_journal_ingestion.py; the scaffolding lives in
+_test_coverage_journal_ingestion_support.py.
 """
 
 import asyncio
 import json
 from pathlib import Path
 from watchdog.events import FileCreatedEvent, FileModifiedEvent
-from src.models.journal_events import (
-    ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
-    DockedEvent,
-    JournalEvent,
-    LocationEvent,
-)
+from src.models.journal_events import LocationEvent
 from src.services.journal_parser import JournalParser
 
 from tests.unit._test_coverage_journal_ingestion_support import (

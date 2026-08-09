@@ -1,22 +1,15 @@
 """State reconstruction, market export and space usage.
 
-Split out of test_coverage_carrier_service.py; the scaffolding lives in _test_coverage_carrier_service_support.py.
+Split out of test_coverage_carrier_service.py; the scaffolding lives in
+_test_coverage_carrier_service_support.py.
 """
 
 from pathlib import Path
 import pytest
 import src.utils.journal as journal_utils
 from src.services.carrier_service import (
-    _normalise_carrier_commodity_key,
-    _prettify_commodity_name,
-    build_current_carrier_response,
     build_current_carrier_state_response,
-    build_identity_from_journal,
     build_my_carriers_response,
-    build_orders_for_carrier,
-    find_latest_carrier_stats_for_callsign,
-    find_latest_carrier_stats_for_id,
-    find_latest_carrier_stats_for_market_id,
 )
 
 from tests.unit._test_coverage_carrier_service_support import (

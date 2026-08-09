@@ -6,15 +6,11 @@ Split out of test_api_routes.py; the scaffolding lives in _test_api_routes_suppo
 from datetime import datetime, UTC
 import httpx
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from src.models.colonisation import Commodity, ConstructionSite
 from src.models.journal_events import DockedEvent
 from src.repositories.colonisation_repository import ColonisationRepository
 from src.services.system_tracker import SystemTracker
-
-from tests.unit._test_api_routes_support import (
-    api_app,
-)
 
 
 @pytest.mark.asyncio

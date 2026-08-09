@@ -1,19 +1,16 @@
 """Contribution arrays and modification events.
 
-Split out of test_file_watcher.py; the scaffolding lives in _test_file_watcher_support.py.
+Split out of test_file_watcher.py; the scaffolding lives in
+_test_file_watcher_support.py.
 """
 
 import asyncio
 from datetime import datetime, UTC
 from pathlib import Path
 import pytest
-from src.models.journal_events import (
-    ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
-    DockedEvent,
-)
+from src.models.journal_events import DockedEvent
 from src.repositories.colonisation_repository import ColonisationRepository
-from src.services.file_watcher import FileWatcher, JournalFileHandler
+from src.services.file_watcher import JournalFileHandler
 from src.services.system_tracker import SystemTracker
 
 from tests.unit._test_file_watcher_support import (
@@ -22,10 +19,11 @@ from tests.unit._test_file_watcher_support import (
 
 
 @pytest.mark.asyncio
-async def test_journal_file_handler_process_file_handles_colonisation_contributions_array(
+async def test_journal_file_handler_handles_colonisation_contributions_array(
     repository: ColonisationRepository,
 ):
-    """_process_file should handle ColonisationContribution with Contributions array schema."""
+    """_process_file should handle ColonisationContribution with Contributions array
+    schema."""
     from src.models.journal_events import (
         LocationEvent,
         FSDJumpEvent,
@@ -104,7 +102,8 @@ async def test_journal_file_handler_process_file_handles_colonisation_contributi
         raw_data={},
     )
 
-    # ColonisationContribution in the new schema (we still use the model but simulate the payload)
+    # ColonisationContribution in the new schema (we still use the model but simulate
+    # the payload)
     contribution = ColonisationContributionEvent(
         timestamp=ts,
         event="ColonisationContribution",
@@ -186,7 +185,8 @@ async def test_journal_file_handler_process_file_handles_colonisation_contributi
     )
     assert system_tracker.is_docked() is True
 
-    # Repository should contain the site with Titanium progress from both depot and contribution
+    # Repository should contain the site with Titanium progress from both depot and
+    # contribution
     site = await repository.get_site_by_market_id(3960951554)
     assert site is not None
     assert site.system_name == "Lupus Dark Region BQ-Y d66"

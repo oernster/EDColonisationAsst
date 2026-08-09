@@ -1,6 +1,7 @@
 """Fleet listing and the not-docked case.
 
-Split out of test_api_carriers.py; the scaffolding lives in _test_api_carriers_support.py.
+Split out of test_api_carriers.py; the scaffolding lives in
+_test_api_carriers_support.py.
 """
 
 from pathlib import Path
@@ -20,7 +21,8 @@ from tests.unit._test_api_carriers_support import (
 async def test_carriers_mine_lists_own_and_squadron(
     tmp_path: Path, monkeypatch: Callable
 ):
-    """Test /api/carriers/mine discovers own and squadron carriers from CarrierStats/CarrierLocation."""
+    """Test /api/carriers/mine discovers own and squadron carriers from
+    CarrierStats/CarrierLocation."""
     journal_dir = tmp_path / "journals"
 
     events = [
@@ -76,7 +78,9 @@ async def test_carriers_mine_lists_own_and_squadron(
 async def test_carriers_current_state_404_when_not_docked_at_carrier(
     tmp_path: Path, monkeypatch: Callable
 ):
-    """When the latest Docked event is not at a FleetCarrier, /current/state should return 404."""
+    """When the latest Docked event is not at a FleetCarrier, /current/state should
+    return
+    404."""
     journal_dir = tmp_path / "journals"
 
     events = [

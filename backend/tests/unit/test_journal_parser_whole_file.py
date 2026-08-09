@@ -11,10 +11,6 @@ from src.services.journal_parser import JournalParser
 from src.models.journal_events import (
     ColonisationConstructionDepotEvent,
     ColonisationContributionEvent,
-    LocationEvent,
-    FSDJumpEvent,
-    DockedEvent,
-    CommanderEvent,
     CarrierLocationEvent,
     CarrierStatsEvent,
     CarrierTradeOrderEvent,
@@ -29,15 +25,23 @@ async def test_parse_file_multiple_events(tmp_path: Path):
 
     lines = [
         # Relevant: ColonisationConstructionDepot
-        '{"timestamp":"2025-11-29T01:00:00Z","event":"ColonisationConstructionDepot",'
-        '"MarketID":123456,"StationName":"Test Station","StationType":"Depot",'
-        '"StarSystem":"Test System","SystemAddress":987654,"ConstructionProgress":25.0,'
-        '"Commodities":[{"Name":"Steel","Name_Localised":"Steel","Total":1000,"Delivered":250,"Payment":1000}]}',
+        (
+            '{"timestamp":"2025-11-29T01:00:00Z",'
+            '"event":"ColonisationConstructionDepot",'
+            '"MarketID":123456,"StationName":"Test Station","StationType":"Depot",'
+            '"StarSystem":"Test System","SystemAddress":987654,'
+            '"ConstructionProgress":25.0,'
+            '"Commodities":[{"Name":"Steel","Name_Localised":"Steel","Total":1000,'
+            '"Delivered":250,"Payment":1000}]}'
+        ),
         # Irrelevant: Scan
         '{"timestamp":"2025-11-29T01:01:00Z","event":"Scan","BodyName":"Something"}',
         # Relevant: ColonisationContribution
-        '{"timestamp":"2025-11-29T01:02:00Z","event":"ColonisationContribution","MarketID":123456,'
-        '"Commodity":"Steel","Quantity":100,"TotalQuantity":350,"CreditsReceived":100000}',
+        (
+            '{"timestamp":"2025-11-29T01:02:00Z","event":"ColonisationContribution",'
+            '"MarketID":123456,"Commodity":"Steel","Quantity":100,"TotalQuantity":350,'
+            '"CreditsReceived":100000}'
+        ),
     ]
 
     file_path.write_text("\n".join(lines), encoding="utf-8")
@@ -51,7 +55,8 @@ async def test_parse_file_multiple_events(tmp_path: Path):
 
 
 def test_parse_construction_depot_with_resources_required(parser):
-    """ColonisationConstructionDepot using ResourcesRequired should be normalised correctly."""
+    """ColonisationConstructionDepot using ResourcesRequired should be normalised
+    correctly."""
     data = {
         "timestamp": "2025-11-29T01:00:00Z",
         "event": "ColonisationConstructionDepot",
@@ -111,7 +116,8 @@ def test_parse_file_skips_lines_that_raise(parser, tmp_path: Path):
     parser = parser  # explicit for clarity
     file_path = tmp_path / "Journal.bad_line.log"
     file_path.write_text(
-        '{"timestamp":"2025-11-29T01:00:00Z","event":"Location","StarSystem":"Sys","SystemAddress":1}\n',
+        '{"timestamp":"2025-11-29T01:00:00Z","event":"Location","StarSystem":"Sys",'
+        '"SystemAddress":1}\n',
         encoding="utf-8",
     )
 

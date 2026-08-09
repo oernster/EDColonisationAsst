@@ -1,6 +1,7 @@
 """Lifecycle and full-file ingestion.
 
-Split out of test_file_watcher.py; the scaffolding lives in _test_file_watcher_support.py.
+Split out of test_file_watcher.py; the scaffolding lives in
+_test_file_watcher_support.py.
 """
 
 import asyncio
@@ -8,11 +9,7 @@ from datetime import datetime, UTC
 from pathlib import Path
 import pytest
 import src.services.file_watcher as fw_module
-from src.models.journal_events import (
-    ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
-    DockedEvent,
-)
+from src.models.journal_events import DockedEvent
 from src.repositories.colonisation_repository import ColonisationRepository
 from src.services.file_watcher import FileWatcher, JournalFileHandler
 from src.services.journal_parser import JournalParser
@@ -27,7 +24,9 @@ from tests.unit._test_file_watcher_support import (
 async def test_file_watcher_start_and_stop(
     tmp_path: Path, repository: ColonisationRepository
 ):
-    """FileWatcher.start_watching and stop_watching should manage the observer lifecycle."""
+    """FileWatcher.start_watching and stop_watching should manage the observer
+    lifecycle.
+    """
     journal_dir = tmp_path / "journals"
     journal_dir.mkdir()
 
@@ -65,7 +64,9 @@ async def test_file_watcher_start_and_stop(
 async def test_file_watcher_start_raises_for_missing_directory(
     repository: ColonisationRepository,
 ):
-    """FileWatcher.start_watching should raise FileNotFoundError when directory is missing."""
+    """FileWatcher.start_watching should raise FileNotFoundError when directory is
+    missing.
+    """
     missing_dir = Path("does_not_exist_12345")
 
     parser = JournalParser()
@@ -85,7 +86,9 @@ async def test_file_watcher_start_raises_for_missing_directory(
 async def test_journal_file_handler_process_file_updates_tracker_and_repository(
     repository: ColonisationRepository,
 ):
-    """_process_file should drive tracker updates, site creation and callbacks for legacy schema."""
+    """_process_file should drive tracker updates, site creation and callbacks for
+    legacy
+    schema."""
     from src.models.journal_events import (
         LocationEvent,
         FSDJumpEvent,
@@ -212,7 +215,8 @@ async def test_journal_file_handler_process_file_updates_tracker_and_repository(
     assert system_tracker.get_current_station() == "Beta Construction Site"
     assert system_tracker.is_docked() is True
 
-    # Repository should contain the site created/updated via depot and contribution events
+    # Repository should contain the site created/updated via depot and contribution
+    # events
     site = await repository.get_site_by_market_id(555)
     assert site is not None
     assert site.system_name == "Beta System"

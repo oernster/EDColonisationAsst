@@ -1,6 +1,7 @@
 """Naming, lookups, identity and order building.
 
-Split out of test_coverage_carrier_service.py; the scaffolding lives in _test_coverage_carrier_service_support.py.
+Split out of test_coverage_carrier_service.py; the scaffolding lives in
+_test_coverage_carrier_service_support.py.
 """
 
 from src.models.carriers import CarrierOrderType, CarrierRole

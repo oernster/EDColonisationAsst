@@ -1,4 +1,5 @@
-"""Tests for the main FastAPI application wiring and lifespan (no external mocking frameworks)."""
+"""Tests for the main FastAPI application wiring and lifespan (no external mocking
+frameworks)."""
 
 from __future__ import annotations
 
@@ -14,13 +15,17 @@ from src.services.system_tracker import SystemTracker
 
 @pytest.mark.asyncio
 async def test_main_lifespan_wires_dependencies_and_stops_watcher():
-    """lifespan should construct core services, wire dependencies, and stop the watcher on shutdown."""
+    """lifespan should construct core services, wire dependencies, and stop the watcher
+    on
+    shutdown."""
     created: dict[str, object] = {}
 
     class DummyFileWatcher:
         """In-memory replacement for FileWatcher used to observe lifecycle calls."""
 
-        def __init__(self, parser, system_tracker, repository) -> None:  # type: ignore[override]
+        def __init__(
+            self, parser, system_tracker, repository
+        ) -> None:  # type: ignore[override]
             self.parser = parser
             self.system_tracker = system_tracker
             self.repository = repository
@@ -38,14 +43,17 @@ async def test_main_lifespan_wires_dependencies_and_stops_watcher():
         async def stop_watching(self) -> None:
             self.stop_calls += 1
 
-    # Patch FileWatcher in the main module so the lifespan uses our dummy implementation.
+    # Patch FileWatcher in the main module so the lifespan uses our dummy
+    # implementation.
     orig_file_watcher_cls = main_mod.FileWatcher
     try:
         main_mod.FileWatcher = DummyFileWatcher  # type: ignore[assignment]
 
-        # Enter and exit the lifespan context manually to avoid starting a real watchdog observer.
+        # Enter and exit the lifespan context manually to avoid starting a real watchdog
+        # observer.
         async with main_mod.lifespan(main_mod.app):
-            # During the lifespan body, core components should be initialised on app.state.
+            # During the lifespan body, core components should be initialised on
+            # app.state.
             repo = getattr(main_mod.app.state, "repository", None)
             agg = getattr(main_mod.app.state, "aggregator", None)
             tracker = getattr(main_mod.app.state, "system_tracker", None)
@@ -68,7 +76,8 @@ async def test_main_lifespan_wires_dependencies_and_stops_watcher():
             assert "version" in root_resp
             assert root_resp["docs"] == "/docs"
 
-        # After exiting the lifespan context, the dummy watcher should have been stopped once.
+        # After exiting the lifespan context, the dummy watcher should have been stopped
+        # once.
         watcher = created.get("instance")
         assert isinstance(watcher, DummyFileWatcher)
         assert watcher.stop_calls == 1

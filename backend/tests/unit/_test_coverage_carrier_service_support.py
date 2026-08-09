@@ -1,6 +1,7 @@
 """Shared scaffolding for the test_coverage_carrier_service modules.
 
-Split out of test_coverage_carrier_service.py when that file passed the module cap. Not named
+Split out of test_coverage_carrier_service.py when that file passed the module cap. Not
+named
 test_* on purpose: pytest collects only the modules that use it.
 """
 
@@ -9,26 +10,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
-import pytest
-import src.utils.journal as journal_utils
-from src.models.carriers import CarrierOrderType, CarrierRole
 from src.models.journal_events import (
     CarrierLocationEvent,
     CarrierStatsEvent,
     CarrierTradeOrderEvent,
     DockedEvent,
-)
-from src.services.carrier_service import (
-    _normalise_carrier_commodity_key,
-    _prettify_commodity_name,
-    build_current_carrier_response,
-    build_current_carrier_state_response,
-    build_identity_from_journal,
-    build_my_carriers_response,
-    build_orders_for_carrier,
-    find_latest_carrier_stats_for_callsign,
-    find_latest_carrier_stats_for_id,
-    find_latest_carrier_stats_for_market_id,
 )
 
 

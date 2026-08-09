@@ -4,18 +4,10 @@ Split out of test_api_routes.py when that file passed the module cap. Not named
 test_* on purpose: pytest collects only the modules that use it.
 """
 
-from datetime import datetime, UTC
-from pathlib import Path
-import httpx
-import pytest
 import pytest_asyncio
-import src.config as config_module
-from fastapi import FastAPI, HTTPException
-from src.api import routes as routes_api
+from fastapi import FastAPI
 from src.api.health import router as health_router
 from src.api.routes import router as routes_router, set_dependencies
-from src.models.colonisation import Commodity, ConstructionSite
-from src.models.journal_events import DockedEvent
 from src.repositories.colonisation_repository import ColonisationRepository
 from src.services.data_aggregator import DataAggregator
 from src.services.system_tracker import SystemTracker

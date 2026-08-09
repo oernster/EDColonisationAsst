@@ -1,6 +1,7 @@
 """Current carrier and state for a docked fleet carrier.
 
-Split out of test_api_carriers.py; the scaffolding lives in _test_api_carriers_support.py.
+Split out of test_api_carriers.py; the scaffolding lives in
+_test_api_carriers_support.py.
 """
 
 from pathlib import Path
@@ -163,7 +164,8 @@ async def test_carriers_current_and_state_with_fleet_carrier(
         assert carrier_state["total_capacity_tonnage"] == 25000
         assert carrier_state["free_space_tonnage"] == 19314
 
-        # Services should include at least exploration and outfitting based on CarrierStats.Crew
+        # Services should include at least exploration and outfitting based on
+        # CarrierStats.Crew
         services = identity.get("services") or []
         assert isinstance(services, list)
         assert "exploration" in services

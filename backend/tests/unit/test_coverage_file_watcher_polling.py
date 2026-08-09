@@ -1,6 +1,7 @@
 """Polling fallback.
 
-Split out of test_coverage_file_watcher.py; the scaffolding lives in _test_coverage_file_watcher_support.py.
+Split out of test_coverage_file_watcher.py; the scaffolding lives in
+_test_coverage_file_watcher_support.py.
 """
 
 import asyncio

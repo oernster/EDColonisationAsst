@@ -1,24 +1,20 @@
 """Shared scaffolding for the test_coverage_journal_ingestion modules.
 
-Split out of test_coverage_journal_ingestion.py when that file passed the module cap. Not named
+Split out of test_coverage_journal_ingestion.py when that file passed the module cap.
+Not named
 test_* on purpose: pytest collects only the modules that use it.
 """
 
 from __future__ import annotations
 import asyncio
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, List, Optional
-from watchdog.events import FileCreatedEvent, FileModifiedEvent
-from src.models.colonisation import Commodity, ConstructionSite
+from src.models.colonisation import ConstructionSite
 from src.models.journal_events import (
     ColonisationConstructionDepotEvent,
-    ColonisationContributionEvent,
     DockedEvent,
     JournalEvent,
-    LocationEvent,
 )
 from src.services.journal_ingestion import JournalFileHandler
 from src.services.journal_parser import JournalParser

@@ -5,7 +5,8 @@ from __future__ import annotations
 These tests exercise the top-level [`main()`](backend/src/launcher.py:441)
 function in a controlled way, focusing on:
 
-- Single-instance behaviour using [`ApplicationInstanceLock`](backend/src/runtime/app_singleton.py:1).
+- Single-instance behaviour using
+  [`ApplicationInstanceLock`](backend/src/runtime/app_singleton.py:1).
 - Ensuring that a lock acquisition error does not prevent the launcher from starting.
 """
 
@@ -125,7 +126,8 @@ def test_main_continues_when_lock_error(
             calls["show_error_called"] = True
 
     def fake_single_shot(_delay: int, callback) -> None:
-        # Immediately invoke the callback instead of scheduling with the real event loop.
+        # Immediately invoke the callback instead of scheduling with the real event
+        # loop.
         calls["single_shot_called"] = True
         callback()
 

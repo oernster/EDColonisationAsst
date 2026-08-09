@@ -10,6 +10,10 @@ from src.services.journal_parser import JournalParser
 from src.services.system_tracker import SystemTracker
 from src.services.data_aggregator import DataAggregator
 
+# Not unused: re-exporting the api_app fixture here makes it injectable by name
+# across the suite without per-module imports that flake8 flags as F401/F811.
+from tests.unit._test_api_routes_support import api_app  # noqa: F401
+
 
 @pytest.fixture
 def sample_commodity() -> Commodity:
@@ -84,7 +88,14 @@ async def aggregator(repository: ColonisationRepository) -> DataAggregator:
 @pytest.fixture
 def sample_journal_line() -> str:
     """Sample journal line for testing"""
-    return '{"timestamp":"2025-11-29T01:00:00Z","event":"ColonisationConstructionDepot","MarketID":123456,"StationName":"Test Station","StationType":"Planetary Construction Depot","StarSystem":"Test System","SystemAddress":987654,"ConstructionProgress":50.0,"Commodities":[{"Name":"Steel","Name_Localised":"Steel","Total":1000,"Delivered":500,"Payment":1234}]}'
+    return (
+        '{"timestamp":"2025-11-29T01:00:00Z","event":"ColonisationConstructionDepot",'
+        '"MarketID":123456,"StationName":"Test Station",'
+        '"StationType":"Planetary Construction Depot","StarSystem":"Test System",'
+        '"SystemAddress":987654,"ConstructionProgress":50.0,'
+        '"Commodities":[{"Name":"Steel","Name_Localised":"Steel","Total":1000,'
+        '"Delivered":500,"Payment":1234}]}'
+    )
 
 
 @pytest.fixture

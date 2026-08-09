@@ -10,7 +10,7 @@ import pytest
 
 from src.models.journal_events import LocationEvent, FSDJumpEvent, DockedEvent
 from src.services.system_tracker import SystemTracker
-from src.utils.journal import get_latest_journal_file, get_journal_directory
+from src.utils.journal import get_latest_journal_file
 from src.utils.logger import setup_logging, get_logger
 from src.utils.windows import get_saved_games_path
 
@@ -194,7 +194,8 @@ def test_get_saved_games_path_uses_shgetknownfolderpath(monkeypatch, tmp_path: P
             self.shell32 = DummyShell32()
             self.ole32 = DummyOle32()
 
-    # Ensure we exercise the SHGetKnownFolderPath branch rather than the USERPROFILE fallback
+    # Ensure we exercise the SHGetKnownFolderPath branch rather than the USERPROFILE
+    # fallback
     monkeypatch.setattr(windows_mod.ctypes, "windll", DummyWindll(), raising=False)
     monkeypatch.delenv("USERPROFILE", raising=False)
 
@@ -204,7 +205,9 @@ def test_get_saved_games_path_uses_shgetknownfolderpath(monkeypatch, tmp_path: P
 
 
 def test_get_saved_games_path_returns_none_when_no_api_and_no_env(monkeypatch):
-    """If both SHGetKnownFolderPath and USERPROFILE are unavailable, function should return None."""
+    """If both SHGetKnownFolderPath and USERPROFILE are unavailable, function should
+    return
+    None."""
     import src.utils.windows as windows_mod  # local import so we patch the right module
 
     class FailingWindll:
@@ -228,9 +231,10 @@ def test_setup_logging_and_get_logger():
 
 
 def test_get_journal_directory_raises_when_saved_games_missing():
-    """Windows-only: get_journal_directory should raise when Saved Games path cannot be determined."""
+    """Windows-only: get_journal_directory should raise when Saved Games path cannot be
+    determined."""
     import src.utils.journal as journal_mod  # local import to patch safely
-    import src.utils.windows as windows_mod  # patch underlying Windows helper actually used
+    import src.utils.windows as windows_mod  # patch the Windows helper in use
 
     # Make this test deterministic cross-platform by forcing the Windows branch.
     # (On Linux/macOS, get_journal_directory() would otherwise use Proton/Wine
@@ -245,16 +249,19 @@ def test_get_journal_directory_raises_when_saved_games_missing():
             with pytest.raises(FileNotFoundError):
                 journal_mod.get_journal_directory()
         finally:
-            windows_mod.get_saved_games_path = orig_get_saved_games  # type: ignore[assignment]
+            windows_mod.get_saved_games_path = (
+                orig_get_saved_games  # type: ignore[assignment]
+            )
     finally:
         if orig_os_name is not None:
             setattr(journal_mod.os, "name", orig_os_name)
 
 
 def test_get_journal_directory_raises_when_journal_folder_missing(tmp_path: Path):
-    """Windows-only: get_journal_directory should raise when the Frontier/Elite Dangerous folder is missing."""
+    """Windows-only: get_journal_directory should raise when the
+    Frontier/Elite Dangerous folder is missing."""
     import src.utils.journal as journal_mod  # local import to patch safely
-    import src.utils.windows as windows_mod  # patch underlying Windows helper actually used
+    import src.utils.windows as windows_mod  # patch the Windows helper in use
 
     # Force the Windows branch so this test can run on any OS.
     orig_os_name = getattr(journal_mod.os, "name", None)
@@ -267,18 +274,23 @@ def test_get_journal_directory_raises_when_journal_folder_missing(tmp_path: Path
 
         orig_get_saved_games = windows_mod.get_saved_games_path
         try:
-            windows_mod.get_saved_games_path = lambda: saved_games  # type: ignore[assignment]
+            windows_mod.get_saved_games_path = (
+                lambda: saved_games  # type: ignore[assignment]
+            )
             with pytest.raises(FileNotFoundError):
                 journal_mod.get_journal_directory()
         finally:
-            windows_mod.get_saved_games_path = orig_get_saved_games  # type: ignore[assignment]
+            windows_mod.get_saved_games_path = (
+                orig_get_saved_games  # type: ignore[assignment]
+            )
     finally:
         if orig_os_name is not None:
             setattr(journal_mod.os, "name", orig_os_name)
 
 
 def test_find_journal_directory_uses_linux_steam_compat(monkeypatch, tmp_path: Path):
-    """Linux path: find_journal_directory should detect Proton compatdata journals when present."""
+    """Linux path: find_journal_directory should detect Proton compatdata journals when
+    present."""
     import src.utils.journal as journal_mod  # local import to patch safely
 
     compat_dir = tmp_path / "compatdata"
@@ -302,7 +314,8 @@ def test_find_journal_directory_uses_linux_steam_compat(monkeypatch, tmp_path: P
         },
     )
 
-    # Replace the os module used inside src.utils.journal with a minimal POSIX-like stub.
+    # Replace the os module used inside src.utils.journal with a minimal POSIX-like
+    # stub.
     monkeypatch.setattr(journal_mod, "os", fake_os, raising=False)
 
     detected = journal_mod.find_journal_directory()
@@ -310,7 +323,9 @@ def test_find_journal_directory_uses_linux_steam_compat(monkeypatch, tmp_path: P
 
 
 def test_get_journal_directory_linux_error_message_lists_candidates(monkeypatch):
-    """Linux path: get_journal_directory should raise with a helpful error message when no dirs exist."""
+    """Linux path: get_journal_directory should raise with a helpful error message when
+    no
+    dirs exist."""
     import src.utils.journal as journal_mod  # local import to patch safely
 
     fake_os = types.SimpleNamespace(

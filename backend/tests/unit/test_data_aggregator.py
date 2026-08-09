@@ -192,7 +192,9 @@ async def test_aggregate_commodities_and_summary(repository: ColonisationReposit
 async def test_aggregate_by_system_inara_failure_falls_back_to_local(
     repository: ColonisationRepository, sample_construction_site
 ):
-    """If Inara fails, aggregate_by_system should still return local data without raising."""
+    """If Inara fails, aggregate_by_system should still return local data without
+    raising.
+    """
     await repository.add_construction_site(sample_construction_site)
 
     aggregator = DataAggregator(repository)
@@ -247,7 +249,8 @@ async def test_aggregate_by_system_inara_only_completed_site_added(
 async def test_aggregate_by_system_inara_upgrades_existing_local_site(
     repository: ColonisationRepository,
 ):
-    """Inara should upgrade an existing local incomplete site to completed and fill commodities."""
+    """Inara should upgrade an existing local incomplete site to completed and fill
+    commodities."""
     # Local site in the same system that we will query
     local_site = ConstructionSite(
         market_id=4242,

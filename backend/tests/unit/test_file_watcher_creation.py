@@ -1,6 +1,7 @@
 """Creation events and existing-file scans.
 
-Split out of test_file_watcher.py; the scaffolding lives in _test_file_watcher_support.py.
+Split out of test_file_watcher.py; the scaffolding lives in
+_test_file_watcher_support.py.
 """
 
 import asyncio
@@ -81,7 +82,7 @@ def test_journal_file_handler_on_created_schedules_for_journal_files(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_journal_file_handler_process_file_with_no_events_does_not_invoke_callback(
+async def test_journal_file_handler_process_file_with_no_events_skips_callback(
     repository: ColonisationRepository,
 ):
     """_process_file should return early when parser yields no events."""
@@ -143,7 +144,8 @@ async def test_file_watcher_process_existing_files_invokes_handler_for_journals(
     tmp_path: Path,
     repository: ColonisationRepository,
 ):
-    """_process_existing_files should call the handler for each existing Journal.*.log file."""
+    """_process_existing_files should call the handler for each existing Journal.*.log
+    file."""
     journal_dir = tmp_path / "journals"
     journal_dir.mkdir()
 

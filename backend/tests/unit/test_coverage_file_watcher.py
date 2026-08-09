@@ -1,6 +1,7 @@
 """Status reporting, lifecycle and stop behaviour.
 
-Split out of test_coverage_file_watcher.py; the scaffolding lives in _test_coverage_file_watcher_support.py.
+Split out of test_coverage_file_watcher.py; the scaffolding lives in
+_test_coverage_file_watcher_support.py.
 """
 
 import asyncio
@@ -10,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 import src.services.file_watcher as fw_module
 import src.services.file_watcher_polling as polling_module
-from src.services.file_watcher import FileWatcher, IFileWatcher
+from src.services.file_watcher import IFileWatcher
 
 from tests.unit._test_coverage_file_watcher_support import (
     BASE_MTIME,

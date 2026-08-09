@@ -59,8 +59,15 @@ export interface CommodityAggregate {
 export interface CurrentSystem {
   current_system: string | null;
   /**
-   * The commander's name, read from the latest journal file's Commander
-   * event. Null until a journal with one is found.
+   * Commander facts read on demand from the newest journal file: the name
+   * (Commander event), the credit balance the session loaded with (LoadGame;
+   * the journal records no running balance) and the docked context from the
+   * newest of Docked/Undocked/FSDJump/Location. Each is null until a journal
+   * carrying it is found.
    */
   commander_name?: string | null;
+  credits_balance?: number | null;
+  is_docked?: boolean | null;
+  station_name?: string | null;
+  station_type?: string | null;
 }

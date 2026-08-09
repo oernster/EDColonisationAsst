@@ -12,13 +12,21 @@ journal files. No spreadsheets. No manual tracking. Runs locally.
 Replaces manual tracking with automatic, journal-driven state.
 
 - Tracks colonisation construction sites directly from your journal data
+- Knows who you are without being told: your commander name, credit balance
+  and where you are docked are read from the journals and shown in the header
+  (the balance is the one your session loaded with, because the journal
+  records no running balance)
 - Shows what your fleet carrier is actually holding, commodity by commodity
 - Shows fleet carrier buy and sell orders in one place
 - Reports what the carrier runs on: fuel and jump range, balance and tax rates,
   the balance movements over time and who is crewing each service
 - Says when the carrier has a jump booked, where to and how long until it leaves
 - Updates automatically as you play
-- Runs entirely locally, with no external services and no accounts
+- Tells you when a newer release exists: your browser checks the GitHub
+  releases page and the header offers the download when one is out
+- Runs entirely locally, with no external services and no accounts. The one
+  outbound call is that update check, made by your browser rather than by
+  EDCA's backend; it sends nothing of yours
 
 ## Who it is for and who it is not for
 
@@ -65,6 +73,11 @@ through it is. Later launches skip straight past it.
 > the installer.
 
 ### Upgrading and removing
+
+EDCA tells you when an upgrade exists: the web UI compares the running version
+against the latest GitHub release (a browser-side check that sends nothing of
+yours) and shows an **Update available** button in the header that opens the
+releases page.
 
 Run the same installer over an existing installation: it works out whether that
 is an upgrade, a reinstall or a downgrade, says which on its button and does it

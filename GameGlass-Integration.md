@@ -402,15 +402,28 @@ Typical usage:
 
 **Purpose**
 
-Provides a minimal view of the latest journal-derived system.
+Provides a minimal view of the newest journal file: the current system and the
+commander's status.
 
 **Response Example**
 
 ```json
 {
-  "current_system": "LHS 1234"
+  "current_system": "LHS 1234",
+  "commander_name": "Jameson",
+  "credits_balance": 1234567890,
+  "is_docked": true,
+  "station_name": "Example Depot",
+  "station_type": "Outpost"
 }
 ```
+
+`commander_name` comes from the latest `Commander` event, `credits_balance`
+from the latest `LoadGame` (the balance the session loaded with; the journal
+records no running balance) and the docked context from the newest of
+`Docked`/`Undocked`/`FSDJump`/`Location`. Every field is `null` until a
+journal carrying it is found. The EDCA header uses all of this, so a shard
+that wants to greet the commander by name or show their balance can too.
 
 This can act as a fallback for inferring the current system directly from journal logs; `/api/systems/current` is the richer endpoint if available.
 
@@ -420,7 +433,7 @@ This can act as a fallback for inferring the current system directly from journa
 **Method:** GET  
 **Path:** `/api/settings`
 
-Returns the current application settings, including the journal directory and Inara configuration.
+Returns the current application settings: the journal directory, which is the one user-editable setting.
 
 **Method:** POST  
 **Path:** `/api/settings`

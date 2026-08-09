@@ -194,10 +194,14 @@ cd backend
 ### Running the dev server
 
 ```bash
-uvicorn src.main:app --reload
+uvicorn src.main:app --reload --port 47021
 ```
 
-or from the project root: `uvicorn backend.src.main:app --reload`.
+or from the project root: `uvicorn backend.src.main:app --reload --port 47021`.
+
+The `--port` flag matters: the uvicorn CLI defaults to 8000 and does not read
+the configured port (only the `python -m src.main` path does), so without it
+the frontend dev proxy cannot reach the backend.
 
 - REST API: `http://localhost:47021`
 - Swagger docs: `http://localhost:47021/docs`
@@ -210,11 +214,12 @@ Non-sensitive config lives in [backend/config.yaml](backend/config.yaml)
 purpose: the file is tracked, so a path written into it is one machine's path
 shipped to everybody; the one that used to be there pointed at a Linux
 Steam Proton prefix. The directory is detected instead; set the key only to
-override that. Commander-specific
-and Inara secrets live in `backend/commander.yaml`, which is gitignored;
-copy [backend/example.commander.yaml](backend/example.commander.yaml) or
-let the Settings page in the UI write it for you. Do not commit real API
-keys.
+override that. The dormant Inara configuration lives in
+`backend/commander.yaml`, which is gitignored and hand-created from
+[backend/example.commander.yaml](backend/example.commander.yaml); no shipped
+feature reads it, so the Settings UI does not expose it. Do not commit real
+API keys. The commander's name is not stored anywhere: it is read from the
+journal files (`/api/journal/status`).
 
 ### Testing
 
@@ -322,7 +327,7 @@ From the project root, two terminals:
 
 ```bash
 # Terminal 1: backend
-uvicorn backend.src.main:app --reload
+uvicorn backend.src.main:app --reload --port 47021
 
 # Terminal 2: frontend
 npm --prefix frontend run dev

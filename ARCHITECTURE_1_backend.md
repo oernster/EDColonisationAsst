@@ -13,10 +13,10 @@ This document focuses on the **Python backend** of the Elite: Dangerous Colonisa
 - **Config & settings**:
   - Pydantic v2 + `pydantic-settings` in [`backend/src/config.py`](backend/src/config.py:1)
   - YAML configuration in [`backend/config.yaml`](backend/config.yaml:1)
-  - Commander/Inara secrets in `backend/commander.yaml` (user-created from the example)
+  - Inara credentials and preferences in `backend/commander.yaml` (user-created from the example)
 - **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
 - **File watching**: `watchdog` in [`FileWatcher`](backend/src/services/file_watcher.py:1)
-- **HTTP client**: `httpx` (for Inara) in [`backend/src/services/inara_service.py`](backend/src/services/inara_service.py:1)
+- **HTTP client**: none in service. Nothing under `backend/src` performs an outbound HTTP request; the Inara path (section 7) is dormant. `httpx` remains a dev dependency for the ASGI test client.
 - **Live updates**: AJAX long-polling via [`backend/src/api/changes.py`](backend/src/api/changes.py:1) backed by [`ChangeBus`](backend/src/services/change_bus.py:1)
 - **Logging**: Standard library logging configured in [`backend/src/utils/logger.py`](backend/src/utils/logger.py:1)
 - **Tests**: `pytest` + plugins under [`backend/tests/unit`](backend/tests/unit:1)
@@ -365,13 +365,13 @@ Concurrency, which the split deliberately left where it was:
   - Filters to `RELEVANT_EVENTS`, then looks the event up in `_EVENT_PARSERS` and calls it. The table replaced an if/elif chain that restated every event name a second time.
   - `RELEVANT_EVENTS` stays a separate `ClassVar` because it is a subclass extension point; a subclass that widens it past what the table knows gets `None` rather than an exception.
 
-The fourteen events, by module:
+The fifteen events, by module:
 
 | Module | Events | Why they are together |
 |---|---|---|
 | [`colonisation_event_parser.py`](backend/src/services/colonisation_event_parser.py:1) | `ColonisationConstructionDepot`, `ColonisationContribution` | The only two whose journal format has changed in service, so the only two carrying real normalisation |
 | [`carrier_event_parser.py`](backend/src/services/carrier_event_parser.py:1) | `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`, `CarrierJumpRequest`, `CarrierJumpCancelled` | The fleet carrier feature area, reconciled downstream by `carrier_identity`, `carrier_orders`, `carrier_status` and `carrier_transit` |
-| [`commander_event_parser.py`](backend/src/services/commander_event_parser.py:1) | `Location`, `FSDJump`, `Docked`, `Undocked`, `Commander` | Where the commander is and who they are; all five are plain field maps. `Undocked` matters as much as `Docked`: without it, a docking stays true forever |
+| [`commander_event_parser.py`](backend/src/services/commander_event_parser.py:1) | `Location`, `FSDJump`, `Docked`, `Undocked`, `Commander`, `LoadGame` | Where the commander is, who they are and what they are worth as the session opens; all six are plain field maps. `Undocked` matters as much as `Docked`: without it, a docking stays true forever |
 | [`market_event_parser.py`](backend/src/services/market_event_parser.py:1) | `MarketBuy`, `MarketSell` | One parser for both, because they are the same shape. Direction is carried as a flag so the hold derivation never has to know journal spellings |
 
 `parse_construction_depot` normalises:
@@ -439,7 +439,7 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 >
 > The merge rules below therefore describe code that only test doubles reach today. They are documented because they are the contract any future Inara integration must satisfy, not because they currently run. `INARA_API_URL` and the module-level rate-limit and cache state beside it (`_MIN_CALL_INTERVAL_SECONDS`, `_CACHE_TTL`, `_last_call_at`, `_ban_until`, `_rate_limit_lock`, `_system_cache`) are likewise unreferenced, held for that same future call.
 >
-> EDCA makes no outbound request for colonisation data. The only network calls in the packaged runtime are loopback probes against its own backend; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it.
+> EDCA makes no outbound request for colonisation data. The backend's only network calls are loopback probes against itself; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it. The web UI's update check is browser-side on the same principle: the page fetches the latest release tag from the public GitHub releases API (one anonymous GET, nothing of the user's sent) and offers the releases page when it is newer than the running version.
 
 [`DataAggregator`](backend/src/services/data_aggregator.py:37) provides high-level views over `ConstructionSite` data:
 
@@ -452,7 +452,7 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
     - Adds Inara‑only completed sites.
     - Never introduces “phantom” in‑progress sites from Inara.
 
-  - Supports a preference `config.inara.prefer_local_for_commander_systems` to prefer journal data in systems the commander has visited.
+  - Supports a preference `config.inara.prefer_local_for_commander_systems` to prefer journal data in systems the commander has visited. Like the rest of the Inara configuration it is yaml/env-only: the Settings UI and `/api/settings` do not expose it.
 
 - `aggregate_commodities(sites) -> list[CommodityAggregate]`:
 
@@ -554,6 +554,14 @@ Key colonisation endpoints:
   own because the splash already polls health to decide when to open the browser.
   Progress is measured in bytes rather than files: journal files vary hugely in
   size; counting files makes the bar lurch.
+- `GET /api/journal/status`: the commander's current status, read on demand
+  from the newest journal file: the current system, the commander's name
+  (`Commander` event), the credit balance the session loaded with (`LoadGame`;
+  the journal records no running balance, so this is the freshest reading that
+  exists) and the docked context (station name and type plus `is_docked`,
+  settled by the newest of `Docked`/`Undocked`/`FSDJump`/`Location`). Every
+  game session opens its journal with `Commander` and `LoadGame` events, which
+  is why none of this is a stored setting.
 - `GET /api/systems`: systems with construction sites.
 - `GET /api/systems/search?q=...`: fuzzy search over known systems.
 - `GET /api/systems/current`: current system/station from `SystemTracker`.

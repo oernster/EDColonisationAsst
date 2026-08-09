@@ -104,8 +104,10 @@ On Linux, install `backend/requirements-dev-linux.txt` instead.
 Keep it activated when you change into `backend/`; there is nothing extra
 to install there.
 
-Copy `backend/example.commander.yaml` to `backend/commander.yaml` if you
-want Inara integration (the file is gitignored; never commit real keys).
+`backend/commander.yaml` (hand-created from
+`backend/example.commander.yaml`; gitignored, never commit real keys) holds
+the dormant Inara configuration. No shipped feature reads it, so most
+checkouts never need the file.
 
 ### 2. Frontend
 
@@ -132,7 +134,7 @@ the bottom.
 
 ```bash
 # Terminal 1 (project root)
-uvicorn backend.src.main:app --reload
+uvicorn backend.src.main:app --reload --port 47021
 
 # Terminal 2 (project root)
 npm --prefix frontend run dev

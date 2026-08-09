@@ -108,19 +108,14 @@ class HealthResponse(BaseModel):
 
 
 class AppSettings(BaseModel):
-    """Application settings model"""
+    """Application settings model.
+
+    One field, deliberately: the journal directory is the only setting a user
+    can change. The dormant Inara configuration is yaml/env-only and the
+    commander's name is journal-derived, so neither belongs here.
+    """
 
     journal_directory: str
-    inara_api_key: str | None
-    prefer_local_for_commander_systems: bool = Field(
-        default=True,
-        description=(
-            "When true (default), prefer local journal data for systems where the "
-            "current commander has construction sites and use Inara data primarily "
-            "for other systems. When false, Inara data is preferred wherever it is "
-            "available."
-        ),
-    )
 
 
 class CurrentCarrierResponse(BaseModel):

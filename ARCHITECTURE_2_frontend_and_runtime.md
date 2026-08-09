@@ -65,13 +65,16 @@ frontend/
     │   └── api.ts                # Axios client and typed API helpers
     ├── utils/
     │   ├── apiError.ts           # One place that turns a failure into a message
+    │   ├── commanderStatus.ts    # Journal status into header copy (credits, location)
+    │   ├── updateCheck.ts        # Release URLs and the version comparison
     │   └── device.ts             # Handheld detection
     ├── stores/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
     │   └── carrierStore.ts       # Zustand store for Fleet carrier data
     ├── hooks/
     │   ├── useLiveUpdates.ts         # AJAX long-poll loop and its backoff
-    │   ├── useBackendMeta.ts         # Version, health and commander name
+    │   ├── useBackendMeta.ts         # Version, health and the commander status
+    │   ├── useUpdateCheck.ts         # Browser-side GitHub release check
     │   ├── useThemeMode.ts           # Theme choice, persisted
     │   ├── useKeepAwakePreference.ts # Whether the user wants keep-awake
     │   ├── useKeepAwake.ts           # Which keep-awake strategy is in force
@@ -81,7 +84,7 @@ frontend/
     ├── types/
     │   ├── colonisation.ts       # Shared frontend types for colonisation data
     │   ├── fleetCarriers.ts      # Types for Fleet carrier data
-    │   └── settings.ts           # Types for settings/Inara config
+    │   └── settings.ts           # Types for settings
     ├── gameglass/
     │   ├── app.js
     │   ├── index.html
@@ -98,8 +101,11 @@ The frontend talks to the backend over HTTP (REST + AJAX long-polling), using he
   - `/api/systems`: for the system selector.
   - `/api/system`: `SystemColonisationData` for the selected system.
   - `/api/system/commodities`: aggregated per‑commodity “shopping list”.
-  - `/api/journal/status`: journal/latest‑file status.
-  - `/api/settings`: app/journal/Inara settings.
+  - `/api/journal/status`: the commander's status (current system, name,
+    session credit balance, docked context), read on demand from the newest
+    journal file. The header shows it and `useBackendMeta` re-reads it on a
+    gentle timer, since it changes as the commander plays.
+  - `/api/settings`: the journal directory, the one user-editable setting.
   - `/api/carriers/*`: Fleet carrier identity and state.
 
 - **Live updates via AJAX long-polling**:
@@ -179,19 +185,31 @@ State is centralised in two Zustand stores:
 
 - **SettingsPage**: [`SettingsPage.tsx`](frontend/src/components/Settings/SettingsPage.tsx:1)
 
-  - Uses `/api/settings` to:
-    - Override the journal directory. The backend detects it, so this is an
-      override for an unusual installation rather than a setup step.
-    - Configure Inara/commander settings.
-  - Writes back to the backend, which persists to YAML.
+  - Uses `/api/settings` to override the journal directory, the one
+    user-editable setting. The backend detects it, so this is an override for
+    an unusual installation rather than a setup step. Writes back to the
+    backend, which persists to YAML.
+  - Also owns the browser-side keep-awake preference, which lives in
+    `localStorage` rather than in backend settings.
+  - The commander's name is not on this page: it is detected from the journals
+    and shown in the header. The dormant Inara configuration is not on it
+    either: no shipped feature reads it, so it stays yaml/env-only.
 
 - **App / main**: [`App.tsx`](frontend/src/App.tsx:1), [`main.tsx`](frontend/src/main.tsx:1)
 
   - Compose the overall layout and route tabs/screens.
   - Initialise stores and start the AJAX long-poll live update loop.
   - App holds no state of its own beyond composition: it moved into the hooks
-    (`useThemeMode`, `useKeepAwakePreference`, `useBackendMeta`, `useLiveUpdates`)
-    and its copy into the components it renders.
+    (`useThemeMode`, `useKeepAwakePreference`, `useBackendMeta`,
+    `useUpdateCheck`, `useLiveUpdates`) and its copy into the components it
+    renders.
+  - The header reports the commander from the journal status: name, session
+    credit balance and where they are (`describeLocation` phrases the docked
+    context: station, planetary base or carrier, plus the system).
+  - `useUpdateCheck` compares the running version from health against the
+    latest GitHub release tag, fetched by the browser rather than the
+    backend; when newer, the header offers an "Update available" button that
+    opens the releases page.
   - Theme is one control rather than two: a single toggle that switches between
     the two themes in `theme.ts`, persisted by `useThemeMode`.
 
@@ -400,8 +418,12 @@ For developers working from a clone:
   venv\Scripts\activate  # Windows
   # source venv/bin/activate  # POSIX
   pip install -r requirements-dev.txt
-  uvicorn backend.src.main:app --reload
+  uvicorn backend.src.main:app --reload --port 47021
   ```
+
+  The `--port` flag matters: the uvicorn CLI defaults to 8000 and does not
+  read the configured port, so without it the frontend dev proxy (which
+  targets 47021) cannot reach the backend.
 
 - Frontend only:
 

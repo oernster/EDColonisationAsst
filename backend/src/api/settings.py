@@ -16,13 +16,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 async def get_app_settings():
     """Get application settings"""
     config = get_config()
-    return AppSettings(
-        journal_directory=config.journal.directory,
-        inara_api_key=config.inara.api_key,
-        prefer_local_for_commander_systems=(
-            config.inara.prefer_local_for_commander_systems
-        ),
-    )
+    return AppSettings(journal_directory=config.journal.directory)
 
 
 @router.post("", response_model=AppSettings)
@@ -32,23 +26,23 @@ async def update_app_settings(
 ):
     """Update application settings.
 
-    - Non-sensitive config (e.g. journal path) is stored in backend/config.yaml
-    - Sensitive commander/Inara config is stored in backend/commander.yaml
+    The one user-editable setting is the journal directory, stored in
+    backend/config.yaml. The dormant Inara configuration is not settable
+    here: it lives in backend/commander.yaml (hand-created from the example)
+    and environment variables, because no shipped feature reads it.
     """
-    # The six file operations below are blocking, which ASYNC230 flags because
+    # The three file operations below are blocking, which ASYNC230 flags because
     # this is an async endpoint and a blocking read parks the event loop. They
-    # are suppressed rather than moved to a thread deliberately: config.yaml
-    # and commander.yaml are two local files of a few hundred bytes each,
-    # written only when the user presses Save on the settings page. The cost of
-    # an asyncio.to_thread hop per call is larger than the block it removes,
-    # and the extra indirection would sit on the path that persists the user's
-    # credentials. Revisit if either file ever grows or moves off local disk.
+    # are suppressed rather than moved to a thread deliberately: config.yaml is
+    # one local file of a few hundred bytes, written only when the user presses
+    # Save on the settings page. The cost of an asyncio.to_thread hop per call
+    # is larger than the block it removes. Revisit if the file ever grows or
+    # moves off local disk.
     # Resolve config paths in a runtime-aware way so that in the packaged
     # executable we always read/write from a per-user writable directory
     # instead of the (potentially read-only) install location.
-    config_path, commander_path = get_config_paths()
+    config_path, _commander_path = get_config_paths()
 
-    # Update non-sensitive config
     if not config_path.exists():
         # Create a default config if it doesn't exist
         with open(config_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
@@ -65,29 +59,6 @@ async def update_app_settings(
     with open(config_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
         yaml.dump(config_data, f, default_flow_style=False)
 
-    # Update sensitive commander/Inara config
-    if not commander_path.exists():
-        # Create a default commander config if it doesn't exist
-        with open(commander_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-            yaml.dump({"inara": {}}, f)
-
-    with open(commander_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
-        commander_data = yaml.safe_load(f) or {}
-
-    if "inara" not in commander_data:
-        commander_data["inara"] = {}
-
-    commander_data["inara"]["api_key"] = settings.inara_api_key or ""
-    # The commander's name is read from the journals now, not stored. Drop the
-    # key an older install may have left behind so the file stops carrying it.
-    commander_data["inara"].pop("commander_name", None)
-    commander_data["inara"][
-        "prefer_local_for_commander_systems"
-    ] = settings.prefer_local_for_commander_systems
-
-    with open(commander_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230
-        yaml.dump(commander_data, f, default_flow_style=False)
-
     # Update in-memory config so the running app sees the changes
     from ..config import _config
 
@@ -95,10 +66,6 @@ async def update_app_settings(
     if _config is not None:
         old_journal_dir = _config.journal.directory
         _config.journal.directory = settings.journal_directory
-        _config.inara.api_key = settings.inara_api_key or ""
-        _config.inara.prefer_local_for_commander_systems = (
-            settings.prefer_local_for_commander_systems
-        )
 
     # Best-effort: restart the live file watcher if the journal directory changed.
     #

@@ -108,6 +108,20 @@ class CommanderEvent(JournalEvent):
     fid: str = Field(description="Frontier ID")
 
 
+class LoadGameEvent(JournalEvent):
+    """LoadGame event - the session as it begins.
+
+    Carries the credit balance at the moment the game loaded. The journal
+    records no running balance afterwards, so this is the freshest reading
+    that exists and is presented as such.
+    """
+
+    commander: str | None = Field(default=None, description="Commander name")
+    credits_balance: int | None = Field(
+        default=None, description="Credit balance when the session loaded"
+    )
+
+
 class CarrierLocationEvent(JournalEvent):
     """CarrierLocation event - location of a fleet carrier."""
 

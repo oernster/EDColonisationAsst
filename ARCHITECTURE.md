@@ -29,7 +29,7 @@ This document is the **front door** to the EDCA architecture. It gives you the b
 │      • Updates SQLite-backed repository                             │
 │  - Aggregation services                                             │
 │      • Aggregates data per system/site                              │
-│      • Optionally enriches with Inara data                          │
+│      • Carries a dormant Inara hook that makes no request           │
 │  - APIs                                                             │
 │      • REST routes under /api/*                                     │
 │      • Live updates via AJAX long-poll (/api/changes/longpoll)       │
@@ -86,7 +86,7 @@ That document focuses on:
     `Docked`/`Undocked`/`FSDJump`/`Location` rather than from the last docking
     seen, which stays true forever.
   - Normalisation of commodity identifiers and display names.
-- Data aggregation and optional Inara integration.
+- Data aggregation and the dormant Inara integration (no request is made).
 - Backend REST APIs and AJAX long-poll live updates.
 - Startup progress reported on the health endpoint, so the splash can say how
   far the first-run journal import has got.
@@ -110,8 +110,9 @@ That document focuses on:
   - Three sub-tabs: Market, Cargo and Status.
   - Known own/squadron carriers list.
 - Settings UI:
-  - Journal directory override, on top of the detected default.
-  - Commander/Inara settings (with Inara integration currently dormant).
+  - Journal directory override, on top of the detected default; the one
+    user-editable setting. The commander's name is not a setting (it is read
+    from the journals) and the dormant Inara configuration is yaml/env-only.
 - Runtime / launcher / tray stack:
   - `ApplicationInstanceLock` and single-instance behaviour.
   - Dev launcher window and tray controller.

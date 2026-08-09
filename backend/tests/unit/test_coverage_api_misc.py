@@ -241,11 +241,7 @@ async def test_reload_journals_skips_no_depot_files_and_tolerates_bus_failure(
 
 def _settings_payload(journal_dir: str) -> dict:
     """Build a JSON payload for the settings update endpoint."""
-    return {
-        "journal_directory": journal_dir,
-        "inara_api_key": "KEY",
-        "prefer_local_for_commander_systems": True,
-    }
+    return {"journal_directory": journal_dir}
 
 
 class _RecordingWatcher:
@@ -284,15 +280,13 @@ async def test_update_app_settings_with_no_loaded_config(
     )
     monkeypatch.setattr(config_module, "_config", None)
 
-    payload = AppSettings(
-        journal_directory=str(tmp_path / "journals"),
-        inara_api_key=None,
-    )
+    payload = AppSettings(journal_directory=str(tmp_path / "journals"))
     result = await settings_api.update_app_settings(payload)
 
     assert result.journal_directory == str(tmp_path / "journals")
     assert config_path.exists()
-    assert commander_path.exists()
+    # commander.yaml is hand-edited only; a settings save never creates it.
+    assert not commander_path.exists()
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,8 @@ work each group does:
 - colonisation_event_parser: the two events whose journal format has changed
   in service, so the only parsers carrying real normalisation.
 - carrier_event_parser: the three fleet carrier events.
-- commander_event_parser: Location, FSDJump, Docked and Commander.
+- commander_event_parser: Location, FSDJump, Docked, Undocked, Commander
+  and LoadGame.
 
 `_EVENT_PARSERS` is the dispatch table. It replaced an if/elif chain that
 restated the event names a second time; `RELEVANT_EVENTS` still names them
@@ -40,6 +41,7 @@ from .commander_event_parser import (
     parse_commander,
     parse_docked,
     parse_fsd_jump,
+    parse_load_game,
     parse_location,
     parse_undocked,
 )
@@ -58,6 +60,7 @@ _EVENT_PARSERS: dict[str, EventParser] = {
     "Docked": parse_docked,
     "Undocked": parse_undocked,
     "Commander": parse_commander,
+    "LoadGame": parse_load_game,
     "CarrierLocation": parse_carrier_location,
     "CarrierStats": parse_carrier_stats,
     "CarrierTradeOrder": parse_carrier_trade_order,
@@ -98,6 +101,8 @@ class JournalParser(IJournalParser):
         "Docked",
         "Undocked",
         "Commander",
+        # The session start, for the credit balance it carries.
+        "LoadGame",
         # Fleet carrier events (location + basic stats + trade orders)
         "CarrierLocation",
         "CarrierStats",

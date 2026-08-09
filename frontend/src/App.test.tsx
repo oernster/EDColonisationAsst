@@ -12,11 +12,15 @@ const { mockHealthCheck, mockGetAppSettings, mockGetCurrentSystem } = vi.hoisted
       .fn()
       .mockResolvedValue({ version: '2.3.1', python_version: '3.11.0' }),
     mockGetAppSettings: vi.fn().mockResolvedValue({}),
-    // The commander name is journal-derived now, so it rides on the journal
-    // status response rather than settings.
+    // The commander details are journal-derived now, so they ride on the
+    // journal status response rather than settings.
     mockGetCurrentSystem: vi.fn().mockResolvedValue({
-      current_system: null,
+      current_system: 'Test System',
       commander_name: 'Test Commander',
+      credits_balance: 1234567,
+      is_docked: true,
+      station_name: 'Test Station',
+      station_type: 'Coriolis',
     }),
   };
 });

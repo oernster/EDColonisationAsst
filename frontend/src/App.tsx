@@ -24,6 +24,9 @@ import { useKeepAwakePreference } from './hooks/useKeepAwakePreference';
 import { ThemeMode, useThemeMode } from './hooks/useThemeMode';
 import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { useBackendMeta } from './hooks/useBackendMeta';
+import { describeLocation, formatCredits } from './utils/commanderStatus';
+import { useUpdateCheck } from './hooks/useUpdateCheck';
+import { RELEASES_PAGE_URL } from './utils/updateCheck';
 import { darkTheme, lightTheme } from './theme';
 // Generated from the single master badge by generate_icons.py at the repo root.
 // Imported rather than read from public/ so Vite fingerprints it and a missing
@@ -60,8 +63,12 @@ function App() {
 
   const { themeMode, setThemeModeAndPersist } = useThemeMode();
   const keepAwakeEnabled = useKeepAwakePreference();
-  const { appVersion, pythonVersion, healthError, commanderName } =
+  const { appVersion, appVersionRaw, pythonVersion, healthError, commanderStatus } =
     useBackendMeta(settingsVersion);
+  const commanderName = commanderStatus?.commander_name ?? null;
+  const commanderCredits = commanderStatus?.credits_balance ?? null;
+  const commanderLocation = commanderStatus ? describeLocation(commanderStatus) : null;
+  const { latestVersion, updateAvailable } = useUpdateCheck(appVersionRaw);
 
   useLiveUpdates({ currentSystem, setSystemData, setAllSystems });
 
@@ -134,6 +141,16 @@ function App() {
               <Typography variant="body1" fontWeight="medium" color="text.primary">
                 {commanderName || 'Unknown'}
               </Typography>
+              {commanderCredits !== null && (
+                <Typography variant="body2" color="text.secondary">
+                  {formatCredits(commanderCredits)}
+                </Typography>
+              )}
+              {commanderLocation && (
+                <Typography variant="body2" color="text.secondary">
+                  {commanderLocation}
+                </Typography>
+              )}
               {!commanderName && (
                 <Typography
                   variant="caption"
@@ -153,6 +170,20 @@ function App() {
                   flexWrap: 'wrap',
                 }}
               >
+                {updateAvailable && latestVersion && (
+                  <Tooltip title="A newer release is on GitHub. Opens the releases page; run the installer over this installation to upgrade.">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="warning"
+                      href={RELEASES_PAGE_URL}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      Update available: v{latestVersion}
+                    </Button>
+                  </Tooltip>
+                )}
                 <KeepAwakeChip
                   enabled={keepAwakeEnabled}
                   status={keepAwakeStatus}

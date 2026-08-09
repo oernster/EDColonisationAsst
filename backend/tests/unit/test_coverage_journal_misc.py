@@ -129,4 +129,11 @@ async def test_journal_status_with_no_location_style_events(
 
     result = await journal_api.get_journal_status()
 
-    assert result == {"current_system": None, "commander_name": "CMDR Coverage"}
+    assert result == {
+        "current_system": None,
+        "commander_name": "CMDR Coverage",
+        "credits_balance": None,
+        "is_docked": None,
+        "station_name": None,
+        "station_type": None,
+    }

@@ -1,9 +1,10 @@
-"""Parsers for the four events describing the commander's own state.
+"""Parsers for the events describing the commander's own state.
 
-`Location`, `FSDJump` and `Docked` are what SystemTracker follows to know
-where the commander is and what they are docked at; `Commander` carries who
-they are. The module is named for the commander rather than for the
-`Commander` event, which is one of the four.
+`Location`, `FSDJump`, `Docked` and `Undocked` are what SystemTracker follows
+to know where the commander is and what they are docked at; `Commander`
+carries who they are and `LoadGame` what they are worth as the session opens.
+The module is named for the commander rather than for the `Commander` event,
+which is one of the six.
 
 Every parser here is a direct field map onto its typed event. Nothing in this
 module normalises anything, which is the difference between it and
@@ -20,6 +21,7 @@ from ..models.journal_events import (
     CommanderEvent,
     DockedEvent,
     FSDJumpEvent,
+    LoadGameEvent,
     LocationEvent,
     UndockedEvent,
 )
@@ -101,9 +103,25 @@ def parse_commander(data: dict[str, Any], timestamp: datetime) -> CommanderEvent
     )
 
 
+def parse_load_game(data: dict[str, Any], timestamp: datetime) -> LoadGameEvent:
+    """Parse LoadGame event.
+
+    Both fields are optional: old journals predate some of them and the value
+    of the event is the credit balance it carries when it carries one.
+    """
+    return LoadGameEvent(
+        timestamp=timestamp,
+        event=data["event"],
+        commander=data.get("Commander"),
+        credits_balance=data.get("Credits"),
+        raw_data=data,
+    )
+
+
 __all__ = [
     "parse_commander",
     "parse_docked",
     "parse_fsd_jump",
+    "parse_load_game",
     "parse_location",
 ]

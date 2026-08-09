@@ -15,7 +15,6 @@ export const SettingsPage = () => {
   const [settings, setSettings] = useState<AppSettings>({
     journal_directory: '',
     inara_api_key: '',
-    inara_commander_name: '',
     prefer_local_for_commander_systems: true,
   });
   const [loading, setLoading] = useState(true);
@@ -153,7 +152,7 @@ export const SettingsPage = () => {
               Keep screen awake while EDCA is open (recommended for tablets)
             </Typography>
           }
-          sx={{ alignItems: 'flex-start', mb: 0.5 }}
+          sx={{ alignItems: 'center', mb: 0.5 }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
           EDCA will attempt the browser Screen Wake Lock API when available (requires HTTPS or
@@ -188,7 +187,8 @@ export const SettingsPage = () => {
           Inara API Settings
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Enter your Inara.cz API key and commander name.
+          Enter your Inara.cz API key. Your commander name is detected automatically from your
+          journal files, so there is nothing to enter for it here.
           <br />
           <strong>
             Note: Inara integration is not currently used by the application. Supplying an API key
@@ -205,16 +205,6 @@ export const SettingsPage = () => {
           sx={{ mb: 3 }}
           type="password"
           disabled
-        />
-
-        <TextField
-          fullWidth
-          label="Inara Commander Name"
-          name="inara_commander_name"
-          value={settings.inara_commander_name || ''}
-          onChange={handleChange}
-          variant="outlined"
-          sx={{ mb: 3 }}
         />
 
         <FormControlLabel

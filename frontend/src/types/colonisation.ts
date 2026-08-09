@@ -58,4 +58,9 @@ export interface CommodityAggregate {
 
 export interface CurrentSystem {
   current_system: string | null;
+  /**
+   * The commander's name, read from the latest journal file's Commander
+   * event. Null until a journal with one is found.
+   */
+  commander_name?: string | null;
 }

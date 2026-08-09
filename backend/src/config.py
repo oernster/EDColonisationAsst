@@ -75,7 +75,6 @@ class InaraConfig(BaseSettings):
     """Inara API configuration"""
 
     api_key: str = os.getenv("INARA_API_KEY", "")
-    commander_name: str | None = os.getenv("INARA_COMMANDER_NAME")
     app_name: str = os.getenv("INARA_APP_NAME", "")
     prefer_local_for_commander_systems: bool = Field(
         default=True,
@@ -218,7 +217,12 @@ def get_config() -> AppConfig:
                 # mean "not configured" rather than a broken application.
                 commander_dict = {}
 
-        inara_cfg = InaraConfig(**commander_dict.get("inara", {}))
+        # The commander's name is journal-derived now. Installs that saved
+        # settings before that change still carry the key in commander.yaml,
+        # and InaraConfig forbids unknown fields, so drop it before validating.
+        inara_dict = dict(commander_dict.get("inara", {}))
+        inara_dict.pop("commander_name", None)
+        inara_cfg = InaraConfig(**inara_dict)
 
         _config = AppConfig(
             journal=JournalConfig(**config_dict.get("journal", {})),

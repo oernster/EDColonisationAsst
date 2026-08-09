@@ -1,4 +1,5 @@
-"""Tests for configuration and runtime detection utilities (no external mocking frameworks)."""
+"""Tests for configuration and runtime detection utilities (no external mocking
+frameworks)."""
 
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ import src as backend_pkg
 
 
 def test_runtime_is_frozen_false_by_default():
-    """Default environment (no sys.frozen, python.exe argv[0]) should be treated as DEV."""
+    """Default environment (no sys.frozen, python.exe argv[0]) is treated as DEV."""
     orig_frozen = getattr(sys, "frozen", None)
     orig_argv0 = sys.argv[0]
     try:
@@ -40,7 +41,7 @@ def test_runtime_is_frozen_false_by_default():
 
 
 def test_runtime_is_frozen_when_sys_frozen_flag():
-    """When sys.frozen is truthy, is_frozen and get_runtime_mode should report FROZEN."""
+    """When sys.frozen is truthy, is_frozen and get_runtime_mode report FROZEN."""
     orig_frozen = getattr(sys, "frozen", None)
     try:
         sys.frozen = True  # type: ignore[attr-defined]
@@ -80,7 +81,7 @@ def test_runtime_is_frozen_for_non_python_exe_path():
 def test_get_config_paths_dev_uses_backend_layout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """In non-frozen mode, get_config_paths should resolve backend/config.yaml layout."""
+    """In non-frozen mode, get_config_paths resolves backend/config.yaml layout."""
     monkeypatch.setattr(config_mod, "_is_frozen", lambda: False)
 
     config_path, commander_path = config_mod.get_config_paths()
@@ -163,7 +164,9 @@ def test_get_config_loads_yaml_and_commander_and_caches(
         assert cfg1.logging.level == "DEBUG"
 
         assert cfg1.inara.api_key == "KEY"
-        assert cfg1.inara.commander_name == "CMDR Test"
+        # The commander_name key in the YAML above is a legacy leftover; the
+        # config model no longer carries it and must ignore it on load.
+        assert not hasattr(cfg1.inara, "commander_name")
         assert cfg1.inara.app_name == "EDCA Test"
         assert cfg1.inara.prefer_local_for_commander_systems is False
 
@@ -194,7 +197,10 @@ def test_get_config_linux_autodetect_overrides_windows_default(
     # is valid on all platforms. Double-quoted Windows paths with backslashes
     # can be invalid YAML (e.g. "\U" unicode escapes) and config.get_config()
     # intentionally falls back to defaults on YAML parse errors.
-    win_default = "C:/Users/%USERNAME%/Saved Games/Frontier Developments/Elite Dangerous/__edca_test_missing__"
+    win_default = (
+        "C:/Users/%USERNAME%/Saved Games/Frontier Developments/"
+        "Elite Dangerous/__edca_test_missing__"
+    )
     config_file.write_text(
         f"journal:\n  directory: '{win_default}'\n",
         encoding="utf-8",

@@ -181,7 +181,7 @@ class _RaisingBus:
 
 
 @pytest.mark.asyncio
-async def test_reload_journals_skips_files_without_depot_events_and_tolerates_bus_failure(
+async def test_reload_journals_skips_no_depot_files_and_tolerates_bus_failure(
     repository: ColonisationRepository,
     tmp_path: Path,
     sample_journal_line: str,
@@ -244,7 +244,6 @@ def _settings_payload(journal_dir: str) -> dict:
     return {
         "journal_directory": journal_dir,
         "inara_api_key": "KEY",
-        "inara_commander_name": "CMDR Coverage",
         "prefer_local_for_commander_systems": True,
     }
 
@@ -288,7 +287,6 @@ async def test_update_app_settings_with_no_loaded_config(
     payload = AppSettings(
         journal_directory=str(tmp_path / "journals"),
         inara_api_key=None,
-        inara_commander_name=None,
     )
     result = await settings_api.update_app_settings(payload)
 

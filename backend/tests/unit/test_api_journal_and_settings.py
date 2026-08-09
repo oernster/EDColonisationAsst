@@ -1,4 +1,6 @@
-"""Tests for journal and settings API routes (no mocking frameworks, real FS with backup)."""
+"""Tests for journal and settings API routes (no mocking frameworks, real FS with
+backup).
+"""
 
 from __future__ import annotations
 
@@ -27,8 +29,17 @@ async def test_get_journal_status_with_latest_file(tmp_path: Path):
 
     latest_file = journal_dir / "Journal.2025-01-01T000000.01.log"
 
-    # Single Location event is enough to determine current system
+    # A Commander event opens every session's journal; a Location event is
+    # enough to determine the current system.
     events = [
+        json.dumps(
+            {
+                "timestamp": "2025-01-01T00:00:00Z",
+                "event": "Commander",
+                "Name": "Jameson",
+                "FID": "F123456",
+            }
+        ),
         json.dumps(
             {
                 "timestamp": "2025-01-01T00:00:00Z",
@@ -41,20 +52,23 @@ async def test_get_journal_status_with_latest_file(tmp_path: Path):
                 "StationType": "Coriolis",
                 "MarketID": 42,
             }
-        )
+        ),
     ]
     latest_file.write_text("\n".join(events), encoding="utf-8")
 
     # Patch get_journal_directory to point at our temp dir
     orig_get_dir = journal_api.get_journal_directory
     try:
-        journal_api.get_journal_directory = lambda: journal_dir  # type: ignore[assignment]
+        journal_api.get_journal_directory = (
+            lambda: journal_dir  # type: ignore[assignment]
+        )
 
         result = await journal_api.get_journal_status()
     finally:
         journal_api.get_journal_directory = orig_get_dir  # type: ignore[assignment]
 
     assert result["current_system"] == "Test System"
+    assert result["commander_name"] == "Jameson"
 
 
 @pytest.mark.asyncio
@@ -65,12 +79,15 @@ async def test_get_journal_status_no_files(tmp_path: Path):
 
     orig_get_dir = journal_api.get_journal_directory
     try:
-        journal_api.get_journal_directory = lambda: journal_dir  # type: ignore[assignment]
+        journal_api.get_journal_directory = (
+            lambda: journal_dir  # type: ignore[assignment]
+        )
         result = await journal_api.get_journal_status()
     finally:
         journal_api.get_journal_directory = orig_get_dir  # type: ignore[assignment]
 
     assert result["current_system"] is None
+    assert result["commander_name"] is None
     assert "No journal files found" in result["message"]
 
 
@@ -104,12 +121,16 @@ async def test_get_journal_status_propagates_http_exception():
     try:
         tmp_dir = Path.cwd()
         journal_api.get_journal_directory = lambda: tmp_dir  # type: ignore[assignment]
-        journal_api.get_latest_journal_file = _boom_latest_file  # type: ignore[assignment]
+        journal_api.get_latest_journal_file = (
+            _boom_latest_file  # type: ignore[assignment]
+        )
         with pytest.raises(HTTPException) as exc:
             await journal_api.get_journal_status()
     finally:
         journal_api.get_journal_directory = orig_get_dir  # type: ignore[assignment]
-        journal_api.get_latest_journal_file = orig_get_latest  # type: ignore[assignment]
+        journal_api.get_latest_journal_file = (
+            orig_get_latest  # type: ignore[assignment]
+        )
 
     assert exc.value.status_code == 418
 
@@ -127,15 +148,18 @@ async def test_get_app_settings_round_trip():
     # Basic shape assertions
     assert hasattr(settings, "journal_directory")
     assert hasattr(settings, "inara_api_key")
-    assert hasattr(settings, "inara_commander_name")
     assert hasattr(settings, "prefer_local_for_commander_systems")
+    # The commander's name is journal-derived, not a stored setting.
+    assert not hasattr(settings, "inara_commander_name")
 
 
 @pytest.mark.asyncio
 async def test_update_app_settings_writes_files_and_updates_config(tmp_path: Path):
-    """update_app_settings should write config/commander YAML and return updated settings.
+    """update_app_settings should write config/commander YAML and return updated
+    settings.
 
-    To avoid polluting the real config, this test backs up config.yaml and commander.yaml
+    To avoid polluting the real config, this test backs up config.yaml and
+    commander.yaml
     before running and restores them afterwards. It also exercises both the
     'file does not exist' and 'missing section' branches in the implementation.
     """
@@ -157,7 +181,6 @@ async def test_update_app_settings_writes_files_and_updates_config(tmp_path: Pat
         app_settings = AppSettings(
             journal_directory=new_journal_dir,
             inara_api_key="TESTKEY",
-            inara_commander_name="CMDR Test",
             # Explicitly set to exercise persistence of this flag
             prefer_local_for_commander_systems=False,
         )
@@ -176,7 +199,6 @@ async def test_update_app_settings_writes_files_and_updates_config(tmp_path: Pat
         assert isinstance(result, AppSettings)
         assert result.journal_directory == new_journal_dir
         assert result.inara_api_key == "TESTKEY"
-        assert result.inara_commander_name == "CMDR Test"
 
         # Verify config.yaml contents
         assert config_path.exists()
@@ -188,8 +210,9 @@ async def test_update_app_settings_writes_files_and_updates_config(tmp_path: Pat
         commander = yaml.safe_load(commander_path.read_text(encoding="utf-8")) or {}
         inara_cfg = commander.get("inara", {})
         assert inara_cfg.get("api_key") == "TESTKEY"
-        assert inara_cfg.get("commander_name") == "CMDR Test"
         assert inara_cfg.get("prefer_local_for_commander_systems") is False
+        # No commander name is ever written; it is journal-derived.
+        assert "commander_name" not in inara_cfg
 
         # ----------------------
         # 2) Files exist but missing sections: exercise "journal"/"inara" insertion
@@ -204,6 +227,19 @@ async def test_update_app_settings_writes_files_and_updates_config(tmp_path: Pat
         commander2 = yaml.safe_load(commander_path.read_text(encoding="utf-8")) or {}
         assert "journal" in cfg2
         assert "inara" in commander2
+
+        # ----------------------
+        # 3) A pre-existing commander.yaml still carrying the legacy
+        #    commander_name key: saving settings removes it.
+        # ----------------------
+        commander_path.write_text(
+            "inara:\n  commander_name: Stale Name\n", encoding="utf-8"
+        )
+
+        await settings_api.update_app_settings(app_settings)
+
+        commander3 = yaml.safe_load(commander_path.read_text(encoding="utf-8")) or {}
+        assert "commander_name" not in commander3.get("inara", {})
     finally:
         # Restore original config.yaml
         if orig_config is None:

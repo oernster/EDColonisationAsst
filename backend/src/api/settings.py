@@ -19,7 +19,6 @@ async def get_app_settings():
     return AppSettings(
         journal_directory=config.journal.directory,
         inara_api_key=config.inara.api_key,
-        inara_commander_name=config.inara.commander_name,
         prefer_local_for_commander_systems=(
             config.inara.prefer_local_for_commander_systems
         ),
@@ -79,7 +78,9 @@ async def update_app_settings(
         commander_data["inara"] = {}
 
     commander_data["inara"]["api_key"] = settings.inara_api_key or ""
-    commander_data["inara"]["commander_name"] = settings.inara_commander_name or ""
+    # The commander's name is read from the journals now, not stored. Drop the
+    # key an older install may have left behind so the file stops carrying it.
+    commander_data["inara"].pop("commander_name", None)
     commander_data["inara"][
         "prefer_local_for_commander_systems"
     ] = settings.prefer_local_for_commander_systems
@@ -95,7 +96,6 @@ async def update_app_settings(
         old_journal_dir = _config.journal.directory
         _config.journal.directory = settings.journal_directory
         _config.inara.api_key = settings.inara_api_key or ""
-        _config.inara.commander_name = settings.inara_commander_name
         _config.inara.prefer_local_for_commander_systems = (
             settings.prefer_local_for_commander_systems
         )

@@ -112,7 +112,6 @@ class AppSettings(BaseModel):
 
     journal_directory: str
     inara_api_key: str | None
-    inara_commander_name: str | None
     prefer_local_for_commander_systems: bool = Field(
         default=True,
         description=(

@@ -1,7 +1,6 @@
 export interface AppSettings {
   journal_directory: string;
   inara_api_key: string | null;
-  inara_commander_name: string | null;
   /**
    * When true (default), systems where this commander's journals contain
    * colonisation sites are served purely from local journal data. Inara is

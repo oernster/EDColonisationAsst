@@ -9,9 +9,6 @@ inara:
   # You can generate this from your Inara account settings.
   api_key: "your_inara_api_key_here"
 
-  # The exact commander name associated with the Inara API key above.
-  commander_name: "Your Commander Name"
-
   # Optional: the registered Inara application name (if you have one).
   # This is currently read via environment variable fallback and may
   # not be strictly required for normal operation, but is included

@@ -6,13 +6,17 @@ import axios from 'axios';
 
 // Mock API calls used by App's `loadMeta()` effect to avoid act warnings and network access.
 // NOTE: `vi.mock()` is hoisted. Use `vi.hoisted()` so these are available when the mock factory runs.
-const { mockHealthCheck, mockGetAppSettings } = vi.hoisted(() => {
+const { mockHealthCheck, mockGetAppSettings, mockGetCurrentSystem } = vi.hoisted(() => {
   return {
     mockHealthCheck: vi
       .fn()
       .mockResolvedValue({ version: '2.3.1', python_version: '3.11.0' }),
-    mockGetAppSettings: vi.fn().mockResolvedValue({
-      inara_commander_name: 'Test Commander',
+    mockGetAppSettings: vi.fn().mockResolvedValue({}),
+    // The commander name is journal-derived now, so it rides on the journal
+    // status response rather than settings.
+    mockGetCurrentSystem: vi.fn().mockResolvedValue({
+      current_system: null,
+      commander_name: 'Test Commander',
     }),
   };
 });
@@ -26,7 +30,7 @@ vi.mock('./services/api', () => ({
     // Used by refreshFromBackend(); prevent errors if called.
     getSystems: vi.fn().mockResolvedValue([]),
     getSystemData: vi.fn().mockResolvedValue(null),
-    getCurrentSystem: vi.fn().mockResolvedValue({ current_system: null }),
+    getCurrentSystem: mockGetCurrentSystem,
   },
 }));
 
@@ -42,6 +46,7 @@ describe('App', () => {
 
     mockHealthCheck.mockClear();
     mockGetAppSettings.mockClear();
+    mockGetCurrentSystem.mockClear();
 
     // Reset global zustand store state between tests.
     useColonisationStore.setState({

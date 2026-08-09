@@ -1,9 +1,12 @@
 /**
  * Version, runtime and commander details read from the backend.
  *
- * Re-read whenever the settings version changes, because the commander name
- * lives in settings. The two requests fail independently: a health failure is
- * surfaced to the user, whereas a missing commander name is simply blank.
+ * The commander name is detected from the journals (the latest journal file's
+ * Commander event), so nothing needs entering in Settings. Re-read whenever
+ * the settings version changes, because a changed journal directory changes
+ * which journals the name comes from. The two requests fail independently: a
+ * health failure is surfaced to the user, whereas a missing commander name is
+ * simply blank.
  */
 
 import { useEffect, useState } from 'react';
@@ -38,10 +41,10 @@ export function useBackendMeta(settingsVersion: number): BackendMeta {
       }
 
       try {
-        const settings = await api.getAppSettings();
-        setCommanderName(settings.inara_commander_name);
+        const journalStatus = await api.getCurrentSystem();
+        setCommanderName(journalStatus.commander_name ?? null);
       } catch {
-        // Ignore settings load errors here; commander name is optional display.
+        // Ignore journal status errors here; commander name is optional display.
       }
     };
 

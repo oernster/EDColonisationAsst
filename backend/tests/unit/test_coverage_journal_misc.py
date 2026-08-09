@@ -79,7 +79,8 @@ def test_linux_candidates_include_compat_and_wineprefix(
     assert wine / "drive_c" / "users" / "steamuser" / subpath in candidates
 
 
-# ------------------------------------------------------------------ get_journal_directory
+# ------------------------------------------------------------------
+# get_journal_directory
 
 
 def test_get_journal_directory_returns_detected_dir(
@@ -109,7 +110,8 @@ async def test_inara_colonisation_data_is_always_empty() -> None:
 async def test_journal_status_with_no_location_style_events(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Relevant but non-location events leave the current system unknown."""
+    """Relevant but non-location events leave the current system unknown,
+    while the Commander event still names the commander."""
     journal_dir = tmp_path / "journals"
     journal_dir.mkdir()
     latest = journal_dir / "Journal.2026-01-01T000000.01.log"
@@ -127,4 +129,4 @@ async def test_journal_status_with_no_location_style_events(
 
     result = await journal_api.get_journal_status()
 
-    assert result == {"current_system": None}
+    assert result == {"current_system": None, "commander_name": "CMDR Coverage"}

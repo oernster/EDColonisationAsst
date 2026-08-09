@@ -140,7 +140,7 @@ function App() {
                   color="text.secondary"
                   sx={{ display: 'block', mt: 0.5 }}
                 >
-                  Set your commander name in the Settings tab.
+                  Detected automatically from your journal files.
                 </Typography>
               )}
               <Box

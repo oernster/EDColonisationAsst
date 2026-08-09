@@ -37,6 +37,9 @@ import edcaIcon from './assets/edca-icon.png';
 // than to the asset: the file is written at twice this so it stays sharp on a
 // high-DPI display or a tablet.
 const HEADER_ICON_PX = 96;
+// On phone-width screens the header stacks, so the badge drops a size to
+// leave the room to the title.
+const HEADER_ICON_PX_SMALL = 64;
 
 const THEME_BUTTON_SX = {
   minWidth: 36,
@@ -99,33 +102,44 @@ function App() {
       <Container maxWidth="xl">
         <Box sx={{ py: 4 }}>
           {/* Header */}
+          {/* Explicit layout per breakpoint rather than flex wrapping: a
+              wrapped right-aligned block reads as broken on tablets, so below
+              md the header is a left-aligned column and from md up the
+              commander block sits beside the title, right-aligned. */}
           <Box
             sx={{
               mb: 4,
               display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              flexWrap: 'wrap',
               gap: 2,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
               <Box
                 component="img"
                 src={edcaIcon}
                 alt=""
                 sx={{
-                  width: HEADER_ICON_PX,
-                  height: HEADER_ICON_PX,
+                  width: { xs: HEADER_ICON_PX_SMALL, sm: HEADER_ICON_PX },
+                  height: { xs: HEADER_ICON_PX_SMALL, sm: HEADER_ICON_PX },
                   flexShrink: 0,
                 }}
               />
-              <Box>
+              <Box sx={{ minWidth: 0 }}>
                 <Typography
                   variant="h3"
                   component="h1"
                   gutterBottom
-                  sx={{ color: 'primary.main', fontWeight: 'bold' }}
+                  sx={{
+                    color: 'primary.main',
+                    fontWeight: 'bold',
+                    // Scaled to the viewport so the md+ side-by-side row fits
+                    // and the stacked tablet/phone layouts are not dominated
+                    // by the title.
+                    fontSize: { xs: '1.75rem', sm: '2.125rem', lg: '3rem' },
+                  }}
                 >
                   Elite: Dangerous Colonisation Assistant
                 </Typography>
@@ -134,7 +148,7 @@ function App() {
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+            <Box sx={{ textAlign: { xs: 'left', md: 'right' }, minWidth: 0 }}>
               <Typography variant="body2" sx={{ color: 'primary.main' }}>
                 Commander:
               </Typography>
@@ -164,7 +178,7 @@ function App() {
                 sx={{
                   mt: 1,
                   display: 'flex',
-                  justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                  justifyContent: { xs: 'flex-start', md: 'flex-end' },
                   gap: 1,
                   alignItems: 'center',
                   flexWrap: 'wrap',

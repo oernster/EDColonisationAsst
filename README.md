@@ -22,8 +22,10 @@ Replaces manual tracking with automatic, journal-driven state.
   the balance movements over time and who is crewing each service
 - Says when the carrier has a jump booked, where to and how long until it leaves
 - Updates automatically as you play
-- Tells you when a newer release exists: your browser checks the GitHub
-  releases page and the header offers the download when one is out
+- Tells you when a newer release exists: your browser asks the GitHub
+  releases API once per day and a prompt offers Download (the installer
+  itself), Skip this version or Later; a skipped version never prompts
+  again on this browser and the header button stays as the way back in
 - Runs entirely locally, with no external services and no accounts. The one
   outbound call is that update check, made by your browser rather than by
   EDCA's backend; it sends nothing of yours

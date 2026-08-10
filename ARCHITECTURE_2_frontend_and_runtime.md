@@ -59,14 +59,16 @@ frontend/
     │   │   └── LicensePanel.tsx  # The licence text
     │   ├── KeepAwake/
     │   │   └── KeepAwakeChip.tsx # Keep-awake state, in the header
-    │   └── Settings/
-    │       └── SettingsPage.tsx
+    │   ├── Settings/
+    │   │   └── SettingsPage.tsx
+    │   └── UpdatePrompt/
+    │       └── UpdatePrompt.tsx  # Download / Skip this version / Later dialog
     ├── services/
     │   └── api.ts                # Axios client and typed API helpers
     ├── utils/
     │   ├── apiError.ts           # One place that turns a failure into a message
     │   ├── commanderStatus.ts    # Journal status into header copy (credits, location)
-    │   ├── updateCheck.ts        # Release URLs and the version comparison
+    │   ├── updateCheck.ts        # Release parsing, asset selection, skip store
     │   └── device.ts             # Handheld detection
     ├── stores/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
@@ -207,9 +209,15 @@ State is centralised in two Zustand stores:
     credit balance and where they are (`describeLocation` phrases the docked
     context: station, planetary base or carrier, plus the system).
   - `useUpdateCheck` compares the running version from health against the
-    latest GitHub release tag, fetched by the browser rather than the
-    backend; when newer, the header offers an "Update available" button that
-    opens the releases page.
+    latest GitHub release, fetched by the browser rather than the backend,
+    once shortly after load and again every 24 hours while the HUD stays
+    open. When newer, an update prompt offers Download (the Windows
+    installer asset, falling back to the releases page), Skip this version
+    (persisted in this browser's local storage, so it never prompts again)
+    or Later; the header's "Update available" button reopens the prompt.
+    The pure half (release parsing, asset selection, the skip store) lives
+    in `utils/updateCheck.ts`; the dialog is
+    `components/UpdatePrompt/UpdatePrompt.tsx`.
   - Theme is one control rather than two: a single toggle that switches between
     the two themes in `theme.ts`, persisted by `useThemeMode`.
 

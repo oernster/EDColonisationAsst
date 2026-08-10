@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ThemeProvider,
   CssBaseline,
@@ -26,7 +26,7 @@ import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { useBackendMeta } from './hooks/useBackendMeta';
 import { describeLocation, formatCredits } from './utils/commanderStatus';
 import { useUpdateCheck } from './hooks/useUpdateCheck';
-import { RELEASES_PAGE_URL } from './utils/updateCheck';
+import { UpdatePrompt } from './components/UpdatePrompt/UpdatePrompt';
 import { darkTheme, lightTheme } from './theme';
 // Generated from the single master badge by generate_icons.py at the repo root.
 // Imported rather than read from public/ so Vite fingerprints it and a missing
@@ -71,7 +71,21 @@ function App() {
   const commanderName = commanderStatus?.commander_name ?? null;
   const commanderCredits = commanderStatus?.credits_balance ?? null;
   const commanderLocation = commanderStatus ? describeLocation(commanderStatus) : null;
-  const { latestVersion, updateAvailable } = useUpdateCheck(appVersionRaw);
+  const {
+    latestVersion,
+    updateAvailable,
+    updateOffered,
+    downloadUrl,
+    pageUrl,
+    skipThisVersion,
+  } = useUpdateCheck(appVersionRaw);
+  const [updatePromptOpen, setUpdatePromptOpen] = useState(false);
+  useEffect(() => {
+    // Open once when an unskipped newer release first appears; Later
+    // closes it without this reopening; the header control remains
+    // as the way back in.
+    if (updateOffered) setUpdatePromptOpen(true);
+  }, [updateOffered]);
 
   useLiveUpdates({ currentSystem, setSystemData, setAllSystems });
 
@@ -185,14 +199,12 @@ function App() {
                 }}
               >
                 {updateAvailable && latestVersion && (
-                  <Tooltip title="A newer release is on GitHub. Opens the releases page; run the installer over this installation to upgrade.">
+                  <Tooltip title="A newer release is on GitHub. Opens the update prompt: download the installer, skip this version or decide later.">
                     <Button
                       size="small"
                       variant="outlined"
                       color="warning"
-                      href={RELEASES_PAGE_URL}
-                      target="_blank"
-                      rel="noopener"
+                      onClick={() => setUpdatePromptOpen(true)}
                     >
                       Update available: v{latestVersion}
                     </Button>
@@ -307,6 +319,21 @@ function App() {
 
           {currentTab === 3 && <LicensePanel />}
         </Box>
+
+        {latestVersion && (
+          <UpdatePrompt
+            open={updatePromptOpen}
+            latestVersion={latestVersion}
+            currentVersion={appVersion ?? appVersionRaw ?? 'an older version'}
+            downloadUrl={downloadUrl}
+            pageUrl={pageUrl}
+            onSkip={() => {
+              skipThisVersion();
+              setUpdatePromptOpen(false);
+            }}
+            onLater={() => setUpdatePromptOpen(false)}
+          />
+        )}
       </Container>
     </ThemeProvider>
   );

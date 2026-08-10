@@ -217,7 +217,7 @@ top-level import here is circular.
 ### 3.4 Saying how far startup has got
 
 [`startup_progress.py`](backend/src/services/startup_progress.py:1) records the
-stage of the first-run backfill and how much of it is done, and
+stage of the first-run backfill and how much of it is done;
 [`api/health.py`](backend/src/api/health.py:1) publishes it on the health
 response. The packaged runtime's splash polls health anyway, so this rides along
 on a request it was already making rather than adding an endpoint of its own.
@@ -439,7 +439,7 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 >
 > The merge rules below therefore describe code that only test doubles reach today. They are documented because they are the contract any future Inara integration must satisfy, not because they currently run. `INARA_API_URL` and the module-level rate-limit and cache state beside it (`_MIN_CALL_INTERVAL_SECONDS`, `_CACHE_TTL`, `_last_call_at`, `_ban_until`, `_rate_limit_lock`, `_system_cache`) are likewise unreferenced, held for that same future call.
 >
-> EDCA makes no outbound request for colonisation data. The backend's only network calls are loopback probes against itself; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it. The web UI's update check is browser-side on the same principle: the page fetches the latest release tag from the public GitHub releases API (one anonymous GET, nothing of the user's sent) and offers the releases page when it is newer than the running version.
+> EDCA makes no outbound request for colonisation data. The backend's only network calls are loopback probes against itself; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it. The web UI's update check is browser-side on the same principle: the page fetches the latest release from the public GitHub releases API (one anonymous GET, nothing of the user's sent) and when it is newer shows a prompt offering to download the Windows installer asset (falling back to the releases page), skip that version or decide later. A skipped version is remembered in the browser's localStorage and the check repeats every 24 hours while the HUD stays open; the backend itself still makes no outbound call.
 
 [`DataAggregator`](backend/src/services/data_aggregator.py:37) provides high-level views over `ConstructionSite` data:
 
@@ -505,7 +505,7 @@ Two separate questions that the API used to answer as one.
 
 **Is the commander aboard?** `find_current_carrier_docking` in
 [`carrier_events.py`](backend/src/services/carrier_events.py:1) takes the newest
-event that settles it, out of `Docked`, `Undocked`, `FSDJump` and `Location`,
+event that settles it (out of `Docked`, `Undocked`, `FSDJump` and `Location`)
 and stops there. Its predecessor asked only when the commander was last at a
 carrier, which is a question whose answer stays true forever; `Undocked` was not
 parsed at all, so nothing could ever make it false again.

@@ -55,7 +55,7 @@ frontend/
     │   │   ├── carrierServices.ts               # Service names for display
     │   │   └── carrierTransit.ts                # Countdown arithmetic
     │   ├── About/
-    │   │   ├── AboutPanel.tsx    # Version, author, open source credits
+    │   │   ├── AboutPanel.tsx    # Version, author, credits, manual update check
     │   │   └── LicensePanel.tsx  # The licence text
     │   ├── KeepAwake/
     │   │   └── KeepAwakeChip.tsx # Keep-awake state, in the header
@@ -215,7 +215,10 @@ State is centralised in two Zustand stores:
     installer asset, falling back to the releases page), Skip this version
     (persisted in this browser's local storage, so it never prompts again)
     or Later; the header's "Update available" button reopens the prompt.
-    The pure half (release parsing, asset selection, the skip store) lives
+    The About tab's Check for Updates runs the same check on demand,
+    ignoring a skipped version: an update opens the prompt while "up to
+    date" and "could not reach GitHub" read out on the tab itself. The
+    pure half (release parsing, asset selection, the skip store) lives
     in `utils/updateCheck.ts`; the dialog is
     `components/UpdatePrompt/UpdatePrompt.tsx`.
   - Theme is one control rather than two: a single toggle that switches between

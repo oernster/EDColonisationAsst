@@ -27,6 +27,14 @@ import {
 /** How often the open HUD re-asks GitHub, in milliseconds. */
 export const RECHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * What a manual check concluded. Unlike the automatic check a manual one
+ * reports every outcome: a malformed payload or an unknown running version
+ * cannot confirm anything, so both read as unreachable rather than as a
+ * false "you are up to date".
+ */
+export type ManualCheckOutcome = 'update' | 'latest' | 'unreachable';
+
 export interface UpdateCheck {
   latestVersion: string | null;
   /** Newer than the running version; true even for a skipped release. */
@@ -39,6 +47,8 @@ export interface UpdateCheck {
   pageUrl: string;
   /** Persist the offered version so it never prompts again. */
   skipThisVersion: () => void;
+  /** Ask GitHub right now, ignoring the skip; for a manual check. */
+  checkNow: () => Promise<ManualCheckOutcome>;
 }
 
 export function useUpdateCheck(currentVersion: string | null): UpdateCheck {
@@ -85,6 +95,21 @@ export function useUpdateCheck(currentVersion: string | null): UpdateCheck {
     setSkippedVersion(latestVersion);
   }, [latestVersion]);
 
+  const checkNow = useCallback(async (): Promise<ManualCheckOutcome> => {
+    if (!currentVersion) return 'unreachable';
+    try {
+      const response = await axios.get(RELEASES_API_URL);
+      const parsed = parseLatestRelease(response.data);
+      if (!parsed) return 'unreachable';
+      setRelease(parsed);
+      return isNewerVersion(parsed.version, currentVersion)
+        ? 'update'
+        : 'latest';
+    } catch {
+      return 'unreachable';
+    }
+  }, [currentVersion]);
+
   return {
     latestVersion,
     updateAvailable,
@@ -92,5 +117,6 @@ export function useUpdateCheck(currentVersion: string | null): UpdateCheck {
     downloadUrl: release ? selectWindowsAssetUrl(release.assets) : null,
     pageUrl: release?.pageUrl ?? RELEASES_PAGE_URL,
     skipThisVersion,
+    checkNow,
   };
 }

@@ -2,21 +2,47 @@
  * The About tab: build identity plus third-party acknowledgements.
  *
  * Long-form static copy, kept out of App.tsx so the root component is
- * structure rather than prose. The only dynamic parts are the versions the
- * backend reports.
+ * structure rather than prose. The dynamic parts are the versions the
+ * backend reports and the manual Check for Updates, which runs the real
+ * check (ignoring a skipped version) and reports every outcome: an update
+ * opens the prompt from App, the other two outcomes read out here.
  */
 
-import { Box, Link, Typography } from '@mui/material';
+import { useState } from 'react';
+import { Box, Button, Typography } from '@mui/material';
 
-const RELEASES_URL = 'https://github.com/oernster/EDColonisationAsst/releases';
+import type { ManualCheckOutcome } from '../../hooks/useUpdateCheck';
+
+const OUTCOME_MESSAGES: Partial<Record<ManualCheckOutcome, string>> = {
+  latest: 'You are running the latest version.',
+  unreachable: 'The update check could not reach GitHub. Please try again later.',
+};
 
 export interface AboutPanelProps {
   appVersion: string | null;
   pythonVersion: string | null;
   healthError: string | null;
+  /** Runs the manual check; an 'update' outcome opens the prompt upstream. */
+  onCheckForUpdates: () => Promise<ManualCheckOutcome>;
 }
 
-export function AboutPanel({ appVersion, pythonVersion, healthError }: AboutPanelProps) {
+export function AboutPanel({
+  appVersion,
+  pythonVersion,
+  healthError,
+  onCheckForUpdates,
+}: AboutPanelProps) {
+  const [checking, setChecking] = useState(false);
+  const [outcome, setOutcome] = useState<ManualCheckOutcome | null>(null);
+
+  const handleCheck = async () => {
+    setChecking(true);
+    setOutcome(null);
+    const result = await onCheckForUpdates();
+    setOutcome(result);
+    setChecking(false);
+  };
+
   return (
     <Box sx={{ pt: 4, maxWidth: 900 }}>
       <Typography variant="h5" gutterBottom>
@@ -40,11 +66,16 @@ export function AboutPanel({ appVersion, pythonVersion, healthError }: AboutPane
         </Typography>
       )}
 
-      <Typography variant="body1" sx={{ mb: 3 }}>
-        <Link href={RELEASES_URL} target="_blank" rel="noopener noreferrer">
+      <Box sx={{ mb: 3 }}>
+        <Button variant="outlined" size="small" onClick={handleCheck} disabled={checking}>
           Check for Updates
-        </Link>
-      </Typography>
+        </Button>
+        {outcome && OUTCOME_MESSAGES[outcome] && (
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            {OUTCOME_MESSAGES[outcome]}
+          </Typography>
+        )}
+      </Box>
 
       <Typography variant="h6" gutterBottom>
         Third&#8209;party components

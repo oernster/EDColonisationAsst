@@ -78,6 +78,7 @@ function App() {
     downloadUrl,
     pageUrl,
     skipThisVersion,
+    checkNow,
   } = useUpdateCheck(appVersionRaw);
   const [updatePromptOpen, setUpdatePromptOpen] = useState(false);
   useEffect(() => {
@@ -314,6 +315,13 @@ function App() {
               appVersion={appVersion}
               pythonVersion={pythonVersion}
               healthError={healthError}
+              onCheckForUpdates={async () => {
+                // Manual check ignores the skip: an update opens the prompt;
+                // the About tab reads out the other outcomes itself.
+                const result = await checkNow();
+                if (result === 'update') setUpdatePromptOpen(true);
+                return result;
+              }}
             />
           )}
 

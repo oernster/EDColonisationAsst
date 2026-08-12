@@ -14,7 +14,15 @@ It provides:
 - [`AboutDialog`](backend/src/runtime/help_menu.py:1): the Help | About
   dialog showing the app icon, author, copyright and open source credits.
 - [`open_releases_page()`](backend/src/runtime/help_menu.py:1): opens the
-  GitHub releases page so users can check for newer versions.
+  GitHub releases page, which is the fallback when no update check was wired.
+
+"Check for Updates" runs a real check. It used to open the releases page and
+nothing else, which meant a menu item named after a question never asked it:
+the user was handed a page and left to compare version numbers by eye. The
+check itself belongs to
+[`UpdateCheckController`](backend/src/runtime/update_check.py:1) and arrives
+here as a callable, so this module still builds a menu and knows nothing about
+releases.
 
 The application version is never hardcoded here; it is resolved from the
 top-level VERSION file via the package `__version__`.
@@ -22,6 +30,7 @@ top-level VERSION file via the package `__version__`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 import webbrowser
@@ -200,12 +209,18 @@ def add_help_menu(
     icon_path: Path | None = None,
     parent: QWidget | None = None,
     version: str | None = None,
+    on_check_updates: Callable[[], None] | None = None,
 ) -> Any:
     """Append a Help submenu (About, Check for Updates) to ``menu``.
 
     The submenu is created through ``menu.addMenu`` so that tests can drive
     this with lightweight menu fakes; no Qt widgets are constructed until an
     action is actually triggered.
+
+    ``on_check_updates`` runs the real check. It falls back to opening the
+    releases page when a caller wires no check at all, which is the older
+    behaviour kept only so that a menu built without one is still useful
+    rather than dead.
 
     Returns the created submenu.
     """
@@ -225,7 +240,9 @@ def add_help_menu(
     about_action.triggered.connect(_show_about)
 
     updates_action = help_menu.addAction(CHECK_FOR_UPDATES_ACTION_TEXT)
-    updates_action.triggered.connect(open_releases_page)
+    updates_action.triggered.connect(
+        on_check_updates if on_check_updates is not None else open_releases_page
+    )
 
     return help_menu
 

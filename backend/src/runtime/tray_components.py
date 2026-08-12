@@ -52,6 +52,14 @@ except ImportError:
         DEFAULT_BACKEND_PORT,
     )
 
+try:
+    from .update_check import default_update_check  # type: ignore[import-not-found]
+except ImportError:
+    # As above.
+    from backend.src.runtime.update_check import (  # type: ignore[import-error]
+        default_update_check,
+    )
+
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 
@@ -143,7 +151,14 @@ class TrayController:
         self._tray.setToolTip(APP_NAME)
 
         menu = QMenu()
-        add_help_menu(menu, icon_path=resolve_about_icon(self._root))
+        # Held on the controller: it is a QObject with no parent, so dropping
+        # the reference would collect it and stop both of its timers.
+        self._updates = default_update_check(icon_path=icon_path)
+        add_help_menu(
+            menu,
+            icon_path=resolve_about_icon(self._root),
+            on_check_updates=self._updates.check_manually,
+        )
         menu.addSeparator()
         exit_action = menu.addAction("Exit")
         exit_action.triggered.connect(self._on_exit_triggered)

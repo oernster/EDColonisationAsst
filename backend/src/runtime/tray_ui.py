@@ -40,6 +40,13 @@ except ImportError:
         resolve_about_icon,
     )
 
+try:
+    from .update_check import default_update_check  # type: ignore[import-not-found]
+except ImportError:
+    from backend.src.runtime.update_check import (  # type: ignore[import-error]
+        default_update_check,
+    )
+
 if TYPE_CHECKING:
     from .backend_server import BackendServerController
 
@@ -68,6 +75,11 @@ class TrayUIController:
         self._env = env
         self._backend = backend
 
+        # Built before the menu, which hangs its Check for Updates action on
+        # it. Held on the controller because it is a QObject with no parent:
+        # dropping the reference would collect it and stop both timers.
+        self._updates = default_update_check(icon_path=env.icon_path)
+
         self._tray = QSystemTrayIcon()
         self._configure_tray_icon()
         self._create_menu()
@@ -93,7 +105,11 @@ class TrayUIController:
 
         menu.addSeparator()
         about_icon = resolve_about_icon(self._env.project_root)
-        add_help_menu(menu, icon_path=about_icon)
+        add_help_menu(
+            menu,
+            icon_path=about_icon,
+            on_check_updates=self._updates.check_manually,
+        )
 
         menu.addSeparator()
         exit_action = menu.addAction("Exit")

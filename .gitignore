@@ -240,6 +240,10 @@ backend/src/colonisation.db
 backend/src/colonisation.db-shm
 backend/src/colonisation.db-wal
 
+# The update check's record of a skipped release. Local state for the same
+# reason as the database beside it: one machine's choice, not the project's.
+backend/src/update-state.json
+
 # installation files
 EDColonisationAsstInstaller.exe
 EDColonisationAsst.exe

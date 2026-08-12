@@ -165,9 +165,40 @@ def test_add_help_menu_creates_about_and_updates_actions() -> None:
     assert action_texts == ["About", "Check for Updates"]
 
 
-def test_help_menu_check_for_updates_opens_releases_page(
+def _updates_action(submenu: DummyMenu) -> DummyAction:
+    """The Check for Updates action out of a built Help submenu."""
+    return next(
+        act
+        for act in submenu.actions
+        if isinstance(act, DummyAction) and act.text == "Check for Updates"
+    )
+
+
+def test_help_menu_check_for_updates_runs_the_wired_check() -> None:
+    """The regression this pins: the action used to open a page and no more.
+
+    A menu item named after a question has to ask it. Opening the releases
+    page left the user comparing version numbers by eye, which is the whole
+    job the check exists to do.
+    """
+    ran: List[bool] = []
+
+    menu = DummyMenu()
+    submenu = help_menu_mod.add_help_menu(
+        menu,
+        version="1.0.0",
+        on_check_updates=lambda: ran.append(True),
+    )
+
+    _updates_action(submenu).triggered.emit()
+
+    assert ran == [True]
+
+
+def test_help_menu_check_for_updates_falls_back_to_the_releases_page(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """With no check wired the action is still useful rather than dead."""
     opened: List[str] = []
     monkeypatch.setattr(
         help_menu_mod.webbrowser, "open", lambda url: opened.append(url)
@@ -176,12 +207,7 @@ def test_help_menu_check_for_updates_opens_releases_page(
     menu = DummyMenu()
     submenu = help_menu_mod.add_help_menu(menu, version="1.0.0")
 
-    updates_action = next(
-        act
-        for act in submenu.actions
-        if isinstance(act, DummyAction) and act.text == "Check for Updates"
-    )
-    updates_action.triggered.emit()
+    _updates_action(submenu).triggered.emit()
 
     assert opened == [help_menu_mod.RELEASES_URL]
 

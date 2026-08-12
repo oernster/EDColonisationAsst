@@ -49,8 +49,8 @@ class CommandRunner(Protocol):
         """Run ``args`` to completion and return its result."""
         ...
 
-    def start_detached(self, args: Sequence[str], *, cwd: str | None = None) -> None:
-        """Start ``args`` without waiting, surviving this process's exit."""
+    def start_detached(self, args: Sequence[str], *, cwd: str | None = None) -> bool:
+        """Start ``args`` without waiting; return whether it started."""
         ...
 
 
@@ -73,8 +73,12 @@ class SubprocessRunner:
             return CommandResult(FAILED_RETURNCODE, "")
         return CommandResult(completed.returncode, completed.stdout or "")
 
-    def start_detached(self, args: Sequence[str], *, cwd: str | None = None) -> None:
-        """Start a command detached, so it outlives this process."""
+    def start_detached(self, args: Sequence[str], *, cwd: str | None = None) -> bool:
+        """Start a command detached, so it outlives this process.
+
+        Returns whether it started. Swallowing the failure made a launch that
+        never happened indistinguishable from one that did.
+        """
         try:
             subprocess.Popen(
                 list(args),
@@ -85,7 +89,8 @@ class SubprocessRunner:
                 creationflags=_NO_WINDOW | _DETACHED,
             )
         except (OSError, subprocess.SubprocessError):
-            return
+            return False
+        return True
 
 
 def default_runner() -> CommandRunner:

@@ -60,6 +60,10 @@ ABOUT_TIP = "Show the licence information"
 CHOOSE_DIR_CAPTION = "Choose installation directory"
 
 INSTALL_DONE_TITLE = "Installation complete"
+LAUNCH_FAILED_MESSAGE = (
+    f"Installed, though {APP_DISPLAY_NAME} could not be started. "
+    "Start it yourself from {path}."
+)
 INSTALL_DONE_MESSAGE = "{name} version {version} is installed at:\n{path}"
 REPAIR_DONE_TITLE = "Repair complete"
 REPAIR_DONE_MESSAGE = "{name} version {version} has been repaired at:\n{path}"
@@ -258,9 +262,13 @@ class InstallerWindow(QMainWindow):
             if isinstance(result, Path)
             else installed_exe(self._snapshot.install_dir)
         )
-        if not exe_path.exists():
+        if not launch(exe_path):
+            # The install itself succeeded, so this must not read as an install
+            # failure. It does mean the window has to stay open: closing on a
+            # launch that never happened left the user with no application, no
+            # window and nothing said, which is indistinguishable from a crash.
+            self._widgets.status.setText(LAUNCH_FAILED_MESSAGE.format(path=exe_path))
             return
-        launch(exe_path)
         self.close()
 
     def _installed(self, result: object) -> None:

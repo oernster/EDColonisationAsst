@@ -30,7 +30,20 @@ _TASKKILL = "taskkill"
 _TASKKILL_IMAGE = "/im"
 _TASKKILL_PID = "/pid"
 _TASKKILL_FORCE = "/f"
-_TASKKILL_TREE = "/t"
+# There is deliberately no tree flag on either terminate below. It ends the
+# target plus everything Windows considers descended from it, decided from a
+# recorded parent process id, so the setup program can be taken for a descendant
+# and terminated along with its target. The symptom is a setup program that
+# vanishes while the application closes perfectly, with no traceback and no
+# error report, because a terminate is not a crash.
+#
+# The flag was reaping nothing here. The packaged runtime hosts the API and the
+# tray in-process, so an installed instance has no child processes; the
+# subprocess launching lives in the development entrypoints, which the setup
+# program never terminates. On the legacy path the flag was worse than useless:
+# the process id comes from a file that outlives the process that wrote it, so
+# a recycled id would have taken an unrelated process and its whole tree with
+# it rather than only the one wrong process.
 
 TASKLIST_TIMEOUT_S = 10.0
 TASKKILL_TIMEOUT_S = 15.0
@@ -87,11 +100,11 @@ def _terminate(runner: CommandRunner, install_dir: Path | None) -> None:
         pid = read_legacy_pid(install_dir)
         if pid is not None:
             runner.run(
-                [_TASKKILL, _TASKKILL_FORCE, _TASKKILL_TREE, _TASKKILL_PID, str(pid)],
+                [_TASKKILL, _TASKKILL_FORCE, _TASKKILL_PID, str(pid)],
                 timeout=TASKKILL_TIMEOUT_S,
             )
     runner.run(
-        [_TASKKILL, _TASKKILL_FORCE, _TASKKILL_TREE, _TASKKILL_IMAGE, EXE_NAME],
+        [_TASKKILL, _TASKKILL_FORCE, _TASKKILL_IMAGE, EXE_NAME],
         timeout=TASKKILL_TIMEOUT_S,
     )
 
@@ -118,7 +131,14 @@ def close_running_app(
         raise AppStillRunningError(STILL_RUNNING_MESSAGE)
 
 
-def launch(exe_path: Path, runner: CommandRunner | None = None) -> None:
-    """Start the installed application detached, so it outlives the installer."""
+def launch(exe_path: Path, runner: CommandRunner | None = None) -> bool:
+    """Start the installed application detached, so it outlives the installer.
+
+    Returns whether it started. It used to return nothing whether or not the
+    application appeared, so the setup program closed itself on a launch that
+    never happened and left the user with no application and no explanation.
+    """
+    if not exe_path.exists():
+        return False
     active = runner or default_runner()
-    active.start_detached([str(exe_path)], cwd=str(exe_path.parent))
+    return active.start_detached([str(exe_path)], cwd=str(exe_path.parent))

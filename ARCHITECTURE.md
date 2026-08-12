@@ -264,8 +264,25 @@ test in [tests/installer/](tests/installer) that fails if it does.
   `test_install_fails_loudly_with_no_payload_to_install`.
 - **Launching the app is detached and rooted in the install directory**, so
   the "launch when finished" option does not tie the new process to the
-  installer's lifetime.
-  `test_launch_starts_the_app_detached_in_its_own_directory`.
+  installer's lifetime; the launch is reported rather than assumed. It
+  used to swallow any failure to start and return nothing, so a launch that
+  never happened looked exactly like one that did and the window closed on
+  it, leaving no application and no explanation.
+  `test_launch_starts_the_app_detached_in_its_own_directory`,
+  `test_launch_reports_a_start_the_system_refused`,
+  `test_launch_reports_a_missing_executable_without_trying`.
+- **Neither terminate ends a process tree.** The tree flag ends the target
+  plus everything Windows considers descended from it, decided from a
+  recorded parent process id, so the setup program can be taken for a
+  descendant and terminated with its target: the application closes
+  perfectly and the installer vanishes, leaving no traceback and no error
+  report because a terminate is not a crash. It was reaping nothing here,
+  since the packaged runtime hosts the API and the tray in process and only
+  the development entrypoints spawn children. On the legacy path it was
+  worse: that process id comes from a file outliving the process that wrote
+  it, so a recycled id would have taken an unrelated tree rather than one
+  wrong process.
+  `test_neither_terminate_ends_a_process_tree`.
 
 One behaviour is deliberately outside that list: every long operation runs
 on a worker thread and reports back through signals, so the window stays

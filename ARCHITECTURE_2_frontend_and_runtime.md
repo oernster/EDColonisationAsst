@@ -381,7 +381,7 @@ Key classes:
   - Sets EDCA icon and tooltip.
   - Offers:
     - “Open Web UI” (launches default browser at `RuntimeEnvironment.frontend_url`, usually `http://127.0.0.1:47021/app/`).
-    - “Help” submenu ([`help_menu.py`](backend/src/runtime/help_menu.py:1), shared with the dev tray): “About” (icon, author, copyright, open source credits) and “Check for Updates” (opens the GitHub releases page).
+    - “Help” submenu ([`help_menu.py`](backend/src/runtime/help_menu.py:1), shared with the dev tray): “About” (icon, author, copyright, open source credits) and “Check for Updates”, which runs a real check and reports all three outcomes. It used to open the GitHub releases page and nothing else, so a menu item named after a question never asked it and left the user comparing version numbers by eye. `help_menu` still knows nothing about releases: the check arrives as a callable from [`update_check.py`](backend/src/runtime/update_check.py:1), which both trays build at composition time.
     - “Exit” (with confirmation).
   - Clicking/double‑clicking the tray icon also opens the web UI.
 
@@ -398,6 +398,29 @@ Key classes:
   Activation can still be refused, since Windows will not let a process that
   does not own the foreground steal it, which is exactly why the flag rather
   than the activation is what carries the fix.
+
+- `UpdateCheckController` ([`update_check.py`](backend/src/runtime/update_check.py:1)):
+  the tray's update check, shared by the frozen and dev trays.
+
+  - Triggers: one check 3 seconds after construction, so it never contends
+    with starting the backend, then one every 24 hours. Both honour a skipped
+    version and say nothing at all unless there is something new to say. The
+    Help menu's manual check ignores the skip and reports every outcome,
+    because a user who asked deserves an answer even when the answer is that
+    nothing has changed.
+  - Threading: the request runs on a `threading.Thread` so an unreachable
+    GitHub cannot freeze the tray; the worker emits an internal signal
+    connected to a **bound method of the controller**. The controller is
+    created on the interface thread, so Qt has a receiver whose affinity it
+    can consult and delivers through a queued connection: every widget is
+    then built on the interface thread. A signal connected to a bare callable
+    would leave Qt nothing to consult, degrade to a direct connection and
+    build the prompt on the worker thread. Proved offscreen rather than
+    assumed.
+  - The rules live below it, inside the coverage gate: `update_service`
+    decides, `version_compare` compares, `github_release_source` fetches and
+    `update_state` remembers a skip. What is left here is Qt wiring and the
+    words on three dialogs, which is why it sits in the omitted runtime shell.
 
 - `RuntimeApplication`: top‑level orchestrator:
 

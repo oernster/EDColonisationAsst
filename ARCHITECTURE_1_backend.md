@@ -16,7 +16,7 @@ This document focuses on the **Python backend** of the Elite: Dangerous Colonisa
   - Inara credentials and preferences in `backend/commander.yaml` (user-created from the example)
 - **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
 - **File watching**: `watchdog` in [`FileWatcher`](backend/src/services/file_watcher.py:1)
-- **HTTP client**: none in service. Nothing under `backend/src` performs an outbound HTTP request; the Inara path (section 7) is dormant. `httpx` remains a dev dependency for the ASGI test client.
+- **HTTP client**: the standard library's `urllib.request`, for one call only. [`github_release_source.py`](backend/src/services/github_release_source.py:1) asks the public GitHub releases API what the latest version is; nothing else under `backend/src` performs an outbound request and the Inara path (section 7) is dormant. `httpx` is a dependency of both the runtime and the dev requirements (the ASGI test client uses it), deliberately not used for the update check: the standard library already does one GET, so the compiled runtime gains no import for it.
 - **Live updates**: AJAX long-polling via [`backend/src/api/changes.py`](backend/src/api/changes.py:1) backed by [`ChangeBus`](backend/src/services/change_bus.py:1)
 - **Logging**: Standard library logging configured in [`backend/src/utils/logger.py`](backend/src/utils/logger.py:1)
 - **Tests**: `pytest` + plugins under [`backend/tests/unit`](backend/tests/unit:1)
@@ -51,7 +51,8 @@ backend/
 │   │   ├── colonisation.py            # Core colonisation domain models
 │   │   ├── carriers.py                # Fleet carrier domain models
 │   │   ├── carrier_status.py          # Fuel, finance, crew and balance history
-│   │   └── journal_events.py          # Typed journal event models
+│   │   ├── journal_events.py          # Typed journal event models
+│   │   └── update_info.py             # Release, asset and update-status values
 │   ├── repositories/
 │   │   ├── __init__.py
 │   │   ├── colonisation_repository.py # SQLite-backed repository
@@ -72,6 +73,7 @@ backend/
 │   │   ├── startup_monitor.py         # Readiness polling and its status line
 │   │   ├── startup_report.py          # Startup progress read back off /api/health
 │   │   ├── help_menu.py               # About and Check for Updates, shared
+│   │   ├── update_check.py            # The tray's check: triggers, thread, prompts
 │   │   └── tray_components.py         # Dev tray helpers
 │   ├── services/
 │   │   ├── __init__.py
@@ -102,6 +104,11 @@ backend/
 │   │   ├── file_watcher_polling.py    # Polling fallback, mixed into FileWatcher
 │   │   ├── data_aggregator.py         # Aggregates per-system data, Inara merge
 │   │   ├── system_tracker.py          # Tracks current system/station
+│   │   ├── release_source.py          # Where a release is read from (the seam)
+│   │   ├── github_release_source.py   # The one outbound call, on urllib
+│   │   ├── version_compare.py         # Dotted-integer comparison that never guesses
+│   │   ├── update_service.py          # Whether to mention a release; which asset
+│   │   ├── update_state.py            # The skipped version, per user
 │   │   └── inara_service.py           # Thin wrapper around Inara API
 │   └── utils/
 │       ├── __init__.py
@@ -439,7 +446,9 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 >
 > The merge rules below therefore describe code that only test doubles reach today. They are documented because they are the contract any future Inara integration must satisfy, not because they currently run. `INARA_API_URL` and the module-level rate-limit and cache state beside it (`_MIN_CALL_INTERVAL_SECONDS`, `_CACHE_TTL`, `_last_call_at`, `_ban_until`, `_rate_limit_lock`, `_system_cache`) are likewise unreferenced, held for that same future call.
 >
-> EDCA makes no outbound request for colonisation data. The backend's only network calls are loopback probes against itself; the Help menu's "Check for Updates" hands a GitHub URL to the user's browser rather than fetching it. The web UI's update check is browser-side on the same principle: the page fetches the latest release from the public GitHub releases API (one anonymous GET, nothing of the user's sent) and when it is newer shows a prompt offering to download the Windows installer asset (falling back to the releases page), skip that version or decide later. A skipped version is remembered in the browser's localStorage; the check repeats every 24 hours while the HUD stays open and the About tab can run it on demand, reporting every outcome. The backend itself still makes no outbound call.
+> EDCA makes no outbound request for colonisation data. Beyond the loopback probes it runs against itself, the only call it ever makes is the update check; it is the same anonymous GET from either surface: the public GitHub releases API, asked what the latest published version is, carrying no identifier and no journal data. When that version is newer the user is offered the Windows installer asset (falling back to the releases page), the chance to skip that version or to decide later.
+>
+> There are two independent surfaces because there are two user interfaces. The web UI checks from the browser, repeating every 24 hours while the HUD stays open, remembering a skipped version in that browser's localStorage, with the About tab able to run it on demand. The tray checks from the runtime process ([`update_check.py`](backend/src/runtime/update_check.py:1)) shortly after launch and every 24 hours after that, remembering a skipped version in [`update_state.py`](backend/src/services/update_state.py:1)'s per-user file, with Help then Check for Updates running it on demand. Each surface's skip is its own, because each is remembered where that surface can read it.
 
 [`DataAggregator`](backend/src/services/data_aggregator.py:37) provides high-level views over `ConstructionSite` data:
 
@@ -600,6 +609,16 @@ Backend tests under [`backend/tests/unit`](backend/tests/unit:1) cover:
   [`test_startup_progress.py`](backend/tests/unit/test_startup_progress.py:1),
   [`test_lifespan_readiness.py`](backend/tests/unit/test_lifespan_readiness.py:1)
 - Port selection: [`test_ports.py`](backend/tests/unit/test_ports.py:1)
+- The update check, one suite per question rather than one per module:
+  [`test_version_compare.py`](backend/tests/unit/test_version_compare.py:1)
+  (what counts as newer; what is not a version at all),
+  [`test_update_service.py`](backend/tests/unit/test_update_service.py:1)
+  (what to report; which asset),
+  [`test_github_release_source.py`](backend/tests/unit/test_github_release_source.py:1)
+  (the request it sends and every unusable payload, through an injected
+  opener so no test reaches the network) and
+  [`test_update_state.py`](backend/tests/unit/test_update_state.py:1)
+  (remembering a skip; surviving every way that can fail)
 - Live update long-poll is exercised indirectly via API wiring tests and frontend integration.
 - Runtime/launcher/tray stack: [`test_runtime_components.py`](backend/tests/unit/test_runtime_components.py:1), [`test_runtime_entry.py`](backend/tests/unit/test_runtime_entry.py:1), [`test_launcher.py`](backend/tests/unit/test_launcher.py:1), [`test_tray_app.py`](backend/tests/unit/test_tray_app.py:1)
 

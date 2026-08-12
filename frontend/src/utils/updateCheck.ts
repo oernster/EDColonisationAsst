@@ -1,11 +1,15 @@
 /**
- * The pure half of the in-app update check: version comparison, release
- * parsing, asset selection and the skipped-version persistence.
+ * The pure half of the HUD's update check: version comparison, release
+ * parsing and asset selection.
  *
- * The check itself runs in the user's browser against the public GitHub
- * releases API, exactly as the project site does. The backend makes no
- * outbound request and nothing of the user's is sent: it is one anonymous
- * GET for the latest published release.
+ * The check runs in the user's browser against the public GitHub releases
+ * API, exactly as the project site does. It runs only when the user asks for
+ * it from the About tab. Nothing of the user's is sent: it is one anonymous GET
+ * for the latest published release.
+ *
+ * There is no skipped-version store here any more. Skipping exists to silence
+ * a check that speaks unbidden; the only such check now lives in the
+ * tray, which remembers its own skip on the machine EDCA is installed on.
  */
 
 export const RELEASES_PAGE_URL =
@@ -16,9 +20,6 @@ export const RELEASES_API_URL =
 
 /** The installer asset the Download button offers; the app is Windows-only. */
 export const WINDOWS_ASSET_SUFFIX = '.exe';
-
-/** Where the skipped release version persists, per browser profile. */
-export const SKIPPED_UPDATE_STORAGE_KEY = 'edcaSkippedUpdateVersion';
 
 export interface ReleaseAsset {
   name: string;
@@ -73,26 +74,6 @@ export function selectWindowsAssetUrl(assets: ReleaseAsset[]): string | null {
     }
   }
   return null;
-}
-
-/** The skipped version; a blocked or absent storage reads as none (null). */
-export function loadSkippedVersion(storage?: Storage): string | null {
-  try {
-    const store = storage ?? window.localStorage;
-    return store.getItem(SKIPPED_UPDATE_STORAGE_KEY) || null;
-  } catch {
-    return null;
-  }
-}
-
-/** Persist the skipped version; best effort, a blocked storage is silent. */
-export function saveSkippedVersion(version: string, storage?: Storage): void {
-  try {
-    const store = storage ?? window.localStorage;
-    store.setItem(SKIPPED_UPDATE_STORAGE_KEY, version);
-  } catch {
-    // A browser that blocks storage simply prompts again next session.
-  }
 }
 
 /** Strip a leading v and anything after the numeric x.y.z core. */

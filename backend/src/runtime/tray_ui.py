@@ -77,7 +77,8 @@ class TrayUIController:
 
         # Built before the menu, which hangs its Check for Updates action on
         # it. Held on the controller because it is a QObject with no parent:
-        # dropping the reference would collect it and stop both timers.
+        # dropping the reference would collect it and take the Help menu's
+        # manual check down with it.
         self._updates = default_update_check(icon_path=env.icon_path)
 
         self._tray = QSystemTrayIcon()

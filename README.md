@@ -22,13 +22,13 @@ Replaces manual tracking with automatic, journal-driven state.
   the balance movements over time and who is crewing each service
 - Says when the carrier has a jump booked, where to and how long until it leaves
 - Updates automatically as you play
-- Tells you when a newer release exists, from either surface. In the browser
-  a prompt offers Download (the installer itself), Skip this version or
-  Later; a skipped version never prompts again on that browser and the
-  header button stays as the way back in. The tray does the same on its own
-  timing and its Help menu's Check for Updates asks on demand, reporting
-  every outcome: the offer, that you are already on the latest version or
-  that GitHub could not be reached
+- Tells you when a newer release exists. EDCA checks automatically once per
+  run, from the tray, which is the machine it is installed on; a prompt
+  offers Download (the installer itself), Skip This Version or Later; a
+  skipped version is not raised again. You can also ask at any time, from
+  the tray's **Help** menu or the web UI's **About** tab; either way you are
+  told the answer: the offer, that you are already on the latest version
+  or that GitHub could not be reached
 - Runs entirely locally, with no external services and no accounts. The only
   thing it ever sends anywhere is the update check: an anonymous request to
   the public GitHub releases API, asking what the latest version is. It
@@ -81,12 +81,17 @@ through it is. Later launches skip straight past it.
 
 ### Upgrading and removing
 
-EDCA tells you when an upgrade exists. Both the web UI and the tray compare
-the running version against the latest GitHub release, each on its own daily
-timing, then offer the installer directly. In the browser an **Update
-available** button stays in the header as the way back to the prompt; from the
-tray, **Help** then **Check for Updates** asks straight away and tells you the
-answer either way.
+EDCA tells you when an upgrade exists. Once per run, shortly after it starts,
+the tray compares the running version against the latest GitHub release and
+offers you the installer if there is a newer one. That is the only check it
+makes on its own. To ask at any time, use **Help** then **Check for Updates**
+in the tray or **Check for Updates** on the web UI's About tab. Either one
+reports straight away, whatever the answer turns out to be.
+
+The automatic check is the tray's rather than the browser's on purpose. The
+web UI is meant to be read from a tablet beside the cockpit, where an offer to
+download a Windows installer would be no use; the tray is on the machine EDCA
+is installed on.
 
 Run the same installer over an existing installation: it works out whether that
 is an upgrade, a reinstall or a downgrade, says which on its button and does it

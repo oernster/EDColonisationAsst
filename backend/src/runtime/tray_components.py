@@ -152,7 +152,7 @@ class TrayController:
 
         menu = QMenu()
         # Held on the controller: it is a QObject with no parent, so dropping
-        # the reference would collect it and stop both of its timers.
+        # the reference would collect it and take the manual check with it.
         self._updates = default_update_check(icon_path=icon_path)
         add_help_menu(
             menu,

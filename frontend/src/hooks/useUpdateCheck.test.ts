@@ -35,16 +35,23 @@ describe('useUpdateCheck checkNow', () => {
     expect(result.current.downloadUrl).toBe('https://example.test/win.exe');
   });
 
-  it('reports an update even for a skipped release', async () => {
-    window.localStorage.setItem('edcaSkippedUpdateVersion', '3.3.0');
-    vi.spyOn(axios, 'get').mockResolvedValue({ data: releasePayload('v3.3.0') });
-    const { result } = renderHook(() => useUpdateCheck('3.2.0'));
-    let outcome = '';
-    await act(async () => {
-      outcome = await result.current.checkNow();
+  it('asks GitHub nothing until the user asks it to', async () => {
+    // The regression this pins: this hook used to check on mount and again
+    // every 24 hours. With the tray checking too, one release raised two
+    // prompts, each with a skip the other could not see. The only automatic
+    // check now lives in the tray.
+    const get = vi.spyOn(axios, 'get').mockResolvedValue({
+      data: releasePayload('v3.3.0'),
     });
-    expect(outcome).toBe('update');
-    await waitFor(() => expect(result.current.updateOffered).toBe(false));
+
+    const { result } = renderHook(() => useUpdateCheck('3.2.0'));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(get).not.toHaveBeenCalled();
+    expect(result.current.latestVersion).toBeNull();
+    expect(result.current.updateAvailable).toBe(false);
   });
 
   it('reports latest when nothing newer exists', async () => {

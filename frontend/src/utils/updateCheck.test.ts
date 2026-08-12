@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isNewerVersion,
-  loadSkippedVersion,
   parseLatestRelease,
-  saveSkippedVersion,
   selectWindowsAssetUrl,
-  SKIPPED_UPDATE_STORAGE_KEY,
 } from './updateCheck';
 
 describe('isNewerVersion', () => {
@@ -97,43 +94,5 @@ describe('selectWindowsAssetUrl', () => {
     expect(
       selectWindowsAssetUrl([{ name: 'app.dmg', downloadUrl: 'https://example.test/m' }]),
     ).toBeNull();
-  });
-});
-
-describe('skipped version persistence', () => {
-  function fakeStorage(initial: Record<string, string> = {}): Storage {
-    const data = new Map(Object.entries(initial));
-    return {
-      getItem: (key: string) => data.get(key) ?? null,
-      setItem: (key: string, value: string) => void data.set(key, value),
-      removeItem: (key: string) => void data.delete(key),
-      clear: () => data.clear(),
-      key: () => null,
-      get length() {
-        return data.size;
-      },
-    } as Storage;
-  }
-
-  it('round-trips through the storage key', () => {
-    const storage = fakeStorage();
-    expect(loadSkippedVersion(storage)).toBeNull();
-    saveSkippedVersion('3.2.0', storage);
-    expect(storage.getItem(SKIPPED_UPDATE_STORAGE_KEY)).toBe('3.2.0');
-    expect(loadSkippedVersion(storage)).toBe('3.2.0');
-  });
-
-  it('reads a blocked or empty storage as no skip', () => {
-    const blocked = {
-      getItem: () => {
-        throw new Error('blocked');
-      },
-      setItem: () => {
-        throw new Error('blocked');
-      },
-    } as unknown as Storage;
-    expect(loadSkippedVersion(blocked)).toBeNull();
-    expect(() => saveSkippedVersion('3.2.0', blocked)).not.toThrow();
-    expect(loadSkippedVersion(fakeStorage({ other: 'x' }))).toBeNull();
   });
 });

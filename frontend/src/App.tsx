@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ThemeProvider,
   CssBaseline,
@@ -71,22 +71,9 @@ function App() {
   const commanderName = commanderStatus?.commander_name ?? null;
   const commanderCredits = commanderStatus?.credits_balance ?? null;
   const commanderLocation = commanderStatus ? describeLocation(commanderStatus) : null;
-  const {
-    latestVersion,
-    updateAvailable,
-    updateOffered,
-    downloadUrl,
-    pageUrl,
-    skipThisVersion,
-    checkNow,
-  } = useUpdateCheck(appVersionRaw);
+  const { latestVersion, updateAvailable, downloadUrl, pageUrl, checkNow } =
+    useUpdateCheck(appVersionRaw);
   const [updatePromptOpen, setUpdatePromptOpen] = useState(false);
-  useEffect(() => {
-    // Open once when an unskipped newer release first appears; Later
-    // closes it without this reopening; the header control remains
-    // as the way back in.
-    if (updateOffered) setUpdatePromptOpen(true);
-  }, [updateOffered]);
 
   useLiveUpdates({ currentSystem, setSystemData, setAllSystems });
 
@@ -200,7 +187,7 @@ function App() {
                 }}
               >
                 {updateAvailable && latestVersion && (
-                  <Tooltip title="A newer release is on GitHub. Opens the update prompt: download the installer, skip this version or decide later.">
+                  <Tooltip title="A newer release is on GitHub. Opens the update prompt so you can download the installer.">
                     <Button
                       size="small"
                       variant="outlined"
@@ -316,8 +303,8 @@ function App() {
               pythonVersion={pythonVersion}
               healthError={healthError}
               onCheckForUpdates={async () => {
-                // Manual check ignores the skip: an update opens the prompt;
-                // the About tab reads out the other outcomes itself.
+                // The only check this HUD makes: an update opens the prompt
+                // and the About tab reads out the other outcomes itself.
                 const result = await checkNow();
                 if (result === 'update') setUpdatePromptOpen(true);
                 return result;
@@ -335,11 +322,7 @@ function App() {
             currentVersion={appVersion ?? appVersionRaw ?? 'an older version'}
             downloadUrl={downloadUrl}
             pageUrl={pageUrl}
-            onSkip={() => {
-              skipThisVersion();
-              setUpdatePromptOpen(false);
-            }}
-            onLater={() => setUpdatePromptOpen(false)}
+            onClose={() => setUpdatePromptOpen(false)}
           />
         )}
       </Container>

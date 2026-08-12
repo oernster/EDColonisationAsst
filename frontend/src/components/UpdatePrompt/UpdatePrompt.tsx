@@ -1,11 +1,14 @@
 /**
- * The update prompt: Download, Skip this version or Later.
+ * The update prompt: Download or Close.
  *
  * Download opens the Windows installer asset directly, falling back to the
  * releases page when the release carries none; run it over the existing
- * installation to upgrade. Skip persists the offered version in this
- * browser so it never prompts again; Later simply closes the prompt while
- * the header control remains as the way back in.
+ * installation to upgrade.
+ *
+ * There is no "Skip this version" here. Skipping exists to silence a check
+ * that speaks unbidden, and this HUD no longer has one: the single automatic
+ * check lives in the tray, which is also where its skip is remembered. A skip
+ * button here would write a preference nothing would ever read.
  */
 
 import Button from '@mui/material/Button';
@@ -21,8 +24,7 @@ export interface UpdatePromptProps {
   currentVersion: string;
   downloadUrl: string | null;
   pageUrl: string;
-  onSkip: () => void;
-  onLater: () => void;
+  onClose: () => void;
 }
 
 export function UpdatePrompt({
@@ -31,11 +33,10 @@ export function UpdatePrompt({
   currentVersion,
   downloadUrl,
   pageUrl,
-  onSkip,
-  onLater,
+  onClose,
 }: UpdatePromptProps) {
   return (
-    <Dialog open={open} onClose={onLater} aria-labelledby="update-prompt-title">
+    <Dialog open={open} onClose={onClose} aria-labelledby="update-prompt-title">
       <DialogTitle id="update-prompt-title">Update available</DialogTitle>
       <DialogContent>
         <DialogContentText>
@@ -50,14 +51,11 @@ export function UpdatePrompt({
           href={downloadUrl ?? pageUrl}
           target="_blank"
           rel="noopener"
-          onClick={onLater}
+          onClick={onClose}
         >
           Download
         </Button>
-        <Button color="warning" onClick={onSkip}>
-          Skip this version
-        </Button>
-        <Button onClick={onLater}>Later</Button>
+        <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
   );

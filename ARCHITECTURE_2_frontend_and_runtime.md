@@ -209,17 +209,19 @@ State is centralised in two Zustand stores:
     credit balance and where they are (`describeLocation` phrases the docked
     context: station, planetary base or carrier, plus the system).
   - `useUpdateCheck` compares the running version from health against the
-    latest GitHub release, fetched by the browser rather than the backend,
-    once shortly after load and again every 24 hours while the HUD stays
-    open. When newer, an update prompt offers Download (the Windows
-    installer asset, falling back to the releases page), Skip this version
-    (persisted in this browser's local storage, so it never prompts again)
-    or Later; the header's "Update available" button reopens the prompt.
-    The About tab's Check for Updates runs the same check on demand,
-    ignoring a skipped version: an update opens the prompt while "up to
-    date" and "could not reach GitHub" read out on the tab itself. The
-    pure half (release parsing, asset selection, the skip store) lives
-    in `utils/updateCheck.ts`; the dialog is
+    latest GitHub release, fetched by the browser rather than the backend.
+    **It has no timer: it asks only when the user asks it to**, from the
+    About tab's Check for Updates. The one automatic check in the product
+    belongs to the tray (section 2.5), because this HUD is meant to be read
+    from a tablet on the local network, where an offer would hand a Windows
+    installer to a device that cannot run it. An update opens a prompt
+    offering Download (the Windows installer asset, falling back to the
+    releases page) or Close, while "up to date" and "could not reach GitHub"
+    read out on the tab itself; the header's "Update available" button
+    reopens the prompt. There is deliberately no Skip here: skipping silences
+    a check that speaks unbidden and this one never does, so the skip lives
+    with the tray's check instead. The pure half (release parsing, asset
+    selection) lives in `utils/updateCheck.ts`; the dialog is
     `components/UpdatePrompt/UpdatePrompt.tsx`.
   - Theme is one control rather than two: a single toggle that switches between
     the two themes in `theme.ts`, persisted by `useThemeMode`.
@@ -402,12 +404,19 @@ Key classes:
 - `UpdateCheckController` ([`update_check.py`](backend/src/runtime/update_check.py:1)):
   the tray's update check, shared by the frozen and dev trays.
 
-  - Triggers: one check 3 seconds after construction, so it never contends
-    with starting the backend, then one every 24 hours. Both honour a skipped
-    version and say nothing at all unless there is something new to say. The
-    Help menu's manual check ignores the skip and reports every outcome,
-    because a user who asked deserves an answer even when the answer is that
-    nothing has changed.
+  - Trigger: one check 3 seconds after construction, so it never contends
+    with starting the backend. There is no repeating timer. **This is the
+    only automatic update check in the product.** It honours a skipped version and
+    says nothing at all unless there is something new to say. The Help menu's
+    manual check ignores the skip and reports every outcome, because a user
+    who asked deserves an answer even when the answer is that nothing has
+    changed.
+  - Why the tray rather than the browser owns it: the web UI is meant to be
+    read from a tablet on the local network, where an offer would hand a
+    Windows installer to a device that cannot run it, while the tray is on the
+    machine EDCA is installed on. Two surfaces checking on their own timing
+    also meant one release could raise two prompts, each with a skip the other
+    could not see.
   - Threading: the request runs on a `threading.Thread` so an unreachable
     GitHub cannot freeze the tray; the worker emits an internal signal
     connected to a **bound method of the controller**. The controller is

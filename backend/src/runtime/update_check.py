@@ -1,4 +1,15 @@
-"""The tray's update check: its triggers, its threading and its three answers.
+"""The tray's update check: its trigger, its threading and its three answers.
+
+This is the ONLY automatic update check in EDCA. The web UI has a manual one
+of its own on the About tab, deliberately with no timer behind it: two
+surfaces checking on their own timing meant one release could raise two
+prompts, each with a skip the other could not see. The tray is the surface
+that owns it because the tray is where a download is useful. EDCA is built to
+be read from a tablet on the local network; an offer made in that browser
+would hand a Windows installer to a tablet that cannot run it, while the tray
+sits on the machine EDCA is actually installed on.
+
+It fires once per run, shortly after the tray appears. It does not repeat.
 
 Outside the coverage gate with the rest of the runtime shell. Everything with
 a rule in it lives under `services/` and is tested there; what is left here is
@@ -46,10 +57,6 @@ APP_NAME = "EDCA"
 # enough that a user who launches and walks away still hears about a release.
 LAUNCH_DELAY_MS = 3000
 
-_MILLISECONDS_PER_SECOND = 1000
-_SECONDS_PER_DAY = 24 * 60 * 60
-RECHECK_INTERVAL_MS = _SECONDS_PER_DAY * _MILLISECONDS_PER_SECOND
-
 UPDATE_TITLE = "Update available"
 UPDATE_MESSAGE = "{name} {latest} is available. You are running {current}."
 DOWNLOAD_BUTTON_TEXT = "Download"
@@ -69,10 +76,10 @@ SkipWriter = Callable[[str], None]
 class UpdateCheckController(QObject):
     """Runs the update check and reports what it found.
 
-    Two ways in, differing only in what silence means. The automatic checks
-    pass the skipped version and say nothing at all unless there is something
-    new to say. The manual check from the Help menu ignores the skip and
-    reports every outcome, because a user who asked deserves an answer even
+    Two ways in, differing only in what silence means. The automatic check
+    passes the skipped version and says nothing at all unless there is
+    something new to say. The manual check from the Help menu ignores the skip
+    and reports every outcome, because a user who asked deserves an answer even
     when the answer is that nothing has changed.
     """
 
@@ -94,16 +101,16 @@ class UpdateCheckController(QObject):
 
         self._result_ready.connect(self._apply_result)
 
+        # One shot and no repeating timer. A background application that runs
+        # for days could reasonably re-ask; a second automatic checker is what
+        # produced two prompts for one release, so there is exactly one
+        # automatic check in the product and it happens here.
         QTimer.singleShot(LAUNCH_DELAY_MS, self.check_automatically)
-        self._recheck = QTimer(self)
-        self._recheck.setInterval(RECHECK_INTERVAL_MS)
-        self._recheck.timeout.connect(self.check_automatically)
-        self._recheck.start()
 
     # -------------------- entry points ----------------------------------------
 
     def check_automatically(self) -> None:
-        """Check in the background, honouring a skipped version."""
+        """Check once in the background, honouring a skipped version."""
         self._start(manual=False)
 
     def check_manually(self) -> None:
@@ -270,7 +277,6 @@ def default_update_check(icon_path: Path | None = None) -> UpdateCheckController
 
 __all__ = [
     "LAUNCH_DELAY_MS",
-    "RECHECK_INTERVAL_MS",
     "UpdateCheckController",
     "default_update_check",
     "install_update_check",

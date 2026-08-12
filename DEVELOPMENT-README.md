@@ -162,7 +162,9 @@ On a Windows test machine:
      actually ready.
 4. No system Python or Node.js should be required.
 5. Leave **Launch when finished** ticked on a fresh install and confirm the
-   app comes up on its own once the installer reports success.
+   app comes up on its own once the installer reports success. The window
+   closes itself only on a launch that actually happened: if the start fails,
+   it stays open and reports the path to start from instead.
 6. Re-run the installer with the app open: it should offer to close the
    running instance before it replaces any files, saying that the running
    session ends; the button should read Upgrade, Reinstall or Downgrade
@@ -362,8 +364,9 @@ The Start Menu / Desktop shortcuts point at `EDColonisationAsst.exe`, which:
 
 - Detects FROZEN mode and starts an in-process `uvicorn.Server` hosting the
   FastAPI app on `http://127.0.0.1:47021`. That port is a preference, not a
-  promise: it is probed first, then the port a previous run recorded, then the
-  remaining candidates, then whatever the operating system will give, because
+  promise: the port a previous run recorded is tried first, then the configured
+  one, then the remaining candidates, then whatever the operating system will
+  give, because
   Windows reserves whole ranges and can make a port unbindable while it looks
   unused. Whatever is chosen is recorded, so the address stays put across runs.
 - Shows the startup splash immediately (icon, author, version, live status and

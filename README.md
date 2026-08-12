@@ -88,6 +88,10 @@ is an upgrade, a reinstall or a downgrade, says which on its button and does it
 in one pass. If EDCA is running it offers to close it first, telling you plainly
 that the running session ends.
 
+**Launch EDCA when finished** is a tick box on the installer. When it is ticked
+and EDCA does not start, the installer says so and stays open with the path to
+start it from yourself, rather than closing on a launch that never happened.
+
 To remove EDCA, use **Apps & features** (Add/Remove Programs) rather than the
 downloaded installer. That is the registered uninstaller; it cleans up the
 install directory, the shortcuts and the sign-in entry.

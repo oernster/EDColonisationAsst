@@ -26,9 +26,9 @@ Replaces manual tracking with automatic, journal-driven state.
   run, from the tray, which is the machine it is installed on; a prompt
   offers Download (the installer itself), Skip This Version or Later; a
   skipped version is not raised again. You can also ask at any time, from
-  the tray's **Help** menu or the web UI's **About** tab; either way you are
-  told the answer: the offer, that you are already on the latest version
-  or that GitHub could not be reached
+  the tray's **Help** menu, being told the answer either way: the offer,
+  that you are already on the latest version or that GitHub could not be
+  reached
 - Runs entirely locally, with no external services and no accounts. The only
   thing it ever sends anywhere is the update check: an anonymous request to
   the public GitHub releases API, asking what the latest version is. It
@@ -83,15 +83,15 @@ through it is. Later launches skip straight past it.
 
 EDCA tells you when an upgrade exists. Once per run, shortly after it starts,
 the tray compares the running version against the latest GitHub release and
-offers you the installer if there is a newer one. That is the only check it
-makes on its own. To ask at any time, use **Help** then **Check for Updates**
-in the tray or **Check for Updates** on the web UI's About tab. Either one
-reports straight away, whatever the answer turns out to be.
+offers you the installer if there is a newer one. To ask at any time, use
+**Help** then **Check for Updates** in the tray, which reports straight away
+whatever the answer turns out to be.
 
-The automatic check is the tray's rather than the browser's on purpose. The
-web UI is meant to be read from a tablet beside the cockpit, where an offer to
-download a Windows installer would be no use; the tray is on the machine EDCA
-is installed on.
+The tray is the only place this happens, on purpose. The web UI is meant to be
+read from a tablet beside the cockpit and has no way of knowing whether the
+device reading it is the machine EDCA is installed on, so an offer there is an
+offer to download a package the device cannot install. The tray runs on the
+machine that can act on the answer.
 
 Run the same installer over an existing installation: it works out whether that
 is an upgrade, a reinstall or a downgrade, says which on its button and does it

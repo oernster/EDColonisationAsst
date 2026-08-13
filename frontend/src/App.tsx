@@ -25,8 +25,6 @@ import { ThemeMode, useThemeMode } from './hooks/useThemeMode';
 import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { useBackendMeta } from './hooks/useBackendMeta';
 import { describeLocation, formatCredits } from './utils/commanderStatus';
-import { useUpdateCheck } from './hooks/useUpdateCheck';
-import { UpdatePrompt } from './components/UpdatePrompt/UpdatePrompt';
 import { darkTheme, lightTheme } from './theme';
 // Generated from the single master badge by generate_icons.py at the repo root.
 // Imported rather than read from public/ so Vite fingerprints it and a missing
@@ -66,14 +64,11 @@ function App() {
 
   const { themeMode, setThemeModeAndPersist } = useThemeMode();
   const keepAwakeEnabled = useKeepAwakePreference();
-  const { appVersion, appVersionRaw, pythonVersion, healthError, commanderStatus } =
+  const { appVersion, pythonVersion, healthError, commanderStatus } =
     useBackendMeta(settingsVersion);
   const commanderName = commanderStatus?.commander_name ?? null;
   const commanderCredits = commanderStatus?.credits_balance ?? null;
   const commanderLocation = commanderStatus ? describeLocation(commanderStatus) : null;
-  const { latestVersion, updateAvailable, downloadUrl, pageUrl, checkNow } =
-    useUpdateCheck(appVersionRaw);
-  const [updatePromptOpen, setUpdatePromptOpen] = useState(false);
 
   useLiveUpdates({ currentSystem, setSystemData, setAllSystems });
 
@@ -186,18 +181,6 @@ function App() {
                   flexWrap: 'wrap',
                 }}
               >
-                {updateAvailable && latestVersion && (
-                  <Tooltip title="A newer release is on GitHub. Opens the update prompt so you can download the installer.">
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="warning"
-                      onClick={() => setUpdatePromptOpen(true)}
-                    >
-                      Update available: v{latestVersion}
-                    </Button>
-                  </Tooltip>
-                )}
                 <KeepAwakeChip
                   enabled={keepAwakeEnabled}
                   status={keepAwakeStatus}
@@ -302,29 +285,11 @@ function App() {
               appVersion={appVersion}
               pythonVersion={pythonVersion}
               healthError={healthError}
-              onCheckForUpdates={async () => {
-                // The only check this HUD makes: an update opens the prompt
-                // and the About tab reads out the other outcomes itself.
-                const result = await checkNow();
-                if (result === 'update') setUpdatePromptOpen(true);
-                return result;
-              }}
             />
           )}
 
           {currentTab === 3 && <LicensePanel />}
         </Box>
-
-        {latestVersion && (
-          <UpdatePrompt
-            open={updatePromptOpen}
-            latestVersion={latestVersion}
-            currentVersion={appVersion ?? appVersionRaw ?? 'an older version'}
-            downloadUrl={downloadUrl}
-            pageUrl={pageUrl}
-            onClose={() => setUpdatePromptOpen(false)}
-          />
-        )}
       </Container>
     </ThemeProvider>
   );

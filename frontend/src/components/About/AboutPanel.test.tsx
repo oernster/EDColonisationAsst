@@ -1,103 +1,49 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { AboutPanel } from './AboutPanel';
-import type { ManualCheckOutcome } from '../../hooks/useUpdateCheck';
 
-function renderPanel(outcome: ManualCheckOutcome | Promise<ManualCheckOutcome>) {
-  const onCheckForUpdates = vi.fn().mockReturnValue(Promise.resolve(outcome));
+function renderPanel(overrides: Partial<Parameters<typeof AboutPanel>[0]> = {}) {
   render(
     <AboutPanel
-      appVersion="3.2.0"
-      pythonVersion="3.11.0"
+      appVersion="3.3.0"
+      pythonVersion="3.13.0"
       healthError={null}
-      onCheckForUpdates={onCheckForUpdates}
+      {...overrides}
     />,
   );
-  return { onCheckForUpdates };
 }
 
-describe('AboutPanel manual update check', () => {
-  it('runs the check when the button is clicked', async () => {
-    const user = userEvent.setup();
-    const { onCheckForUpdates } = renderPanel('latest');
-    await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
-    expect(onCheckForUpdates).toHaveBeenCalledTimes(1);
+describe('AboutPanel', () => {
+  it('reports the versions the backend gave it', () => {
+    renderPanel();
+    expect(screen.getByText('Version: 3.3.0')).toBeInTheDocument();
+    expect(screen.getByText('Python runtime: 3.13.0')).toBeInTheDocument();
   });
 
-  it('reports up to date', async () => {
-    const user = userEvent.setup();
-    renderPanel('latest');
-    await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
-    expect(
-      await screen.findByText('You are running the latest version.'),
-    ).toBeInTheDocument();
+  it('says loading rather than inventing a version it does not have', () => {
+    renderPanel({ appVersion: null, pythonVersion: null });
+    expect(screen.getByText('Version: Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Python runtime: Loading...')).toBeInTheDocument();
   });
 
-  it('reports an unreachable check', async () => {
-    const user = userEvent.setup();
-    renderPanel('unreachable');
-    await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
-    expect(
-      await screen.findByText(
-        'The update check could not reach GitHub. Please try again later.',
-      ),
-    ).toBeInTheDocument();
+  it('shows a health error when the backend reported one', () => {
+    renderPanel({ healthError: 'Backend unreachable' });
+    expect(screen.getByText('Backend unreachable')).toBeInTheDocument();
   });
 
-  it('shows no message on an update outcome; the prompt opens upstream', async () => {
-    const user = userEvent.setup();
-    renderPanel('update');
-    await user.click(screen.getByRole('button', { name: 'Check for Updates' }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Check for Updates' }),
-      ).toBeEnabled(),
-    );
+  it('offers no update check at all', () => {
+    // The guard on the removal rather than a test of absence for its own sake.
+    // This HUD is served over the local network and cannot tell whether the
+    // device reading it is the machine EDCA is installed on, so any update
+    // surface here offers a download to a tablet that cannot install it. The
+    // tray owns the check. If this test starts failing, the surface has come
+    // back and the tablet problem has come back with it.
+    renderPanel();
     expect(
-      screen.queryByText('You are running the latest version.'),
+      screen.queryByRole('button', { name: /update/i }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/could not reach GitHub/),
-    ).not.toBeInTheDocument();
-  });
-
-  it('disables the button while a check is in flight and clears a stale message', async () => {
-    const user = userEvent.setup();
-    let resolveCheck: (outcome: ManualCheckOutcome) => void = () => {};
-    const pending = new Promise<ManualCheckOutcome>((resolve) => {
-      resolveCheck = resolve;
-    });
-    const onCheckForUpdates = vi
-      .fn<() => Promise<ManualCheckOutcome>>()
-      .mockReturnValueOnce(Promise.resolve('latest'))
-      .mockReturnValueOnce(pending);
-    render(
-      <AboutPanel
-        appVersion="3.2.0"
-        pythonVersion="3.11.0"
-        healthError={null}
-        onCheckForUpdates={onCheckForUpdates}
-      />,
-    );
-
-    const button = screen.getByRole('button', { name: 'Check for Updates' });
-    await user.click(button);
-    expect(
-      await screen.findByText('You are running the latest version.'),
-    ).toBeInTheDocument();
-
-    await user.click(button);
-    expect(button).toBeDisabled();
-    expect(
-      screen.queryByText('You are running the latest version.'),
-    ).not.toBeInTheDocument();
-
-    resolveCheck('unreachable');
-    expect(
-      await screen.findByText(/could not reach GitHub/),
-    ).toBeInTheDocument();
-    expect(button).toBeEnabled();
+    expect(screen.queryByText(/latest version/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/GitHub/i)).not.toBeInTheDocument();
   });
 });

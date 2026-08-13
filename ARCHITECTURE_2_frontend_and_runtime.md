@@ -55,20 +55,17 @@ frontend/
     │   │   ├── carrierServices.ts               # Service names for display
     │   │   └── carrierTransit.ts                # Countdown arithmetic
     │   ├── About/
-    │   │   ├── AboutPanel.tsx    # Version, author, credits, manual update check
+    │   │   ├── AboutPanel.tsx    # Version, author and credits
     │   │   └── LicensePanel.tsx  # The licence text
     │   ├── KeepAwake/
     │   │   └── KeepAwakeChip.tsx # Keep-awake state, in the header
-    │   ├── Settings/
-    │   │   └── SettingsPage.tsx
-    │   └── UpdatePrompt/
-    │       └── UpdatePrompt.tsx  # Download / Skip this version / Later dialog
+    │   └── Settings/
+    │       └── SettingsPage.tsx
     ├── services/
     │   └── api.ts                # Axios client and typed API helpers
     ├── utils/
     │   ├── apiError.ts           # One place that turns a failure into a message
     │   ├── commanderStatus.ts    # Journal status into header copy (credits, location)
-    │   ├── updateCheck.ts        # Release parsing, asset selection, skip store
     │   └── device.ts             # Handheld detection
     ├── stores/
     │   ├── colonisationStore.ts  # Zustand store for colonisation data
@@ -76,7 +73,6 @@ frontend/
     ├── hooks/
     │   ├── useLiveUpdates.ts         # AJAX long-poll loop and its backoff
     │   ├── useBackendMeta.ts         # Version, health and the commander status
-    │   ├── useUpdateCheck.ts         # Browser-side GitHub release check
     │   ├── useThemeMode.ts           # Theme choice, persisted
     │   ├── useKeepAwakePreference.ts # Whether the user wants keep-awake
     │   ├── useKeepAwake.ts           # Which keep-awake strategy is in force
@@ -203,26 +199,22 @@ State is centralised in two Zustand stores:
   - Initialise stores and start the AJAX long-poll live update loop.
   - App holds no state of its own beyond composition: it moved into the hooks
     (`useThemeMode`, `useKeepAwakePreference`, `useBackendMeta`,
-    `useUpdateCheck`, `useLiveUpdates`) and its copy into the components it
-    renders.
+    `useLiveUpdates`) and its copy into the components it renders.
   - The header reports the commander from the journal status: name, session
     credit balance and where they are (`describeLocation` phrases the docked
     context: station, planetary base or carrier, plus the system).
-  - `useUpdateCheck` compares the running version from health against the
-    latest GitHub release, fetched by the browser rather than the backend.
-    **It has no timer: it asks only when the user asks it to**, from the
-    About tab's Check for Updates. The one automatic check in the product
-    belongs to the tray (section 2.5), because this HUD is meant to be read
-    from a tablet on the local network, where an offer would hand a Windows
-    installer to a device that cannot run it. An update opens a prompt
-    offering Download (the Windows installer asset, falling back to the
-    releases page) or Close, while "up to date" and "could not reach GitHub"
-    read out on the tab itself; the header's "Update available" button
-    reopens the prompt. There is deliberately no Skip here: skipping silences
-    a check that speaks unbidden and this one never does, so the skip lives
-    with the tray's check instead. The pure half (release parsing, asset
-    selection) lives in `utils/updateCheck.ts`; the dialog is
-    `components/UpdatePrompt/UpdatePrompt.tsx`.
+  - **The HUD carries no update check at all.** The whole of it, the hook, the
+    release parsing, the prompt and the About tab's button, was removed. It
+    had no timer and asked only when the user asked it to, which was thought
+    to be enough. The timer was never the problem: this HUD is served over
+    the local network and cannot tell whether the device reading it is the
+    machine EDCA is installed on, so a tablet beside the cockpit was offered a
+    Windows installer it had no way to run. Update checking belongs to the
+    tray (section 2.5), which runs on the machine that can act on the answer.
+    One owner also ends the case where a single release could raise two
+    prompts, each carrying a skip the other could not see. `AboutPanel` has a
+    test asserting the absence, so the surface cannot return without the
+    tablet problem returning with it.
   - Theme is one control rather than two: a single toggle that switches between
     the two themes in `theme.ts`, persisted by `useThemeMode`.
 
@@ -405,18 +397,19 @@ Key classes:
   the tray's update check, shared by the frozen and dev trays.
 
   - Trigger: one check 3 seconds after construction, so it never contends
-    with starting the backend. There is no repeating timer. **This is the
-    only automatic update check in the product.** It honours a skipped version and
-    says nothing at all unless there is something new to say. The Help menu's
+    with starting the backend. There is no repeating timer. **This is the only
+    update check in the product.** It honours a skipped version and says
+    nothing at all unless there is something new to say. The Help menu's
     manual check ignores the skip and reports every outcome, because a user
     who asked deserves an answer even when the answer is that nothing has
     changed.
-  - Why the tray rather than the browser owns it: the web UI is meant to be
-    read from a tablet on the local network, where an offer would hand a
-    Windows installer to a device that cannot run it, while the tray is on the
-    machine EDCA is installed on. Two surfaces checking on their own timing
-    also meant one release could raise two prompts, each with a skip the other
-    could not see.
+  - Why the tray owns it and the browser has none: the web UI is served over
+    the local network and is meant to be read from a tablet beside the
+    cockpit, so it cannot know whether the device reading it is the machine
+    EDCA is installed on. Every offer it made was an offer to download a
+    package the device might have no way to install. The tray runs on the
+    machine that can act on the answer. Two surfaces also meant one release
+    could raise two prompts, each with a skip the other could not see.
   - Threading: the request runs on a `threading.Thread` so an unreachable
     GitHub cannot freeze the tray; the worker emits an internal signal
     connected to a **bound method of the controller**. The controller is

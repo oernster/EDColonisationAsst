@@ -4,8 +4,9 @@
  * The commander details (name, credit balance, docked context) are detected
  * from the journals via the journal status endpoint, so nothing needs
  * entering in Settings. They are re-read on a timer because they change as
- * the commander plays, and whenever the settings version changes, because a
- * changed journal directory changes which journals they come from. The two
+ * the commander plays. They are re-read again whenever the settings version
+ * changes: a changed journal directory changes which journals they come
+ * from. The two
  * requests fail independently: a health failure is surfaced to the user,
  * whereas missing commander details are simply blank.
  */
@@ -21,8 +22,6 @@ const COMMANDER_REFRESH_MS = 30_000;
 
 export interface BackendMeta {
   appVersion: string | null;
-  /** The bare x.y.z, without the build marker; what the update check compares. */
-  appVersionRaw: string | null;
   pythonVersion: string | null;
   healthError: string | null;
   commanderStatus: CurrentSystem | null;
@@ -30,7 +29,6 @@ export interface BackendMeta {
 
 export function useBackendMeta(settingsVersion: number): BackendMeta {
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [appVersionRaw, setAppVersionRaw] = useState<string | null>(null);
   const [pythonVersion, setPythonVersion] = useState<string | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [commanderStatus, setCommanderStatus] = useState<CurrentSystem | null>(null);
@@ -42,7 +40,6 @@ export function useBackendMeta(settingsVersion: number): BackendMeta {
         setAppVersion(
           health.build_id ? `${health.version} (${health.build_id})` : health.version,
         );
-        setAppVersionRaw(health.version ?? null);
         // Surface the actual Python runtime version reported by the backend, so
         // the embedded interpreter the packaged EXE uses is visible at a glance.
         setPythonVersion(health.python_version ?? null);
@@ -66,5 +63,5 @@ export function useBackendMeta(settingsVersion: number): BackendMeta {
     return () => window.clearInterval(timer);
   }, [settingsVersion]);
 
-  return { appVersion, appVersionRaw, pythonVersion, healthError, commanderStatus };
+  return { appVersion, pythonVersion, healthError, commanderStatus };
 }

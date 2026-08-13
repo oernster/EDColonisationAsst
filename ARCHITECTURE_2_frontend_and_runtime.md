@@ -383,6 +383,15 @@ Key classes:
   - Closing the fallback window is routed to the same Exit, because `quitOnLastWindowClosed` is False: a window that merely hid itself would restore exactly the state the module exists to prevent. `_on_exit` therefore returns whether the application is actually going away; a cancelled confirmation leaves the window on screen.
   - Tested in [`test_tray_ui.py`](backend/tests/unit/test_tray_ui.py:1) with fakes rather than Qt widgets, matching the rest of the runtime suite. The tests were verified by removing the detection and watching three of them fail.
 
+- **Desktop identity**: what ties a running window back to the launcher it was started from. Get it wrong and the application still works; it simply appears in the dock as a second, generic entry beside its own icon, which is the kind of fault nobody reports.
+
+  The two display servers answer it differently and EDCA runs under either, so both are set and neither is guessed:
+
+  - **Wayland** ignores WM_CLASS. It matches on the desktop entry the application names through `QGuiApplication.setDesktopFileName`, which `_build_application` sets from [`desktop_file_name()`](backend/src/utils/runtime.py:1). Inside a flatpak that value is read back from `FLATPAK_ID`, which is the same string flatpak used to install the entry, so the two cannot disagree the way a second copy of the constant could. Outside a sandbox it falls back to `APPLICATION_ID`.
+  - **X11** matches WM_CLASS, which has two halves that Qt fills from different places. The **class** half comes from the Qt application name, so the desktop entry's `StartupWMClass` carries that exact string, colon and spaces included. The **instance** half comes from `RESOURCE_NAME`, which the flatpak launcher exports; without it Qt derives the instance name from the executable. Inside the sandbox the executable is `python3`, so every window would announce itself as python3 and match nothing.
+
+  The string therefore lives in two languages, Python and the packaging script, which is the real risk here: a one-character difference matches nothing and fails silently. [`test_desktop_identity.py`](backend/tests/unit/test_desktop_identity.py:1) asserts the packaging script's `APP_ID` and `QT_APPLICATION_NAME` against the real Python constants, plus the launcher still exporting `RESOURCE_NAME`. It was verified by drifting the name by one character and watching the suite fail.
+
   Every dialog this menu opens goes through
   [`dialogs.present`](backend/src/runtime/dialogs.py:1) rather than a bare
   `exec()`. A packaged EDCA has no main window, so a dialog raised from the

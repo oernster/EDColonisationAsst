@@ -58,6 +58,14 @@ except ImportError:
         TrayUIController,
     )
 
+try:
+    from ..utils.runtime import desktop_file_name  # type: ignore[import-not-found]
+except ImportError:
+    # As above.
+    from backend.src.utils.runtime import (  # type: ignore[import-error]
+        desktop_file_name,
+    )
+
 # Shared Help menu icon, used for the startup splash.
 try:
     from .help_menu import resolve_about_icon  # type: ignore[import-not-found]
@@ -201,6 +209,18 @@ class RuntimeApplication:
         app = QApplication([])
         app.setApplicationName(_APPLICATION_NAME)
         app.setQuitOnLastWindowClosed(False)
+
+        # Desktop identity, which is what ties a window back to the launcher it
+        # was started from rather than leaving it as a second, generic entry.
+        # The two display servers answer it differently and both are needed
+        # because the application runs under either. Wayland reads the desktop
+        # entry named here. X11 reads WM_CLASS, whose class half Qt takes from
+        # the application name set above, which is why the desktop entry's
+        # StartupWMClass carries that same string; its instance half comes from
+        # RESOURCE_NAME, which the flatpak launcher sets, because otherwise Qt
+        # derives it from the executable and inside the sandbox the executable
+        # is python3.
+        app.setDesktopFileName(desktop_file_name())
 
         # Ensure the runtime EXE has the correct icon in the Windows taskbar.
         # In frozen mode this process is the Nuitka-built EDColonisationAsst.exe,

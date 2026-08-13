@@ -21,6 +21,29 @@ import sys
 # runtime.common.
 _ENV_FLATPAK_ID = "FLATPAK_ID"
 
+# The application's reverse-DNS identity. It is the flatpak app id, the basename
+# of the installed desktop entry and the name of the installed icons, because a
+# desktop matches a running window to its launcher by that one string. The
+# packaging script declares the same value; the test in test_desktop_identity.py
+# fails if the two ever drift.
+APPLICATION_ID = "uk.co.oernster.EDColonisationAsst"
+
+
+def desktop_file_name() -> str:
+    """Return the desktop entry this process should claim as its identity.
+
+    Wayland does not use WM_CLASS: a compositor ties a window to its launcher
+    by the desktop entry the application names, which is what
+    ``QGuiApplication.setDesktopFileName`` announces. Without it a window opens
+    as a second, generic entry beside the launcher it was started from.
+
+    Inside a flatpak the answer is stated by the sandbox itself. That is not a
+    convenience: it is the same string flatpak uses to install the desktop
+    entry, so reading it back cannot disagree with the file on disk the way a
+    second copy of the constant could.
+    """
+    return os.environ.get(_ENV_FLATPAK_ID) or APPLICATION_ID
+
 
 class RuntimeMode(Enum):
     """Enumerates the supported runtime modes for the application."""

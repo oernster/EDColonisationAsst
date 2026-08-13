@@ -37,6 +37,12 @@ MANIFEST="${APP_ID}.yml"
 APP_COMMAND="edcolonisationasst"
 STAGED_DIR="/app/share/${APP_COMMAND}"
 
+# The name the application gives Qt, which becomes the class half of WM_CLASS
+# on X11 and therefore the desktop entry's StartupWMClass. It has to match
+# _APPLICATION_NAME in backend/src/runtime/app_runtime.py exactly, character
+# for character. A near miss matches nothing; a test asserts they stay equal.
+QT_APPLICATION_NAME="Elite: Dangerous Colonisation Assistant"
+
 RUNTIME="org.freedesktop.Platform"
 SDK="org.freedesktop.Sdk"
 RUNTIME_VERSION="25.08"
@@ -259,6 +265,12 @@ export PYTHONPATH="${STAGED_DIR}:/app/lib/python${PYTHON_MM}/site-packages\${PYT
 export QT_PLUGIN_PATH="/app/lib/python${PYTHON_MM}/site-packages/PySide6/Qt/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="/app/lib/python${PYTHON_MM}/site-packages/PySide6/Qt/plugins/platforms"
 export EDCA_PROJECT_ROOT="${STAGED_DIR}"
+# The instance half of WM_CLASS on X11. Qt derives it from the executable when
+# this is unset. In here the executable is python3, so every window would
+# announce itself as python3 and the desktop would tie it to nothing. The class
+# half comes from the Qt application name; the desktop entry's StartupWMClass
+# carries that string.
+export RESOURCE_NAME="${APP_ID}"
 if [ -n "\${WAYLAND_DISPLAY:-}" ] && [ -z "\${FORCE_X11:-}" ]; then
     export QT_QPA_PLATFORM=wayland
 elif [ -n "\${DISPLAY:-}" ]; then
@@ -279,16 +291,12 @@ Icon=${APP_ID}
 Terminal=false
 Type=Application
 Categories=Game;Utility;
-# StartupWMClass is deliberately absent for now. It ties the window back to this
-# entry so it lights up the launcher it was started from rather than appearing
-# as a second, generic one, but the value has to MATCH what the toolkit actually
-# publishes and this application has not been observed on a Linux desktop yet.
-# Qt takes WM_CLASS from the application name, which here is a string with
-# spaces and a colon in it, and Wayland does not use WM_CLASS at all: it matches
-# on the id from setDesktopFileName, which the application does not yet call.
-# Guessing produces a line that silently matches nothing. Read the real value
-# with 'xprop WM_CLASS' once it runs, add setDesktopFileName for Wayland, then
-# set this.
+# Ties a window back to this entry rather than letting it open as a second,
+# generic one. This is the X11 half: it is the class part of WM_CLASS, which Qt
+# takes verbatim from the Qt application name, spaces and colon included. The
+# instance part comes from RESOURCE_NAME in the launcher. Wayland uses
+# neither: it matches on setDesktopFileName. See ARCHITECTURE_2, section 2.5.
+StartupWMClass=${QT_APPLICATION_NAME}
 DESKTOP
 
 cat > "packaging/${APP_ID}.metainfo.xml" <<XML

@@ -68,6 +68,11 @@ something else on the machine has taken it or Windows has reserved it, EDCA
 serves on the next address it can bind and remembers it for next time. The tray
 icon's **Open Web UI** always goes to the right one.
 
+EDCA lives in the tray because it has no window of its own. Some Linux desktops
+provide no system tray at all. There EDCA shows a small window instead,
+offering the same **Open Web UI** and **Exit**. You are told that is why it is
+there, rather than being left with an application you cannot see or quit.
+
 The first launch reads every journal already on your machine, once, so that you
 start with the colonisation history you have actually flown rather than from
 empty. The splash says so while it happens, naming the file it is on and how far

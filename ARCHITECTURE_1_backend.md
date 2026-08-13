@@ -63,6 +63,7 @@ backend/
 │   │   ├── app_runtime.py             # Packaged runtime orchestration
 │   │   ├── backend_server.py          # In-process uvicorn control and readiness
 │   │   ├── tray_ui.py                 # Frozen-runtime system tray UI
+│   │   ├── tray_fallback.py           # Stand-in window when there is no tray
 │   │   ├── app_singleton.py           # ApplicationInstanceLock
 │   │   ├── common.py                  # Shared runtime helpers
 │   │   ├── environment.py             # Runtime environment detection

@@ -47,6 +47,13 @@ except ImportError:
         default_update_check,
     )
 
+try:
+    from .tray_fallback import TrayFallbackWindow  # type: ignore[import-not-found]
+except ImportError:
+    from backend.src.runtime.tray_fallback import (  # type: ignore[import-error]
+        TrayFallbackWindow,
+    )
+
 if TYPE_CHECKING:
     from .backend_server import BackendServerController
 
@@ -81,25 +88,59 @@ class TrayUIController:
         # manual check down with it.
         self._updates = default_update_check(icon_path=env.icon_path)
 
-        self._tray = QSystemTrayIcon()
-        self._configure_tray_icon()
-        self._create_menu()
+        # Asked once, here, because this is where the choice is made and the
+        # answer decides which surface exists for the life of the process.
+        #
+        # A desktop that has no tray is not an error and must not be treated as
+        # one: on Linux the icon is published over D-Bus as a
+        # StatusNotifierItem and drawn by the desktop's own watcher; plenty of
+        # desktops ship no watcher at all. Inside a flatpak the watcher is
+        # also unreachable unless the sandbox is granted the name, so a missing
+        # permission looks exactly like a missing tray from in here.
+        #
+        # The answer can in principle be a false negative, if a watcher
+        # registers moments after this runs. That costs the user a small window
+        # instead of a tray icon, which is a worse fit but still every action
+        # they need. Believing a false positive would cost them the
+        # application, so the check is not retried in the hope of a better
+        # answer.
+        self._tray: QSystemTrayIcon | None = None
+        self._window: TrayFallbackWindow | None = None
 
-        # Treat clicking the tray icon itself as a large "Open Web UI" button.
-        # Left-click or double-click on the tray icon will open the web UI,
-        # in addition to the explicit "Open Web UI" menu item.
-        self._tray.activated.connect(self._on_tray_activated)  # type: ignore[arg-type]
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self._tray = QSystemTrayIcon()
+            self._configure_tray_icon(self._tray)
+            self._create_menu(self._tray)
+
+            # Treat clicking the tray icon itself as a large "Open Web UI"
+            # button. Left-click or double-click on the tray icon will open the
+            # web UI, in addition to the explicit "Open Web UI" menu item.
+            self._tray.activated.connect(  # type: ignore[arg-type]
+                self._on_tray_activated
+            )
+        else:
+            logger.warning(
+                "No system tray is available on this desktop; showing the "
+                "control window instead."
+            )
+            self._window = TrayFallbackWindow(
+                icon_path=env.icon_path,
+                about_icon_path=resolve_about_icon(env.project_root),
+                on_open_web_ui=self._on_open_web_ui,
+                on_exit=self._on_exit,
+                on_check_updates=self._updates.check_manually,
+            )
 
     # -------------------- setup ------------------------------------------------
 
-    def _configure_tray_icon(self) -> None:
+    def _configure_tray_icon(self, tray: QSystemTrayIcon) -> None:
         icon_path = self._env.icon_path
         if icon_path.exists():
-            self._tray.setIcon(QIcon(str(icon_path)))
-        self._tray.setToolTip(_TRAY_TOOLTIP)
-        self._tray.setVisible(True)
+            tray.setIcon(QIcon(str(icon_path)))
+        tray.setToolTip(_TRAY_TOOLTIP)
+        tray.setVisible(True)
 
-    def _create_menu(self) -> None:
+    def _create_menu(self, tray: QSystemTrayIcon) -> None:
         menu = QMenu()
         open_action = menu.addAction("Open Web UI")
         open_action.triggered.connect(self._on_open_web_ui)  # type: ignore[arg-type]
@@ -116,7 +157,7 @@ class TrayUIController:
         exit_action = menu.addAction("Exit")
         exit_action.triggered.connect(self._on_exit)  # type: ignore[arg-type]
 
-        self._tray.setContextMenu(menu)
+        tray.setContextMenu(menu)
 
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         """
@@ -138,8 +179,15 @@ class TrayUIController:
         logger.info("Opening web UI at %s", url)
         webbrowser.open(url)
 
-    def _on_exit(self) -> None:
-        logger.info("Exit requested from tray menu.")
+    def _on_exit(self) -> bool:
+        """Confirm, then shut down. True when the application is going away.
+
+        The answer is what the fallback window needs: closing it through the
+        title bar is the same request as pressing Exit; a cancelled
+        confirmation has to leave the window on screen rather than hide the
+        only surface the user has.
+        """
+        logger.info("Exit requested.")
         # Confirm with the user to avoid accidental shutdown. This goes through
         # `ask_yes_no` rather than QMessageBox.question because there is no
         # parent window to give it: a bare question box opens behind the game
@@ -150,19 +198,24 @@ class TrayUIController:
             icon_path=self._env.icon_path,
         ):
             logger.info("Exit cancelled at the confirmation.")
-            return
+            return False
 
         try:
             self._backend.stop()
         finally:
-            self._tray.setVisible(False)
+            if self._tray is not None:
+                self._tray.setVisible(False)
             self._app.quit()
+        return True
 
     # -------------------- public API ------------------------------------------
 
     def show(self) -> None:
-        # Nothing extra to do at the moment; kept for symmetry / extension.
-        self._tray.show()
+        """Show whichever surface this desktop turned out to support."""
+        if self._tray is not None:
+            self._tray.show()
+        elif self._window is not None:
+            self._window.show()
 
 
 __all__ = ["TrayUIController"]

@@ -356,6 +356,91 @@ Useful environment variables: `EDCA_HOST`, `EDCA_PORT`, `EDCA_PYTHON`,
 per machine (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and
 `uv python install 3.13` if your distro lacks Python 3.13.
 
+#### Distributions and desktops the script has not seen
+
+The script's package hints cover the common package managers, which is a
+different thing from covering the common systems. What follows names what EDCA
+actually needs rather than which package provides it, because that answer
+differs on every distribution and on some of them the usual answer is wrong.
+
+What it needs is short:
+
+- **Python 3.11 or newer.** That is the floor `backend/pyproject.toml` declares.
+  The convenience scripts still say 3.10 in their prompts, which is older than
+  the package metadata allows.
+- **Node 18 or newer, only to build the front end.** Set
+  `EDCA_SKIP_FRONTEND_BUILD=1` against a prebuilt `frontend/dist` and Node is
+  not needed at all.
+- **A browser**, because the UI is a web page rather than a window.
+- **Qt, only for the tray icon and the splash.** See below: it is optional in a
+  way that is worth knowing.
+
+#### Desktop environments other than GNOME
+
+A system tray is not something a Linux desktop owes anyone. The icon is not
+drawn by EDCA at all: it is published over D-Bus as a StatusNotifierItem and
+the desktop's own watcher draws it. A GNOME session provides no watcher without
+an extension, Ubuntu ships that extension enabled, KDE, XFCE, MATE, Cinnamon and
+LXQt each provide one by their own route; any of them can have it turned
+off.
+
+**EDCA does not depend on it.** This is the useful difference between EDCA and a
+tray-only application: the entire interface is a web page, so where no icon
+appears the app is still running and still completely usable. Open
+`http://127.0.0.1:47021/app/` and bookmark it. Nothing is lost but the
+convenience of the menu.
+
+Be aware that nothing currently tells you which case you are in. EDCA does not
+ask the desktop whether it draws a tray, so on a session without a watcher the
+icon simply does not appear and no message explains why. Knowing the URL is the
+whole workaround.
+
+If the splash or the tray behave oddly under Wayland, forcing the X11 path
+through XWayland is the first thing to try:
+
+```bash
+QT_QPA_PLATFORM=xcb ./run-edca-built.sh
+```
+
+#### Running with no Qt at all
+
+On a distribution where PySide6 is difficult, skip it. The backend is a plain
+FastAPI application that imports no Qt whatsoever, so it can be run directly and
+used entirely through the browser:
+
+```bash
+python -m uvicorn backend.src.main:app --host 127.0.0.1 --port 47021
+```
+
+Then open `http://127.0.0.1:47021/app/`, which needs `frontend/dist` to have
+been built at least once. What you give up is the tray icon and the splash. What
+you keep is every feature, because all of them live in the web UI.
+
+That matters most where the PySide6 wheel is the problem rather than the
+project. `pip install PySide6` fetches a wheel built for a conventional
+filesystem layout, one with an interpreter and loader at fixed paths and shared
+libraries on a global search path. A distribution not built that way, NixOS
+being the clear case, installs the wheel perfectly happily and then fails to
+import it, which reads as a broken package rather than as a mismatched
+assumption. The answer there is either to take Qt for Python from the
+distribution instead of from pip or to run inside an environment providing the
+conventional layout. That is a question about your distribution rather than
+about EDCA. Or, given the above, to not install it at all.
+
+Two commands tell the possible causes apart:
+
+```bash
+python -c "import PySide6.QtWidgets; print('Qt imports')"
+```
+
+```bash
+QT_DEBUG_PLUGINS=1 python -m backend.src.tray_app
+```
+
+The first separates a Python-level import failure from a Qt-level one. The
+second makes Qt name every platform plugin it tried and why it rejected each,
+which is what to read when the import succeeds and nothing appears on screen.
+
 ---
 
 ## Runtime behaviour of the installed app

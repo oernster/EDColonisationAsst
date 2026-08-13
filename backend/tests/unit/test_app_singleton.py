@@ -40,6 +40,10 @@ def _make_isolated_lock(
         # Prefer XDG_RUNTIME_DIR on POSIX, consistent with the implementation.
         monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "xdg_runtime"))
 
+    # Cleared so that a suite run from inside a flatpak resolves the same path
+    # as one run outside it, rather than silently taking the sandbox branch.
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
     return ApplicationInstanceLock(app_id="edca_test")
 
 
@@ -104,6 +108,46 @@ def test_resolve_lock_path_uses_per_user_directory(
     assert path.parent == base
     # The directory should have been created by _resolve_lock_path().
     assert path.parent.exists()
+
+
+def test_runtime_lock_dir_uses_the_app_subdirectory_outside_a_sandbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Outside a flatpak the lock sits in the application's own subdirectory.
+
+    The helper is called directly rather than through _resolve_lock_path()
+    because that branches on the platform first, so on Windows the POSIX half
+    is unreachable. Pretending otherwise by rewriting os.name would also
+    rewrite which concrete path class Path builds, and a POSIX path cannot be
+    instantiated on Windows at all, so the pretence breaks before the code
+    under test is reached.
+    """
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    assert app_singleton_mod._runtime_lock_dir(tmp_path) == tmp_path / "edca"
+
+
+def test_runtime_lock_dir_uses_the_shared_directory_inside_a_flatpak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Inside a flatpak the lock moves to the directory instances share.
+
+    Every instance of a flatpak application is given its own runtime directory,
+    so a lock file directly beneath it is invisible to the next launch: both
+    instances would acquire their own file and both would proceed, which is the
+    second-runtime-racing-for-the-port failure this lock exists to prevent. The
+    application id beneath app/ is the one directory flatpak shares between
+    instances, so that is where the lock has to live in the sandbox.
+
+    The id is whatever flatpak states in the environment rather than a value
+    this project chooses, so the test states one rather than asserting ours.
+    """
+    monkeypatch.setenv("FLATPAK_ID", "uk.co.oernster.EDColonisationAsst")
+
+    assert (
+        app_singleton_mod._runtime_lock_dir(tmp_path)
+        == tmp_path / "app" / "uk.co.oernster.EDColonisationAsst"
+    )
 
 
 def test_acquire_twice_on_same_instance_returns_true(

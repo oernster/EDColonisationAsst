@@ -11,6 +11,13 @@ The lock is based on an OS-level file lock:
 - On POSIX systems it uses fcntl.flock on a file under either
   $XDG_RUNTIME_DIR, $XDG_CACHE_HOME or ~/.cache/EDColonisationAsst.
 
+Inside a flatpak the runtime directory needs care: each instance of an
+application is given its OWN $XDG_RUNTIME_DIR, so a lock file placed directly
+beneath it is invisible to the next launch and both instances acquire. Flatpak
+shares exactly one directory between instances of the same application, the
+application id under app/, so that is where the lock goes in the sandbox. See
+_runtime_lock_dir().
+
 Operating system file locks are automatically released when the owning
 process exits, so stale locks are not an issue under normal crashes or
 reboots.
@@ -29,6 +36,40 @@ from typing import IO, ClassVar, Self
 # _acquire_windows_lock() for what happens when they do not.
 _LOCK_REGION_OFFSET = 0
 _LOCK_REGION_BYTES = 1
+
+# Set by flatpak inside the sandbox, where it names the running application.
+_ENV_FLATPAK_ID = "FLATPAK_ID"
+# The subdirectory of $XDG_RUNTIME_DIR that flatpak shares between every
+# instance of one application. Everything else under the runtime directory is
+# private to a single instance.
+_FLATPAK_APP_DIR_NAME = "app"
+# The application's own subdirectory of the runtime directory, used outside a
+# sandbox where the runtime directory is already per-user rather than
+# per-instance.
+_RUNTIME_SUBDIR_NAME = "edca"
+
+
+def _runtime_lock_dir(runtime_dir: Path) -> Path:
+    """Return the lock directory to use beneath the XDG runtime directory.
+
+    Outside a sandbox the runtime directory is per-user, so the application's
+    own subdirectory of it is exactly right.
+
+    Inside a flatpak it is not: every instance is given a private runtime
+    directory, so two launches would each create their own lock file, each
+    would lock it successfully and both would proceed. The failure that
+    follows is the one already recorded against the Windows locking region in
+    this module, a second copy of the runtime starting and then racing for the
+    backend port, except that no amount of locking care prevents it because the
+    two instances are not contending for the same file at all.
+
+    Flatpak shares one directory between instances of the same application, the
+    application id beneath app/, which is what makes the lock mutual there.
+    """
+    flatpak_id = os.environ.get(_ENV_FLATPAK_ID)
+    if flatpak_id:
+        return runtime_dir / _FLATPAK_APP_DIR_NAME / flatpak_id
+    return runtime_dir / _RUNTIME_SUBDIR_NAME
 
 
 class ApplicationInstanceLockError(Exception):
@@ -188,7 +229,7 @@ class ApplicationInstanceLock:
         else:
             runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
             if runtime_dir:
-                root = Path(runtime_dir) / "edca"
+                root = _runtime_lock_dir(Path(runtime_dir))
             else:
                 cache_home = os.environ.get("XDG_CACHE_HOME")
                 if cache_home:

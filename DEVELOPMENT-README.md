@@ -552,6 +552,73 @@ The first separates a Python-level import failure from a Qt-level one. The
 second makes Qt name every platform plugin it tried and why it rejected each,
 which is what to read when the import succeeds and nothing appears on screen.
 
+#### Reaching it from a tablet on the same network
+
+The interface is a web page, so putting it on a tablet beside the cockpit means
+another machine has to reach the port. On Linux two things stand in the way and
+only one of them is the firewall.
+
+**What it binds.** The flatpak and the packaged runtime bind whatever
+`server.host` says, which defaults to `0.0.0.0`, so they are already listening
+on every interface. `run-edca.sh` passes `0.0.0.0` explicitly.
+`run-edca-built.sh` does not: it defaults to `EDCA_HOST=127.0.0.1`, which is
+loopback only. No firewall rule makes a loopback socket reachable, so start it
+this way instead:
+
+```bash
+EDCA_HOST=0.0.0.0 ./run-edca-built.sh
+```
+
+**Which port.** 47021 is a preference rather than a promise, so open the port it
+actually got rather than the one it asked for. The listening socket names
+itself:
+
+```bash
+ss -ltnp | grep -i python
+```
+
+The runtime also writes the port down. Under flatpak that is
+`~/.var/app/uk.co.oernster.EDColonisationAsst/data/EDColonisationAsst/runtime-port`;
+from a source checkout it is a `runtime-port` file at the project root.
+
+**Opening it, scoped to your own network.** Substitute the port you just read
+and your own subnet. There is no reason to open this to anything wider than the
+network the tablet is on.
+
+ufw (Debian, Ubuntu, Mint):
+
+```bash
+sudo ufw allow from 192.168.0.0/16 to any port 47021 proto tcp
+```
+
+firewalld (Fedora, RHEL, openSUSE), naming the zone your LAN interface is in:
+
+```bash
+sudo firewall-cmd --permanent --zone=home --add-port=47021/tcp
+```
+
+```bash
+sudo firewall-cmd --reload
+```
+
+nftables directly, where a table and chain of these names already exist:
+
+```bash
+sudo nft add rule inet filter input ip saddr 192.168.0.0/16 tcp dport 47021 accept
+```
+
+NixOS, which is declarative rather than imperative, so this belongs in
+`configuration.nix` followed by `sudo nixos-rebuild switch`:
+
+```nix
+networking.firewall.allowedTCPPorts = [ 47021 ];
+```
+
+Then browse to `http://<your-PC-IP>:47021/app/` from the tablet, substituting
+the address of the machine EDCA is running on. Nothing is served over HTTPS,
+which is why the keep-screen-awake option needs a single tap to start on a
+mobile browser: that API is restricted to a secure context.
+
 ---
 
 ## Runtime behaviour of the installed app

@@ -152,6 +152,13 @@ The sandbox is granted four things:
   possibly from a tablet on the same network
 - the ability to talk to your desktop's tray-icon service
 
+Granting the sandbox the network is not the same as your firewall allowing it
+in. To open the HUD on a tablet you have to let that port through on your own
+network; the port is whichever one EDCA managed to bind rather than always
+47021. How to read the port it settled on, plus commands for ufw, firewalld,
+nftables and NixOS, are in
+[DEVELOPMENT-README.md](DEVELOPMENT-README.md#reaching-it-from-a-tablet-on-the-same-network).
+
 You do not have to package it at all: see
 [Run from source on Linux](#run-from-source-on-linux) below. For what to do on a
 distribution where PySide6 is awkward, plus the build itself, see

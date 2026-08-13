@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EDCA - Elite Dangerous Colonisation Assistant</title>
-<meta name="description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
+<meta name="description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD: an installer on Windows, a Flatpak you build yourself on Linux. Free and open source.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="EDCA">
 <meta property="og:title" content="EDCA - Elite Dangerous Colonisation Assistant">
-<meta property="og:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
+<meta property="og:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD: an installer on Windows, a Flatpak you build yourself on Linux. Free and open source.">
 <meta property="og:url" content="https://ernster.dev/EDColonisationAsst/">
 <meta property="og:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
 <meta property="og:image:width" content="1200">
@@ -20,7 +20,7 @@
 <meta property="og:locale" content="en_GB">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="EDCA - Elite Dangerous Colonisation Assistant">
-<meta name="twitter:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD for Windows. Free and open source.">
+<meta name="twitter:description" content="EDCA tracks your Elite Dangerous colonisation construction sites and fleet carrier logistics automatically from your journal. A local, browser-based HUD: an installer on Windows, a Flatpak you build yourself on Linux. Free and open source.">
 <meta name="twitter:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
 <link rel="canonical" href="https://ernster.dev/EDColonisationAsst/">
 <meta name="author" content="Oliver Ernster">
@@ -31,7 +31,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "EDCA - Elite Dangerous Colonisation Assistant",
-  "operatingSystem": "Windows 10, Windows 11",
+  "operatingSystem": "Windows 10, Windows 11, Linux",
   "applicationCategory": "GameApplication",
   "url": "https://ernster.dev/EDColonisationAsst/",
   "image": "https://ernster.dev/EDColonisationAsst/assets/social-card.png",
@@ -87,7 +87,7 @@
         <a class="btn ghost" href="colonisation.html">Take the tour</a>
         <a class="btn ghost" href="https://github.com/oernster/EDColonisationAsst">View on GitHub</a>
       </div>
-      <p class="platform-note">Windows &middot; opens in your browser automatically; reachable from a tablet on your local network at &lt;your-PC-IP&gt;:47021/app</p>
+      <p class="platform-note">Windows and Linux &middot; opens in your browser automatically; reachable from a tablet on your local network at &lt;your-PC-IP&gt;:47021/app</p>
     </header>
 
     <section>
@@ -135,9 +135,9 @@
     <section id="download">
       <div class="eyebrow">Get EDCA</div>
       <h2 class="section-title">Download EDCA</h2>
-      <p class="section-sub">Download the newest release with one click. Free and open
-        source under LGPL-3.0, built for Windows; it runs entirely on your machine and
-        nothing leaves your PC.</p>
+      <p class="section-sub">Download the newest release with one click on Windows; on
+        Linux you build the Flatpak yourself. Free and open source under LGPL-3.0; it runs
+        entirely on your machine and nothing leaves your PC.</p>
       <span class="dl-version" id="dl-version">Latest release</span>
       <div class="downloads">
         <div class="dl-card">
@@ -149,6 +149,15 @@
           <p class="meta" data-asset="EDColonisationAsstInstaller.exe">Installer (.exe)</p>
           <p class="meta">Windows may show a SmartScreen warning when you run this: <a href="/windows-smartscreen.html">here's why</a>.</p>
           <p class="how">Run the installer: there is nothing to configure and EDCA opens in your browser when it starts. Already have it? The same installer upgrades in place, in one pass.</p>
+        </div>
+        <div class="dl-card">
+          <div class="ico">&#128039;</div>
+          <h3>Linux</h3>
+          <p class="req">Any distribution with Flatpak</p>
+          <a class="btn ghost" href="https://github.com/oernster/EDColonisationAsst#install-and-run-on-linux">
+            How to build it</a>
+          <p class="meta">Flatpak, built from a checkout</p>
+          <p class="how">There is no downloadable Linux package. Clone the repository and run <code>./build_flatpak.sh</code>, which builds the app, installs it and writes a <code>.flatpak</code> file you can copy to another machine. You can also run it straight from source.</p>
         </div>
       </div>
       <p class="dl-links">

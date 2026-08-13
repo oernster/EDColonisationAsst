@@ -35,6 +35,14 @@ MANIFEST="${APP_ID}.yml"
 # The command name, the staged directory name and the launcher all share this.
 # Lower case with no punctuation because it becomes an executable on PATH.
 APP_COMMAND="edcolonisationasst"
+
+# The name the desktop shows: in the application menu, in the dock and in a
+# software centre. It leads with ED because that is what the app is searched
+# for by; a launcher that searches Name alone, which several do, finds nothing
+# for "Elite" or "ED" if the name starts at "Colonisation". This is the display
+# name only and is unrelated to QT_APPLICATION_NAME below, which is a window
+# matching key and must not be changed to read well.
+APP_DISPLAY_NAME="ED Colonisation Assistant"
 STAGED_DIR="/app/share/${APP_COMMAND}"
 
 # The name the application gives Qt, which becomes the class half of WM_CLASS
@@ -298,7 +306,7 @@ chmod +x "packaging/${APP_COMMAND}-launcher.sh"
 
 cat > "packaging/${APP_ID}.desktop" <<DESKTOP
 [Desktop Entry]
-Name=Colonisation Assistant
+Name=${APP_DISPLAY_NAME}
 Comment=Track Elite Dangerous colonisation projects, hauling and carrier logistics
 Exec=${APP_COMMAND}
 Icon=${APP_ID}
@@ -317,7 +325,7 @@ cat > "packaging/${APP_ID}.metainfo.xml" <<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>${APP_ID}</id>
-  <name>Colonisation Assistant</name>
+  <name>${APP_DISPLAY_NAME}</name>
   <summary>Colonisation support for Elite Dangerous</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>LGPL-3.0-or-later</project_license>

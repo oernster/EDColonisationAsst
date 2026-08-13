@@ -108,11 +108,15 @@ hardcodes a version.
 ### Prerequisites (developer machine)
 
 - Windows 10/11 x64.
-- **Python 3.13+** (3.12 remains a supported fallback).
+- **Python 3.13** for a release build. The application itself runs on
+  3.11 or newer (`requires-python` in `backend/pyproject.toml`); the
+  shipped Windows binary is compiled on 3.13.
 - **Visual Studio 2022 Build Tools** with the *Desktop development with C++*
   workload (MSVC v143) and a recent Windows 10/11 SDK; see the compiler
   notes below.
-- **Node.js 18+** with npm (frontend build only; never needed by end users).
+- **Node.js 20.19+** with npm (frontend build only; never needed by end
+  users). That is the floor Vite declares in its own `engines`; 22.12+
+  also qualifies.
 - Dev dependencies installed in a root virtual environment, which is what
   the build scripts, the whole-suite test run and the linters use:
 
@@ -176,6 +180,110 @@ On a Windows test machine:
    the registered uninstaller runs from inside the install directory, so
    this is the path that exercises the deferred deletion. The directory
    should be gone within a few seconds of the window closing.
+
+---
+
+## Building the Linux release (one command)
+
+```bash
+./build_flatpak.sh             # build, install locally and write the bundle
+./build_flatpak.sh --no-bundle # build and install only
+```
+
+Run it from the project root on a Linux machine. It installs `flatpak` and
+`flatpak-builder` through whichever of apt, dnf, pacman or zypper is present.
+Node is needed only if `frontend/dist` has to be built.
+
+### What build_flatpak.sh does
+
+It targets `org.freedesktop.Platform//25.08`, which ships Python 3.13. Nothing
+is compiled: the sandbox already provides its own interpreter and every
+dependency, which is the condition the frozen Windows build satisfies by other
+means, so what is packaged is the source tree. Inside the sandbox EDCA
+therefore takes the same path as the packaged Windows runtime, uvicorn
+in-process behind a Qt tray icon, rather than the source-checkout path of
+building a virtual environment and spawning processes.
+
+In order, the script:
+
+1. Checks its tools, then creates or reuses a build virtualenv at
+   `backend/.venv` (the same default `run-edca-built.sh` uses) and puts Pillow
+   in it. Pillow is a build dependency only; the application never imports it.
+2. Builds `frontend/dist` if it is missing. This is a hard failure rather than a
+   warning when Node is absent, because a Flatpak built without it installs
+   cleanly, starts cleanly and then serves nothing.
+3. Downloads the wheels named in
+   [backend/requirements-flatpak.txt](backend/requirements-flatpak.txt) on the
+   host, tagged for Python 3.13 and manylinux, then installs them inside the
+   sandbox with `--no-index`. The build never reaches the network.
+4. Derives the hicolor icon set from `EDColonisationAsst.png`. Every size is a
+   downscale of that master and nothing is ever resampled upwards, so the set
+   stops at 256: the master is 343px.
+5. Writes the manifest, the launcher, the `.desktop` entry and the
+   `.metainfo.xml` from heredocs. None of them is committed; only the script is.
+6. Builds, installs for the current user and writes
+   `edcolonisationasst.flatpak`.
+
+`./cleanup_flatpak.sh` undoes all of it and uninstalls the app. It touches
+nothing belonging to the Windows or the run-from-source paths, so the delivery
+routes stay independent. `--keep-installed` clears the artefacts and leaves the
+app; `--purge-data` additionally deletes `~/.var/app/<app-id>`, which is opt-in
+because that is where the commander's database lives.
+
+### Why the requirements file is its own
+
+[backend/requirements-flatpak.txt](backend/requirements-flatpak.txt) mirrors
+`backend/requirements.txt` with two differences, both forced rather than chosen:
+
+- Nuitka and shiboken6 are absent. Nuitka builds the Windows executable and is
+  never imported at runtime; shiboken6 arrives with PySide6.
+- PyYAML is 6.0.3 rather than 6.0.1. The runtime ships Python 3.13 and 6.0.1
+  published no wheel for it, not even a pure-Python one, so the offline download
+  fails outright rather than falling back.
+
+### What the sandbox is granted
+
+Every permission in `finish-args` is there for a named reason:
+
+| Grant | Why |
+|---|---|
+| `--share=ipc`, `--socket=fallback-x11`, `--socket=wayland`, `--device=dri` | Qt needs a display for the tray and the splash |
+| `--share=network` | the interface is an HTTP server the user opens in a browser, including from a tablet on the same network |
+| `--filesystem=home` | the journal lives in the game's Wine or Proton prefix; the settings page can repoint it |
+| `--filesystem=~/.var/app/com.valvesoftware.Steam:ro` | a Flatpak Steam keeps its Proton prefixes there; `--filesystem=home` deliberately excludes it |
+| `--talk-name=org.kde.StatusNotifierWatcher` | a Linux tray icon is published over D-Bus and drawn by the desktop's watcher, which is unreachable from the sandbox without this |
+
+### What runs where inside the sandbox
+
+The application is staged in its source layout under
+`/app/share/edcolonisationasst`, `backend/src` beside `frontend/dist`, because
+that is the layout the backend resolves its own project root from. The launcher
+at `/app/bin/edcolonisationasst` sets `PYTHONPATH`, the Qt plugin paths and:
+
+- `EDCA_PROJECT_ROOT`, because inside the sandbox `sys.argv[0]` is the launcher
+  rather than the staged directory, so the tray cannot find the icon by
+  guessing.
+- `RESOURCE_NAME`, which is the instance half of `WM_CLASS` on X11. Qt derives
+  it from the executable when it is unset. In here the executable is
+  `python3`.
+
+`/app` is read-only, so everything EDCA writes goes to the per-user data
+directory instead: see
+[`user_data.py`](backend/src/utils/user_data.py) and section 2.5 of
+[ARCHITECTURE_2_frontend_and_runtime.md](ARCHITECTURE_2_frontend_and_runtime.md).
+
+### Testing it
+
+Nothing about the Flatpak can be verified from Windows beyond shell syntax and
+the generated files, so the first build on a Linux machine is where surprises
+belong. Worth checking beyond "it starts":
+
+1. The tray icon appears. If it does not, the control window should have
+   appeared in its place, which is the tray-availability fallback working.
+2. The dock shows one entry rather than two, which is the desktop identity
+   matching.
+3. Saving a journal directory on the Settings page succeeds, which is the
+   writable-path work.
 
 ---
 
@@ -368,7 +476,7 @@ What it needs is short:
 - **Python 3.11 or newer.** That is the floor `backend/pyproject.toml` declares.
   The convenience scripts still say 3.10 in their prompts, which is older than
   the package metadata allows.
-- **Node 18 or newer, only to build the front end.** Set
+- **Node 20.19 or newer, only to build the front end.** Set
   `EDCA_SKIP_FRONTEND_BUILD=1` against a prebuilt `frontend/dist` and Node is
   not needed at all.
 - **A browser**, because the UI is a web page rather than a window.
@@ -390,10 +498,13 @@ appears the app is still running and still completely usable. Open
 `http://127.0.0.1:47021/app/` and bookmark it. Nothing is lost but the
 convenience of the menu.
 
-Be aware that nothing currently tells you which case you are in. EDCA does not
-ask the desktop whether it draws a tray, so on a session without a watcher the
-icon simply does not appear and no message explains why. Knowing the URL is the
-whole workaround.
+The packaged runtime asks rather than assuming. `TrayUIController` calls
+`QSystemTrayIcon.isSystemTrayAvailable()` when it is built. Where the answer
+is no it shows a small control window instead, carrying the same Open Web UI,
+the same Help menu and the same Exit, plus a line saying why it is there.
+Closing that window is the same request as pressing Exit. Running from source
+through `run-edca-built.sh` takes the no-Qt path below and has no tray at all,
+by design.
 
 If the splash or the tray behave oddly under Wayland, forcing the X11 path
 through XWayland is the first thing to try:
@@ -460,7 +571,8 @@ The Start Menu / Desktop shortcuts point at `EDColonisationAsst.exe`, which:
 - Serves the bundled frontend at `http://127.0.0.1:47021/app/` and opens the
   browser only once both the health endpoint and the web UI respond.
 - Provides a tray icon with Open Web UI, a Help submenu (About plus
-  Check for Updates) and Exit.
+  Check for Updates) and Exit. Where the desktop reports no system tray,
+  a small control window carrying the same actions appears instead.
 - Started with `--no-browser` (login autostart), it stays silent: no splash
   and no browser.
 

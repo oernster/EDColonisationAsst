@@ -117,7 +117,8 @@ backend/
 │       ├── logger.py                  # Logging configuration and helpers
 │       ├── ports.py                   # Probing and choosing a bindable port
 │       ├── windows.py                 # Windows-only helpers
-│       └── runtime.py                 # Frozen/runtime detection helpers
+│       ├── user_data.py               # Where the app may write its own files
+│       └── runtime.py                 # Mode, sandbox and packaged detection
 └── tests/
     ├── unit/                          # Unit and integration-style tests
     └── conftest.py                    # Shared pytest fixtures
@@ -151,7 +152,7 @@ On startup, the lifespan context manager `lifespan(app)`:
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
    - **First run (empty DB):** [`prime_colonisation_database_if_empty`](backend/src/services/startup_ingestion.py:1) walks all `Journal.*.log` files via [`JournalFileHandler._process_file`](backend/src/services/journal_ingestion.py:153) to backfill history once. It runs while the UI is already available; the change‑bus bump on completion drives the long‑poll UI to refetch and populate progressively.
-   - **Repeat run (persisted DB under `%LOCALAPPDATA%`):** only a bounded tail sync ([`sync_latest_journals_best_effort`](backend/src/services/startup_ingestion.py:1), newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
+   - **Repeat run (persisted DB in the per-user data directory):** only a bounded tail sync ([`sync_latest_journals_best_effort`](backend/src/services/startup_ingestion.py:1), newest few files). The full history is already persisted; live changes are handled by watchdog and polling, so re‑scanning everything on every launch is unnecessary.
 
 5. Configures the `FileWatcher`:
 
@@ -169,7 +170,14 @@ Everything in this section lives in [`colonisation_db.py`](backend/src/repositor
 The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repositories/colonisation_db.py:42), which chooses:
 
 - **Dev mode** (non‑frozen): `backend/src/colonisation.db`, derived from that module's own location
-- **Frozen/packaged runtime**: `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows or `~/.edcolonisationasst/colonisation.db` on POSIX.
+- **Packaged runtime** (a frozen EXE or a Flatpak): the per-user data
+  directory that [`user_data.py`](backend/src/utils/user_data.py:1) reports.
+  `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows;
+  `$XDG_DATA_HOME/EDColonisationAsst/colonisation.db` elsewhere, falling
+  back to `~/.local/share`. Inside a Flatpak the sandbox points
+  `XDG_DATA_HOME` at its own writable directory, so no sandbox-specific
+  branch is needed. The predicate is `is_packaged()`, not `is_frozen()`:
+  a Flatpak is not frozen and must still not write into a read-only `/app`.
 
 To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationDatabase`](backend/src/repositories/colonisation_db.py:75):
 
@@ -430,7 +438,7 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
   - `prime_colonisation_database_if_empty(...)` runs once, in a background task scheduled during startup (see section 3.1), so it never blocks server readiness.
   - It uses `JournalFileHandler._process_file` to ingest all historical `Journal.*.log` files, bumping the change bus so the UI populates progressively.
 
-- **Repeat launch / non‑empty DB:**
+- **Repeat launch / non-empty DB:**
   - Only a bounded tail sync (`sync_latest_journals_best_effort`) runs in the background; the persisted DB already holds prior history.
   - The watcher is started with `process_existing=False`, so no full re‑scan happens on the readiness path.
 

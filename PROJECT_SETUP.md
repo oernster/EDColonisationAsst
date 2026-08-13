@@ -12,12 +12,14 @@ workflows), [TESTING.md](TESTING.md) (test suites and the coverage gate),
 
 ### Backend
 
-- Python 3.13+ (3.12 remains a supported fallback)
+- Python 3.11 or newer, the floor `backend/pyproject.toml` declares.
+  The Windows release is built on 3.13 and the Flatpak runtime ships it
 - Virtual environment support (`python -m venv` or `uv venv`)
 
 ### Frontend
 
-- Node.js 18+ with npm
+- Node.js 20.19+ with npm (the floor Vite declares in its own
+  `engines`; 22.12+ also qualifies)
 - A modern web browser
 
 ### Windows release builds only
@@ -57,6 +59,8 @@ EDColonisationAsst/
 ├── .flake8                   # flake8 at 88, matching black
 ├── buildexe.py               # Windows runtime EXE build (Nuitka)
 ├── buildinstaller.py         # Windows GUI installer build (Nuitka)
+├── build_flatpak.sh          # Linux Flatpak build (offline wheels)
+├── cleanup_flatpak.sh        # Removes what build_flatpak.sh produced
 ├── generate_icons.py         # Every icon and the site's social card, from one master
 ├── installer_main.py         # Setup program entry point (Nuitka compiles this)
 ├── installer/                # The setup program, a separate PySide6 application
@@ -71,6 +75,7 @@ EDColonisationAsst/
 │   ├── tests/unit/           # pytest suite (100% gate; see TESTING.md)
 │   ├── config.yaml           # non-sensitive backend config
 │   ├── requirements.txt      # runtime dependencies
+│   ├── requirements-flatpak.txt # runtime dependencies for the sandbox
 │   ├── requirements-dev.txt  # dev/build dependencies (incl. Nuitka)
 │   ├── pytest.ini            # backend-only pytest + coverage gate configuration
 │   └── pyproject.toml        # black/isort/coverage configuration

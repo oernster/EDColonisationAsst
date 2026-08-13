@@ -244,7 +244,12 @@ The runtime code lives under [`backend/src/runtime`](backend/src/runtime:1) and 
 
 - **POSIX**:
   - Lock file under one of:
-    - `$XDG_RUNTIME_DIR/edca`
+    - `$XDG_RUNTIME_DIR/app/$FLATPAK_ID` inside a Flatpak. Flatpak gives
+      each instance its own `$XDG_RUNTIME_DIR`, so a lock placed directly
+      in it is invisible to the next launch and both instances acquire.
+      That subdirectory is the one directory the sandbox shares between
+      instances, which is what makes the lock mutual.
+    - `$XDG_RUNTIME_DIR/edca` outside one
     - `$XDG_CACHE_HOME/EDColonisationAsst`
     - `~/.cache/EDColonisationAsst`
   - Uses `fcntl.flock` for non‑blocking exclusive locks.
@@ -326,7 +331,10 @@ In DEV mode, this is the simplest way to start both backend and frontend with he
   - Configures system tray icon and an Exit action.
   - Logs to:
     - `<install-root>/run-edca.log`
-    - `%LOCALAPPDATA%\EDColonisationAsst\run-edca.log` on Windows.
+    - `run-edca.log` in the per-user data directory, on every platform.
+      Inside a Flatpak that is the only one of the two that can be
+      written at all, the install root being a read-only `/app`, so it is
+      what explains a sandbox that fails to start.
 
 [`tray_app.py`](backend/src/tray_app.py:1) is the thin entrypoint:
 
@@ -502,7 +510,18 @@ On Windows, a Nuitka/EXE‑based runtime:
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:
   - Additional launches open the existing browser UI rather than starting a new backend.
 
-On Linux, the helper script [`run-edca-built.sh`](run-edca-built.sh:1) starts the backend with production settings and (if desired) serves the built frontend from `frontend/dist`. It remains valid with the runtime and single‑instance design above.
+On Linux there are two routes. [`build_flatpak.sh`](build_flatpak.sh:1)
+packages the source tree against `org.freedesktop.Platform//25.08`, where
+the sandbox provides the interpreter and the dependencies, so the runtime
+takes the packaged path (in-process uvicorn behind a tray icon) exactly as
+the frozen Windows build does. `get_runtime_mode()` reports FROZEN inside a
+sandbox for that reason: the distinction the modes draw is whether the
+dependencies are installed and the layout fixed, not whether Nuitka
+compiled anything. [`cleanup_flatpak.sh`](cleanup_flatpak.sh:1) reverses it.
+
+The helper script [`run-edca-built.sh`](run-edca-built.sh:1) is the other
+route: it starts the backend from the checkout and serves the built
+frontend from `frontend/dist`, taking the DEV path with no tray at all.
 
 It is one script rather than one per distribution. The package manager is detected at runtime and used only to phrase install hints, so the executable path is identical everywhere and cannot drift between distributions the way five hand-maintained copies did.
 

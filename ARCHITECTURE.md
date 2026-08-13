@@ -117,7 +117,8 @@ That document focuses on:
   - `ApplicationInstanceLock` and single-instance behaviour.
   - Dev launcher window and tray controller.
   - Packaged/frozen runtime (in-process uvicorn + Qt tray).
-- Deployment and helper scripts for running EDCA on different platforms.
+- Deployment on each platform: the frozen Windows runtime, the Flatpak
+  build and the run-from-source helper scripts.
 - Frontend and runtime tests.
 
 These two files are the authoritative, up-to-date references for how EDCA works internally.

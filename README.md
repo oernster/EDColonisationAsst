@@ -43,10 +43,10 @@ or a tablet on the same network as their HUD.
 
 It is not for you if you want squadron-wide or shared tracking: Elite Dangerous
 writes journals per player on the local machine, so EDCA can only ever see your
-own contributions and does not pretend otherwise. It is also Windows-only as a
-packaged release (a source checkout runs on Linux; see
-[Run from source on Linux](#run-from-source-on-linux)); it does nothing at all
-when the game is not writing journals.
+own contributions and does not pretend otherwise. Windows is the only platform
+with a downloadable installer; on Linux you build a Flatpak from a checkout
+(see [Install and run on Linux](#install-and-run-on-linux)) or run from source.
+It does nothing at all when the game is not writing journals.
 
 ---
 
@@ -110,6 +110,49 @@ start it from yourself, rather than closing on a launch that never happened.
 To remove EDCA, use **Apps & features** (Add/Remove Programs) rather than the
 downloaded installer. That is the registered uninstaller; it cleans up the
 install directory, the shortcuts and the sign-in entry.
+
+---
+
+## Install and run on Linux
+
+There is no downloadable Linux package. You build a Flatpak from a checkout,
+which needs `git`, `python3` and `node`:
+
+```bash
+git clone https://github.com/oernster/EDColonisationAsst.git
+cd EDColonisationAsst
+./build_flatpak.sh
+```
+
+The script installs `flatpak` and `flatpak-builder` if they are missing, builds
+the front end, downloads the Python wheels on your machine and installs them
+inside the sandbox with no network access, then installs the result and writes
+`edcolonisationasst.flatpak` for copying to another machine. Run it with
+`flatpak run uk.co.oernster.EDColonisationAsst` or from your applications menu.
+
+`./cleanup_flatpak.sh` removes everything the build produced and uninstalls the
+app; pass `--purge-data` to delete your colonisation database and settings too,
+which it will not do otherwise.
+
+EDCA's own files live under `~/.var/app/uk.co.oernster.EDColonisationAsst`
+rather than inside the installed application, so an upgrade leaves your
+database and your journal-directory setting where they are.
+
+The sandbox is granted four things:
+
+- your home directory, because the journal lives inside the game's Wine or
+  Proton prefix
+- read-only access to a Flatpak Steam's own directory, which
+  `--filesystem=home` deliberately excludes and where Proton prefixes live on
+  that very common setup
+- the network, because the interface is a web page you open in a browser,
+  possibly from a tablet on the same network
+- the ability to talk to your desktop's tray-icon service
+
+You do not have to package it at all: see
+[Run from source on Linux](#run-from-source-on-linux) below. For what to do on a
+distribution where PySide6 is awkward, plus the build itself, see
+[DEVELOPMENT-README.md](DEVELOPMENT-README.md).
 
 ---
 
@@ -277,8 +320,8 @@ browsers block it otherwise.
 
 ## Run from source on Linux
 
-There is no packaged Linux release. To run EDCA from a local checkout, use the
-helper script from the project root:
+If you would rather not package it at all, EDCA runs straight from a checkout.
+Use the helper script from the project root:
 
 ```bash
 chmod +x ./run-edca-built.sh

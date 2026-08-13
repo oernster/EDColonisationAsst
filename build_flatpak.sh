@@ -250,6 +250,20 @@ for size in SIZES:
 print(f"  {len(SIZES)} icon sizes written from {MASTER} ({master.width}px master)")
 PYICONS
 
+# ── Build identifier ──────────────────────────────────────────────────────────
+# The manifest stages BUILD_ID beside VERSION, because the app reports both from
+# its health endpoint. BUILD_ID is gitignored and is normally written by
+# buildexe.py, which only ever runs on Windows, so a Linux checkout does not have
+# one and flatpak-builder fails resolving the source rather than warning. It is
+# written here in the same shape buildexe.py uses: a UTC timestamp and the short
+# git SHA, with the same nogit fallback outside a repository.
+section "Writing BUILD_ID"
+build_stamp=$(date -u +%Y%m%dT%H%M%SZ)
+build_sha=$(git rev-parse --short HEAD 2>/dev/null || true)
+[[ -n "${build_sha}" ]] || build_sha="nogit"
+echo "${build_stamp}-${build_sha}" > BUILD_ID
+echo "  BUILD_ID: $(cat BUILD_ID)"
+
 # ── Packaging helpers ─────────────────────────────────────────────────────────
 section "Writing packaging helpers"
 mkdir -p packaging

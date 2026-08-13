@@ -129,6 +129,9 @@ the front end, downloads the Python wheels on your machine and installs them
 inside the sandbox with no network access, then installs the result and writes
 `edcolonisationasst.flatpak` for copying to another machine. Run it with
 `flatpak run uk.co.oernster.EDColonisationAsst` or from your applications menu.
+The package managers that install step covers, plus what to do on a
+distribution outside them, are described in
+[DEVELOPMENT-README.md](DEVELOPMENT-README.md).
 
 `./cleanup_flatpak.sh` removes everything the build produced and uninstalls the
 app; pass `--purge-data` to delete your colonisation database and settings too,

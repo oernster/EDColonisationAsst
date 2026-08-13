@@ -1,0 +1,30 @@
+# Runtime dependencies for the Flatpak build.
+#
+# This mirrors requirements.txt with two deliberate differences, both forced by
+# the sandbox rather than chosen:
+#
+# 1. nuitka and shiboken6 are absent. Nuitka builds the Windows executable and
+#    is never imported at runtime, so shipping it would add a compiler toolchain
+#    to every install for nothing. shiboken6 arrives as a dependency of pyside6
+#    and does not need naming twice.
+#
+# 2. pyyaml is 6.0.3 rather than 6.0.1. The freedesktop 25.08 runtime ships
+#    Python 3.13 and PyYAML 6.0.1 published no wheel for it, not even a pure
+#    Python one, so the offline wheel download fails outright rather than
+#    falling back. 6.0.3 is the version the Windows build already resolves to.
+#
+# Everything below is downloaded as a wheel on the host and installed inside the
+# sandbox with --no-index, so the build never reaches the network.
+
+aiofiles==23.2.1
+fastapi==0.104.1
+httpx==0.25.2
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+pyside6
+python-dotenv
+python-multipart==0.0.6
+pyyaml==6.0.3
+uvicorn[standard]==0.24.0
+watchdog==3.0.0
+websockets==12.0

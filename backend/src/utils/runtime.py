@@ -12,8 +12,14 @@ imported from anywhere in the backend.
 from __future__ import annotations
 
 from enum import Enum, auto
+import os
 from pathlib import Path
 import sys
+
+# Set by flatpak inside the sandbox, naming the running application. This is the
+# one place the sandbox is detected; the runtime stack reaches it through
+# runtime.common.
+_ENV_FLATPAK_ID = "FLATPAK_ID"
 
 
 class RuntimeMode(Enum):
@@ -58,14 +64,32 @@ def is_frozen() -> bool:
     return False
 
 
+def is_flatpak() -> bool:
+    """
+    Return True if the current process is running inside a flatpak sandbox.
+
+    Flatpak sets ``FLATPAK_ID`` in the sandbox, naming the application being
+    run. Nothing else sets it, so its presence is a reliable answer.
+    """
+    return bool(os.environ.get(_ENV_FLATPAK_ID))
+
+
 def get_runtime_mode() -> RuntimeMode:
     """
     Determine the current runtime mode.
 
+    A flatpak reports the packaged mode despite not being frozen, because the
+    distinction the modes actually draw is not "compiled by Nuitka" but
+    "dependencies already installed and the layout already fixed". Both hold
+    inside the sandbox: it ships its own Python and every requirement; ``/app``
+    is read-only. Development mode would be actively wrong there, since it
+    builds a virtual environment and starts the backend and the front end as
+    separate processes, none of which a sandbox can or should do.
+
     Returns
     -------
     RuntimeMode
-        ``RuntimeMode.FROZEN`` when running inside a frozen executable,
-        otherwise ``RuntimeMode.DEV``.
+        ``RuntimeMode.FROZEN`` when running inside a frozen executable or a
+        flatpak, otherwise ``RuntimeMode.DEV``.
     """
-    return RuntimeMode.FROZEN if is_frozen() else RuntimeMode.DEV
+    return RuntimeMode.FROZEN if is_frozen() or is_flatpak() else RuntimeMode.DEV

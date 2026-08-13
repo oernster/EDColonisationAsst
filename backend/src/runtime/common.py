@@ -60,7 +60,7 @@ try:
     try:
         from ..main import app as fastapi_app  # type: ignore[import-not-found]
         from ..utils.logger import get_logger, setup_logging
-        from ..utils.runtime import RuntimeMode, get_runtime_mode
+        from ..utils.runtime import RuntimeMode, get_runtime_mode, is_flatpak
     except ImportError:
         # The relative form fails only when this module is executed as a
         # top-level script, which the frozen Nuitka onefile build does. That
@@ -74,6 +74,7 @@ try:
         from backend.src.utils.runtime import (  # type: ignore[import-error]
             RuntimeMode,
             get_runtime_mode,
+            is_flatpak,
         )
 except Exception as exc:  # pragma: no cover
     _debug_log(
@@ -103,6 +104,7 @@ __all__ = [
     "fastapi_app",
     "get_logger",
     "get_runtime_mode",
+    "is_flatpak",
     "logger",
     "setup_logging",
 ]

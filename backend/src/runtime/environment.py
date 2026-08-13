@@ -17,10 +17,11 @@ while the bulk of the environment logic is shared with
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import sys
 
-from .common import RuntimeMode, get_runtime_mode
+from .common import RuntimeMode, get_runtime_mode, is_flatpak
 
 try:
     from ..constants import (  # type: ignore[import-not-found]
@@ -49,6 +50,45 @@ except ImportError:
 RECORDED_PORT_FILENAME = "runtime-port"
 
 _LOOPBACK_HOST = "127.0.0.1"
+
+# Where the flatpak launcher states the staged application directory. Inside the
+# sandbox sys.argv[0] is the launcher in /app/bin, which is not where the
+# frontend bundle and the icons live, so the root is stated rather than guessed.
+_ENV_PROJECT_ROOT = "EDCA_PROJECT_ROOT"
+# Per-user writable location. Flatpak points this at the application's own data
+# directory under ~/.var/app, which is one of the few places the sandbox may
+# write; outside a sandbox it is the ordinary XDG data location.
+_ENV_XDG_DATA_HOME = "XDG_DATA_HOME"
+
+
+def _writable_state_dir(project_root: Path) -> Path:
+    """Return a directory the runtime may write its own small state into.
+
+    Beside the application is right everywhere it is writable, which covers the
+    Windows install directory and a source checkout, keeping the recorded port
+    next to the runtime log that explains it.
+
+    A flatpak is the exception: /app is mounted read-only, so the same choice
+    would silently fail to record the port and every run would have to rediscover
+    it. There the per-user data directory is used instead, which the sandbox
+    grants and which survives the application being updated.
+    """
+    if not is_flatpak():
+        return project_root
+
+    data_home = os.environ.get(_ENV_XDG_DATA_HOME)
+    if data_home:
+        state_dir = Path(data_home)
+    else:
+        state_dir = Path.home() / ".local" / "share"
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Recording the port is a convenience, never a precondition: the next
+        # run rediscovers it. A state directory that cannot be made must not
+        # stop the application starting.
+        return project_root
+    return state_dir
 
 
 def _configured_server(attribute: str, fallback: str | int) -> str | int:
@@ -129,9 +169,11 @@ class RuntimeEnvironment:
         """Where the port actually being served is recorded.
 
         Beside the runtime log in the install directory, so a second instance
-        and the next run can both find it without reading configuration.
+        and the next run can both find it without reading configuration. Inside
+        a flatpak that directory is read-only, so the per-user data directory is
+        used instead; see _writable_state_dir().
         """
-        return self.project_root / RECORDED_PORT_FILENAME
+        return _writable_state_dir(self.project_root) / RECORDED_PORT_FILENAME
 
     @property
     def icon_path(self) -> Path:
@@ -184,7 +226,13 @@ class RuntimeEnvironment:
         """
         mode = get_runtime_mode()
 
-        if mode is RuntimeMode.FROZEN:
+        stated_root = os.environ.get(_ENV_PROJECT_ROOT)
+        if stated_root:
+            # The flatpak launcher states this, because inside the sandbox
+            # sys.argv[0] is a launcher in /app/bin rather than the directory
+            # holding the frontend bundle and the icons.
+            project_root = Path(stated_root)
+        elif mode is RuntimeMode.FROZEN:
             try:
                 project_root = Path(sys.argv[0]).resolve().parent
             except (OSError, TypeError, ValueError):
@@ -194,5 +242,7 @@ class RuntimeEnvironment:
         else:
             project_root = Path(__file__).resolve().parents[2]
 
-        port = resolve_backend_port(project_root / RECORDED_PORT_FILENAME)
+        port = resolve_backend_port(
+            _writable_state_dir(project_root) / RECORDED_PORT_FILENAME
+        )
         return cls(mode=mode, project_root=project_root, backend_port=port)

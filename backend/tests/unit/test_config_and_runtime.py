@@ -19,8 +19,11 @@ import src as backend_pkg
 # ---------------------------------------------------------------------------
 
 
-def test_runtime_is_frozen_false_by_default():
+def test_runtime_is_frozen_false_by_default(monkeypatch):
     """Default environment (no sys.frozen, python.exe argv[0]) is treated as DEV."""
+    # Cleared so the answer does not depend on where the suite is being run
+    # from: inside a flatpak the mode is deliberately not DEV.
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
     orig_frozen = getattr(sys, "frozen", None)
     orig_argv0 = sys.argv[0]
     try:
@@ -50,6 +53,42 @@ def test_runtime_is_frozen_when_sys_frozen_flag():
     finally:
         if orig_frozen is not None:
             sys.frozen = orig_frozen  # type: ignore[attr-defined]
+        elif hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+
+
+def test_runtime_reports_no_flatpak_when_the_variable_is_absent(monkeypatch):
+    """Outside a sandbox nothing claims a flatpak."""
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+
+    assert runtime_mod.is_flatpak() is False
+
+
+def test_runtime_treats_a_flatpak_as_the_packaged_mode(monkeypatch):
+    """Inside a flatpak the mode is packaged even though nothing is frozen.
+
+    The distinction the modes draw is not "compiled by Nuitka" but
+    "dependencies already installed and layout already fixed"; a sandbox
+    satisfies both. Development mode would build a virtual environment and
+    start the backend and front end as separate processes, which is exactly
+    what must not happen inside a read-only sandbox that already ships every
+    dependency.
+    """
+    monkeypatch.setenv("FLATPAK_ID", "uk.co.oernster.EDColonisationAsst")
+    orig_frozen = getattr(sys, "frozen", None)
+    orig_argv0 = sys.argv[0]
+    try:
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+        sys.argv[0] = str(Path(sys.executable))
+
+        assert runtime_mod.is_frozen() is False
+        assert runtime_mod.is_flatpak() is True
+        assert runtime_mod.get_runtime_mode() == runtime_mod.RuntimeMode.FROZEN
+    finally:
+        sys.argv[0] = orig_argv0
+        if orig_frozen is not None:
+            setattr(sys, "frozen", orig_frozen)
         elif hasattr(sys, "frozen"):
             delattr(sys, "frozen")
 

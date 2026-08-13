@@ -24,6 +24,15 @@ import sys
 from .common import RuntimeMode, get_runtime_mode, is_flatpak
 
 try:
+    from ..utils.user_data import user_data_dir  # type: ignore[import-not-found]
+except ImportError:
+    # The relative form fails only when this module runs as a top-level script,
+    # which the frozen build does, exactly as for the imports below.
+    from backend.src.utils.user_data import (  # type: ignore[import-error]
+        user_data_dir,
+    )
+
+try:
     from ..constants import (  # type: ignore[import-not-found]
         BACKEND_PORT_CANDIDATES,
         DEFAULT_BACKEND_PORT,
@@ -55,10 +64,6 @@ _LOOPBACK_HOST = "127.0.0.1"
 # sandbox sys.argv[0] is the launcher in /app/bin, which is not where the
 # frontend bundle and the icons live, so the root is stated rather than guessed.
 _ENV_PROJECT_ROOT = "EDCA_PROJECT_ROOT"
-# Per-user writable location. Flatpak points this at the application's own data
-# directory under ~/.var/app, which is one of the few places the sandbox may
-# write; outside a sandbox it is the ordinary XDG data location.
-_ENV_XDG_DATA_HOME = "XDG_DATA_HOME"
 
 
 def _writable_state_dir(project_root: Path) -> Path:
@@ -76,11 +81,7 @@ def _writable_state_dir(project_root: Path) -> Path:
     if not is_flatpak():
         return project_root
 
-    data_home = os.environ.get(_ENV_XDG_DATA_HOME)
-    if data_home:
-        state_dir = Path(data_home)
-    else:
-        state_dir = Path.home() / ".local" / "share"
+    state_dir = user_data_dir()
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
     except OSError:

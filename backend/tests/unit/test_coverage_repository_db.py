@@ -42,32 +42,42 @@ from tests.unit._test_coverage_repository_support import (
 
 
 def test_resolve_db_file_dev_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """In dev mode the DB lives inside the source tree, beside the packages."""
-    monkeypatch.setattr(db_mod, "is_frozen", lambda: False)
+    """In a source checkout the DB lives in the tree, beside the packages."""
+    monkeypatch.setattr(db_mod, "is_packaged", lambda: False)
 
     expected = Path(db_mod.__file__).parent.parent / "colonisation.db"
     assert resolve_db_file() == expected
 
 
-def test_resolve_db_file_frozen_with_localappdata(
+def test_resolve_db_file_packaged_with_localappdata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In frozen mode the DB lives under LOCALAPPDATA when it is set."""
-    monkeypatch.setattr(db_mod, "is_frozen", lambda: True)
+    """A packaged build on Windows keeps the DB under LOCALAPPDATA.
+
+    This is the path an existing installation already uses, so it is asserted
+    directly rather than through the helper: the helper changing must not move
+    a commander's database.
+    """
+    monkeypatch.setattr(db_mod, "is_packaged", lambda: True)
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     expected = tmp_path / "EDColonisationAsst" / "colonisation.db"
     assert resolve_db_file() == expected
 
 
-def test_resolve_db_file_frozen_without_localappdata(
-    monkeypatch: pytest.MonkeyPatch,
+def test_resolve_db_file_packaged_uses_the_xdg_data_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without LOCALAPPDATA the frozen DB falls back to the home directory."""
-    monkeypatch.setattr(db_mod, "is_frozen", lambda: True)
-    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    """Off Windows the DB follows XDG, which is what a flatpak needs.
 
-    expected = Path.home() / ".edcolonisationasst" / "colonisation.db"
+    Inside the sandbox the source tree is a read-only /app, so the packaged
+    branch has to be taken and has to land somewhere writable.
+    """
+    monkeypatch.setattr(db_mod, "is_packaged", lambda: True)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+
+    expected = tmp_path / "EDColonisationAsst" / "colonisation.db"
     assert resolve_db_file() == expected
 
 

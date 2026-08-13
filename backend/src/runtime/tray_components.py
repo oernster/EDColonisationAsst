@@ -60,6 +60,14 @@ except ImportError:
         default_update_check,
     )
 
+try:
+    from ..utils.user_data import user_data_dir  # type: ignore[import-not-found]
+except ImportError:
+    # As above.
+    from backend.src.utils.user_data import (  # type: ignore[import-error]
+        user_data_dir,
+    )
+
 
 APP_NAME = "Elite: Dangerous Colonisation Assistant"
 
@@ -176,9 +184,11 @@ class TrayController:
         - The same run-edca.log used by run-edca.bat in the install root.
 
         Secondary target (best-effort):
-        - A user-local log under %LOCALAPPDATA%\\EDColonisationAsst\\run-edca.log
-          to avoid any filesystem virtualisation / permission issues writing
-          directly into Program Files.
+        - A user-local log under the per-user data directory, to avoid any
+          filesystem virtualisation or permission issues writing directly into
+          Program Files. Inside a flatpak this is the only one of the two that
+          can be written at all, since the primary target sits under a read-only
+          /app, so it is what explains a sandbox that fails to start.
         """
         # Primary: install root next to run-edca.bat
         try:
@@ -191,13 +201,11 @@ class TrayController:
 
         # Secondary: user-local log that should always be writable.
         try:
-            local_base = os.environ.get("LOCALAPPDATA")
-            if local_base:
-                user_log_dir = Path(local_base) / "EDColonisationAsst"
-                user_log_dir.mkdir(parents=True, exist_ok=True)
-                user_log = user_log_dir / "run-edca.log"
-                with user_log.open("a", encoding="utf-8") as f:
-                    f.write(message + "\n")
+            user_log_dir = user_data_dir()
+            user_log_dir.mkdir(parents=True, exist_ok=True)
+            user_log = user_log_dir / "run-edca.log"
+            with user_log.open("a", encoding="utf-8") as f:
+                f.write(message + "\n")
         except Exception:  # noqa: BLE001, S110
             # Ignore all errors here as well.
             pass

@@ -93,3 +93,22 @@ def get_runtime_mode() -> RuntimeMode:
         flatpak, otherwise ``RuntimeMode.DEV``.
     """
     return RuntimeMode.FROZEN if is_frozen() or is_flatpak() else RuntimeMode.DEV
+
+
+def is_packaged() -> bool:
+    """
+    Return True when the application runs from a packaged layout.
+
+    This is the question every module asks before deciding where to keep a file
+    it writes. A packaged layout ships its own dependencies at a fixed location
+    that the application must not write into, so its data belongs in the
+    per-user directory :func:`utils.user_data.user_data_dir` reports. A source
+    checkout is the opposite case: the tree is the developer's own and keeping
+    derived files beside the packages that use them is what makes a checkout
+    self-contained.
+
+    It is the runtime mode asked as a yes or no question rather than a second
+    detection, so a runtime that counts as packaged counts as packaged
+    everywhere at once.
+    """
+    return get_runtime_mode() is RuntimeMode.FROZEN

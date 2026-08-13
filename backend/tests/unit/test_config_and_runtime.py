@@ -112,6 +112,63 @@ def test_runtime_is_frozen_for_non_python_exe_path():
             delattr(sys, "frozen")
 
 
+def test_runtime_reports_not_packaged_in_a_source_checkout(monkeypatch):
+    """A checkout keeps its derived files beside the packages that use them."""
+    monkeypatch.delenv("FLATPAK_ID", raising=False)
+    orig_frozen = getattr(sys, "frozen", None)
+    orig_argv0 = sys.argv[0]
+    try:
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+        sys.argv[0] = str(Path(sys.executable))
+
+        assert runtime_mod.is_packaged() is False
+    finally:
+        sys.argv[0] = orig_argv0
+        if orig_frozen is not None:
+            setattr(sys, "frozen", orig_frozen)
+        elif hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+
+
+def test_runtime_reports_packaged_when_frozen():
+    """A frozen executable writes to the per-user directory, not beside itself."""
+    orig_frozen = getattr(sys, "frozen", None)
+    try:
+        sys.frozen = True  # type: ignore[attr-defined]
+        assert runtime_mod.is_packaged() is True
+    finally:
+        if orig_frozen is not None:
+            sys.frozen = orig_frozen  # type: ignore[attr-defined]
+        elif hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+
+
+def test_runtime_reports_packaged_inside_a_flatpak(monkeypatch):
+    """The sandbox counts as packaged without being frozen.
+
+    This is the case the whole predicate exists for: nothing is frozen, so the
+    older is_frozen() question answered no and every writable path fell back to
+    the source tree, which inside the sandbox is a read-only /app.
+    """
+    monkeypatch.setenv("FLATPAK_ID", "uk.co.oernster.EDColonisationAsst")
+    orig_frozen = getattr(sys, "frozen", None)
+    orig_argv0 = sys.argv[0]
+    try:
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+        sys.argv[0] = str(Path(sys.executable))
+
+        assert runtime_mod.is_frozen() is False
+        assert runtime_mod.is_packaged() is True
+    finally:
+        sys.argv[0] = orig_argv0
+        if orig_frozen is not None:
+            setattr(sys, "frozen", orig_frozen)
+        elif hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+
+
 # ---------------------------------------------------------------------------
 # Config path and loading tests (src/config.py)
 # ---------------------------------------------------------------------------

@@ -158,6 +158,27 @@ def test_get_config_paths_frozen_argv_error_falls_back_to_source_layout(
     assert commander_path == expected_base / "commander.yaml"
 
 
+def test_get_config_paths_inside_a_flatpak_uses_the_user_config_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A sandbox writes its configuration where it is allowed to write.
+
+    Saving the journal directory rewrites config.yaml. Inside a flatpak both of
+    the other candidates sit under a read-only /app, so the save would fail on
+    the one setting a Linux user has to change.
+    """
+    monkeypatch.setenv("FLATPAK_ID", "uk.co.oernster.EDColonisationAsst")
+    _pin_concrete_path(monkeypatch)
+    monkeypatch.setattr(config_mod.os, "name", "posix", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    config_path, commander_path = config_mod.get_config_paths()
+
+    expected_base = tmp_path / "EDColonisationAsst"
+    assert config_path == expected_base / "config.yaml"
+    assert commander_path == expected_base / "commander.yaml"
+
+
 # ---------------------------------------------------------------------------
 # get_config defensive branches
 # ---------------------------------------------------------------------------

@@ -23,9 +23,8 @@ def _default_journal_directory() -> str:
     that could not exist on any machine. Detection has always been available;
     it simply was not used here.
 
-    The import is deliberately late. utils/__init__ pulls in the logger, and
-    the logger imports this module, so importing it at the top would be
-    circular.
+    The import is deliberately late. utils/__init__ pulls in the logger and the
+    logger imports this module, so importing it at the top would be circular.
     """
     from .utils.journal import find_journal_directory
 
@@ -160,8 +159,21 @@ def get_config_paths() -> tuple[Path, Path]:
     - In the packaged (frozen) runtime we store configuration alongside
       the installed executable so that the DB, logs and config all live
       under the single install directory (e.g. AppData\\Local\\EDColonisationAssistant).
+
+    - Inside a flatpak neither of those is writable: the staged application
+      lives under a read-only ``/app``. Saving the journal directory is the one
+      setting the user must change, so it goes to the per-user configuration
+      directory, which the sandbox points at its own writable location.
     """
-    if _is_frozen():
+    # Late for the same reason as the import in _default_journal_directory: a
+    # top-level import of anything under utils would be circular. By call time
+    # utils is fully imported. This is what keeps one definition of the sandbox
+    # test rather than a second local mirror like _is_frozen above.
+    from .utils.runtime import is_flatpak
+
+    if is_flatpak():
+        base_dir = _get_user_config_dir()
+    elif _is_frozen():
         # Directory containing the running EXE (install root when packaged).
         try:
             base_dir = Path(sys.argv[0]).resolve().parent

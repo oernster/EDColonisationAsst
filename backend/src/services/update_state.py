@@ -13,17 +13,15 @@ British spelling is used in comments. No em dashes appear anywhere.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from ..utils.logger import get_logger
-from ..utils.runtime import is_frozen
+from ..utils.runtime import is_packaged
+from ..utils.user_data import user_data_dir
 
 logger = get_logger(__name__)
 
 _STATE_FILENAME = "update-state.json"
-_FROZEN_DIR_NAME = "EDColonisationAsst"
-_FROZEN_FALLBACK_DIR_NAME = ".edcolonisationasst"
 _SKIPPED_KEY = "skipped_version"
 
 
@@ -35,15 +33,10 @@ def resolve_state_file() -> Path:
     directory is what makes a skip survive an upgrade replacing the install
     directory; it is also why this is not kept next to the recorded port.
     """
-    if not is_frozen():
+    if not is_packaged():
         return Path(__file__).parent.parent / _STATE_FILENAME
 
-    local_appdata = os.environ.get("LOCALAPPDATA")
-    if local_appdata:
-        base = Path(local_appdata) / _FROZEN_DIR_NAME
-    else:
-        base = Path.home() / _FROZEN_FALLBACK_DIR_NAME
-    return base / _STATE_FILENAME
+    return user_data_dir() / _STATE_FILENAME
 
 
 def _read_state(state_file: Path) -> dict[str, object]:

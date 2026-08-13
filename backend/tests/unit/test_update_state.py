@@ -28,7 +28,7 @@ from src.services.update_state import (
 def test_a_source_checkout_keeps_the_file_beside_the_packages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(update_state, "is_frozen", lambda: False)
+    monkeypatch.setattr(update_state, "is_packaged", lambda: False)
 
     path = resolve_state_file()
 
@@ -41,7 +41,7 @@ def test_a_packaged_build_keeps_the_file_under_local_appdata(
     tmp_path: Path,
 ) -> None:
     """It must outlive the install directory, which an upgrade replaces."""
-    monkeypatch.setattr(update_state, "is_frozen", lambda: True)
+    monkeypatch.setattr(update_state, "is_packaged", lambda: True)
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     path = resolve_state_file()
@@ -49,15 +49,18 @@ def test_a_packaged_build_keeps_the_file_under_local_appdata(
     assert path == tmp_path / "EDColonisationAsst" / "update-state.json"
 
 
-def test_a_packaged_build_falls_back_to_the_home_directory(
+def test_a_packaged_build_uses_the_xdg_data_directory(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    monkeypatch.setattr(update_state, "is_frozen", lambda: True)
+    """Off Windows it follows XDG, so a flatpak records the skip somewhere real."""
+    monkeypatch.setattr(update_state, "is_packaged", lambda: True)
     monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
 
     path = resolve_state_file()
 
-    assert path == Path.home() / ".edcolonisationasst" / "update-state.json"
+    assert path == tmp_path / "EDColonisationAsst" / "update-state.json"
 
 
 # ------------------------------------------------------------------- reading

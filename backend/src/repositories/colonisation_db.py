@@ -19,12 +19,12 @@ dying before the user sees a window.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import sqlite3
 
 from ..utils.logger import get_logger
-from ..utils.runtime import is_frozen
+from ..utils.runtime import is_packaged
+from ..utils.user_data import user_data_dir
 
 logger = get_logger(__name__)
 
@@ -34,8 +34,6 @@ logger = get_logger(__name__)
 CURRENT_DB_SCHEMA_VERSION = 1
 
 _DB_FILENAME = "colonisation.db"
-_FROZEN_DIR_NAME = "EDColonisationAsst"
-_FROZEN_FALLBACK_DIR_NAME = ".edcolonisationasst"
 _SCHEMA_VERSION_KEY = "db_schema_version"
 
 # Write-ahead logging lets a reader and the writer proceed without blocking
@@ -64,25 +62,20 @@ def resolve_db_file() -> Path:
       This is derived from this module's own location, so this module has to
       stay one directory below `src` for it to hold.
 
-    - In FROZEN mode (packaged EXE via Nuitka): store the DB under a
-      user-local, writable directory so it persists across runs and does
-      not live in Nuitka's temporary onefile extraction directory:
+    - In a packaged runtime (a Nuitka EXE or a flatpak): store the DB under the
+      per-user writable directory, so it persists across runs, does not live in
+      Nuitka's temporary onefile extraction directory and does not attempt a
+      write into a read-only install location:
 
-        %LOCALAPPDATA%\\EDColonisationAsst\\colonisation.db
+        %LOCALAPPDATA%\\EDColonisationAsst\\colonisation.db  (Windows)
+        $XDG_DATA_HOME/EDColonisationAsst/colonisation.db    (Linux, flatpak)
 
-      If LOCALAPPDATA is not set for any reason, fall back to the user's
-      home directory.
+      See :func:`utils.user_data.user_data_dir`, which owns that choice.
     """
-    if not is_frozen():
+    if not is_packaged():
         return Path(__file__).parent.parent / _DB_FILENAME
 
-    local_appdata = os.environ.get("LOCALAPPDATA")
-    if local_appdata:
-        base = Path(local_appdata) / _FROZEN_DIR_NAME
-    else:
-        base = Path.home() / _FROZEN_FALLBACK_DIR_NAME
-
-    return base / _DB_FILENAME
+    return user_data_dir() / _DB_FILENAME
 
 
 class ColonisationDatabase:
@@ -95,13 +88,13 @@ class ColonisationDatabase:
     connection of its own.
 
     Sharing it is what makes the first-run backfill affordable. Opening a
-    connection per query cost 8,379 opens over a real 72-file journal folder,
-    and against a WAL database each open must map the sidecar files: measured
-    end to end, the backfill went from 120 s to 15 s on the pragmas above and
-    to 3 s once the connection was shared.
+    connection per query cost 8,379 opens over a real 72-file journal folder;
+    against a WAL database each open must map the sidecar files. Measured end
+    to end, the backfill went from 120 s to 15 s on the pragmas above and to
+    3 s once the connection was shared.
 
     Thread safety: every caller runs on the asyncio event loop thread (the
-    watchdog threads hand their work to it through run_coroutine_threadsafe),
+    watchdog threads hand their work to it through run_coroutine_threadsafe)
     and the sqlite3 module reports threadsafety 3, so `check_same_thread` is
     switched off deliberately rather than accidentally.
     """

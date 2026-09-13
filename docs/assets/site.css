@@ -70,6 +70,11 @@ header.hero { text-align: center; padding: 88px 0 60px; }
 .btn.primary:hover { background: var(--accent-soft); color: #14110d; }
 .btn.ghost { background: var(--surface); color: var(--text); }
 .btn.ghost:hover { background: var(--edge); }
+/* The donate button carries artwork before its label. The mark is sized in em
+   against the button's own type; at one line box the artwork could not be read,
+   so it takes 2.7em and the button is deliberately taller than a text-only one. */
+.btn-donate { display: inline-flex; align-items: center; gap: 10px; }
+.btn-donate img { display: block; height: 2.7em; width: auto; }
 .platform-note {
   margin-top: 18px;
   font-size: 13px;

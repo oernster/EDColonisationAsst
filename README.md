@@ -401,6 +401,16 @@ If you have cloned the repository and want to build or run EDCA from source:
 
 ---
 
+## Supporting the project
+
+EDCA is free and stays free. There is no paid tier, no licence key and no
+feature held back behind a donation. If it has saved you time or simply been
+useful, a donation supports its maintenance and continued development.
+
+<a href="https://www.paypal.com/ncp/payment/H62KN85EJSYR6"><img src="docs/assets/donate.png" alt="Donate to EDCA" width="120"></a>
+
+---
+
 ## Licence
 
 EDCA is free software under the GNU Lesser General Public Licence v3.0; see

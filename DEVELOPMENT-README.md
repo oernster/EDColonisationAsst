@@ -45,6 +45,16 @@ and every backend dependency. It also:
   it into the EXE's PE metadata (product/file version, company, copyright).
 - Bundles `VERSION` and `BUILD_ID` inside the EXE.
 - Keeps all Nuitka intermediates under `build/` (gitignored).
+- Pins where the onefile runtime unpacks itself:
+  `{CACHE_DIR}/Oliver Ernster/EDColonisationAsst/{VERSION}`, one static folder
+  per version, rather than Nuitka's default of a fresh
+  `Temp\onefile_<pid>_<time>` on every launch. The default gives the unpacked
+  runtime a new path each run, so a security product that flags it cannot be
+  told to trust it: Malwarebytes quarantined `runtime_entry.dll` out of such a
+  folder during sign-in and the application did not start. A static path can be
+  excluded once; the cached contents also make later launches faster. The
+  product name is not used in the path because it carries a colon, which
+  Windows paths cannot.
 
 Output: `dist-runtime/EDColonisationAsst.exe`
 
@@ -536,7 +546,7 @@ import it, which reads as a broken package rather than as a mismatched
 assumption. The answer there is either to take Qt for Python from the
 distribution instead of from pip or to run inside an environment providing the
 conventional layout. That is a question about your distribution rather than
-about EDCA. Or, given the above, to not install it at all.
+about EDCA. Given everything above, a third answer is to not install Qt at all.
 
 Two commands tell the possible causes apart:
 

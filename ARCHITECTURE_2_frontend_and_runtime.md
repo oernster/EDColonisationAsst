@@ -505,6 +505,12 @@ On Windows, a Nuitka/EXE‑based runtime:
 
 - Uses `runtime_entry.py` as the EXE entrypoint.
 - Bundles the backend and uses in‑process uvicorn.
+- Unpacks itself into one static folder per version under the user cache
+  directory rather than into a fresh temporary folder on each launch. A onefile
+  build has to extract somewhere before it can run; a path that changes every
+  time cannot be excluded in a security product, which is how a heuristic
+  scanner came to quarantine part of the runtime during sign-in and stop the
+  application starting. The spec lives in [buildexe.py](buildexe.py:1).
 - Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:144)).
 - Presents a system tray icon from which users can open/close EDCA.
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:

@@ -105,6 +105,14 @@
     },
     {
       "@type": "Question",
+      "name": "My antivirus flagged EDCA. What is going on?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "EDCA is a single executable that unpacks itself before it runs, which heuristic scanners sometimes object to; it is not code-signed either, being free rather than commercial. The unpacked files go to one fixed folder per version under your user cache directory, so if something is quarantined you can restore it and exclude EDColonisationAsst.exe once rather than meeting the warning on every launch. The whole source is in the repository if you would rather read it before trusting it."
+      }
+    },
+    {
+      "@type": "Question",
       "name": "How do I update or uninstall EDCA?",
       "acceptedAnswer": {
         "@type": "Answer",
@@ -176,6 +184,10 @@
         <div class="card">
           <h3>Does EDCA support squadron or multiplayer colonisation?</h3>
           <p>No. Elite Dangerous journals are local to each player, so EDCA tracks your own contributions only.</p>
+        </div>
+        <div class="card">
+          <h3>My antivirus flagged EDCA. What is going on?</h3>
+          <p>EDCA is a single executable that unpacks itself before it runs, which heuristic scanners sometimes object to; it is not code-signed either, being free rather than commercial. The unpacked files go to one fixed folder per version under your user cache directory, so if something is quarantined you can restore it and exclude EDColonisationAsst.exe once rather than meeting the warning on every launch. The whole source is in the repository if you would rather read it before trusting it.</p>
         </div>
         <div class="card">
           <h3>How do I update or uninstall EDCA?</h3>

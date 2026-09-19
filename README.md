@@ -83,6 +83,12 @@ through it is. Later launches skip straight past it.
 > installer or runtime is from an unrecognised publisher. If you are unsure, you
 > can review the complete source code in this repository before choosing to run
 > the installer.
+>
+> A heuristic scanner may also object to the runtime itself, which unpacks
+> before it runs. It unpacks to one fixed folder per version, under your user
+> cache directory, so if your security software quarantines something from
+> there you can restore it and exclude `EDColonisationAsst.exe` once rather
+> than meeting the same warning after every launch.
 
 ### Upgrading and removing
 

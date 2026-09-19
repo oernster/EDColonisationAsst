@@ -54,6 +54,7 @@ PE_VERSION_PARTS = 4
 CONSOLE_MODE_RELEASE = "disable"
 CONSOLE_MODE_DEBUG = "attach"
 DEBUG_CONSOLE_ENV_VAR = "EDCA_DEBUG_CONSOLE"
+ONEFILE_TEMPDIR_SPEC = f"{{CACHE_DIR}}/{APP_AUTHOR}/{EXE_NAME}/{{VERSION}}"
 UNLINK_RETRY_ATTEMPTS = 20
 UNLINK_RETRY_DELAY_S = 0.15
 BYTES_PER_MB = 1024 * 1024
@@ -164,6 +165,14 @@ def build_exe() -> None:
         "-m",
         "nuitka",
         "--onefile",
+        # Unpack to one static folder per version rather than to a fresh
+        # Temp\onefile_<pid>_<time> folder on every launch. Nuitka's default
+        # spec gives the unpacked runtime a new path each run, so a security
+        # product that flags it cannot be told to trust it: Malwarebytes
+        # quarantined runtime_entry.dll out of such a folder during sign-in on
+        # 2026-09-20 and the application did not start. A static path can be
+        # excluded once; the cached contents also make later launches faster.
+        f"--onefile-tempdir-spec={ONEFILE_TEMPDIR_SPEC}",
         "--assume-yes-for-downloads",
         "--enable-plugin=pyside6",
         f"--jobs={cpu_count}",

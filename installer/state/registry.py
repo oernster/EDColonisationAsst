@@ -23,6 +23,7 @@ from installer.constants import (
     APP_DISPLAY_NAME,
     APP_PUBLISHER,
     APP_URL,
+    LAUNCH_SCRIPT_NAME,
     NO_BROWSER_FLAG,
     RUN_SUBKEY,
     RUN_VALUE,
@@ -60,7 +61,7 @@ DEFAULT_KEYS = RegistryKeys()
 
 
 def read_string(key: str, name: str) -> str | None:
-    """Return an HKCU string value, or None when the key or value is absent."""
+    """Return an HKCU string value; None when the key or value is absent."""
     import winreg
 
     try:
@@ -116,15 +117,15 @@ def delete_uninstall_entry(keys: RegistryKeys = DEFAULT_KEYS) -> None:
 
 
 def installed_version(keys: RegistryKeys = DEFAULT_KEYS) -> str | None:
-    """Return the registered installed version, or None when not installed."""
+    """Return the registered installed version; None when not installed."""
     return read_string(keys.uninstall_key, DISPLAY_VERSION)
 
 
 def installed_location(keys: RegistryKeys = DEFAULT_KEYS) -> Path | None:
-    """Return the registered install location, or None when not installed.
+    """Return the registered install location; None when not installed.
 
     A recorded location that is not absolute is treated as absent: it cannot be
-    acted on, and Path would quietly turn an empty value into the current
+    acted on; Path would also quietly turn an empty value into the current
     directory, which is the one place an uninstall must never point at.
     """
     raw = read_string(keys.uninstall_key, INSTALL_LOCATION)
@@ -140,8 +141,14 @@ def autostart_command(exe_path: Path) -> str:
     The runtime is started with the no-browser flag so a sign-in start puts the
     tray icon up without opening a browser window over whatever the user is
     doing.
+
+    An installed EDCA is an interpreter plus a launch script, so the entry
+    names the script as well. The working directory a Run entry inherits is not
+    the install directory, which is exactly why the script is given by its full
+    path rather than as a module.
     """
-    return f'"{exe_path}" {NO_BROWSER_FLAG}'
+    script = exe_path.parent / LAUNCH_SCRIPT_NAME
+    return f'"{exe_path}" "{script}" {NO_BROWSER_FLAG}'
 
 
 def set_autostart(

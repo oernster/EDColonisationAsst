@@ -1,4 +1,4 @@
-"""Finding the bundled payload, and reading what travels with it.
+"""Finding the bundled payload, then reading what travels with it.
 
 The payload anchors are redirected at a temporary tree, so these tests stage a
 tiny bundle rather than touching the one the build stages. British spelling is
@@ -10,14 +10,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from fakes import BUNDLED_VERSION
 
 from installer.constants import (
     BUILD_DIR_NAME,
-    EXE_NAME,
     ICON_FILE_NAME,
     LICENSE_FILE_NAME,
     PAYLOAD_DIR_NAME,
     PNG_FILE_NAME,
+    RUNTIME_ARCHIVE_NAME,
     RUNTIME_DIR_NAME,
     VERSION_FILE_NAME,
 )
@@ -27,7 +28,7 @@ from installer.ops.payload import (
     LICENCE_FALLBACK,
     LICENCE_HEADER,
     app_version,
-    bundled_runtime_exe,
+    bundled_runtime_archive,
     find_payload_root,
     icon_file,
     installed_icon,
@@ -35,10 +36,8 @@ from installer.ops.payload import (
     payload_root,
     png_file,
     reflow_licence,
-    runtime_exe_candidates,
+    runtime_archive_candidates,
 )
-
-_BUNDLED_VERSION = "2.9.0"
 
 
 def _populate(directory: Path) -> Path:
@@ -101,39 +100,53 @@ def test_payload_root_returns_the_stage_when_there_is_one(payload_dir: Path) -> 
     assert payload_root() == payload_dir
 
 
-def test_the_runtime_is_looked_for_under_the_package_first(
+def test_the_archive_is_looked_for_under_the_package_first(
     staged_payload: Path,
 ) -> None:
-    assert runtime_exe_candidates()[0] == (staged_payload / RUNTIME_DIR_NAME / EXE_NAME)
+    first = runtime_archive_candidates()[0]
+
+    assert first == staged_payload / RUNTIME_DIR_NAME / RUNTIME_ARCHIVE_NAME
 
 
-def test_the_payload_itself_is_the_last_runtime_candidate(payload_dir: Path) -> None:
+def test_the_payload_itself_is_the_last_archive_candidate(payload_dir: Path) -> None:
     _populate(payload_dir)
 
-    assert runtime_exe_candidates()[-1] == payload_dir / EXE_NAME
+    assert runtime_archive_candidates()[-1] == payload_dir / RUNTIME_ARCHIVE_NAME
 
 
-def test_bundled_runtime_exe_finds_the_embedded_copy(staged_payload: Path) -> None:
-    runtime = staged_payload / RUNTIME_DIR_NAME
-    runtime.mkdir()
-    exe = runtime / EXE_NAME
-    exe.write_bytes(b"exe")
-
-    assert bundled_runtime_exe() == exe
-
-
-def test_bundled_runtime_exe_is_none_when_nothing_carries_it(
+def test_the_payload_is_no_candidate_while_the_stage_is_empty(
     staged_payload: Path,
 ) -> None:
-    assert bundled_runtime_exe() is None
+    """An empty stage is not a payload, so it contributes no candidate."""
+    candidates = runtime_archive_candidates()
+
+    assert all(candidate.name == RUNTIME_ARCHIVE_NAME for candidate in candidates)
+    assert all(candidate.parent.name == RUNTIME_DIR_NAME for candidate in candidates)
+
+
+def test_bundled_runtime_archive_finds_the_embedded_copy(
+    staged_payload: Path,
+) -> None:
+    runtime = staged_payload / RUNTIME_DIR_NAME
+    runtime.mkdir()
+    archive = runtime / RUNTIME_ARCHIVE_NAME
+    archive.write_bytes(b"zip")
+
+    assert bundled_runtime_archive() == archive
+
+
+def test_bundled_runtime_archive_is_none_when_nothing_carries_it(
+    staged_payload: Path,
+) -> None:
+    assert bundled_runtime_archive() is None
 
 
 def test_app_version_reads_the_bundled_version(payload_dir: Path) -> None:
     (payload_dir / VERSION_FILE_NAME).write_text(
-        f"{_BUNDLED_VERSION}\n", encoding="utf-8"
+        f"{BUNDLED_VERSION}\n", encoding="utf-8"
     )
 
-    assert app_version() == _BUNDLED_VERSION
+    assert app_version() == BUNDLED_VERSION
 
 
 def test_app_version_skips_an_empty_version_file(
@@ -141,9 +154,9 @@ def test_app_version_skips_an_empty_version_file(
 ) -> None:
     _populate(payload_dir)
     (payload_dir / VERSION_FILE_NAME).write_text("  \n", encoding="utf-8")
-    (staged_payload / VERSION_FILE_NAME).write_text(_BUNDLED_VERSION, encoding="utf-8")
+    (staged_payload / VERSION_FILE_NAME).write_text(BUNDLED_VERSION, encoding="utf-8")
 
-    assert app_version() == _BUNDLED_VERSION
+    assert app_version() == BUNDLED_VERSION
 
 
 def test_app_version_is_empty_when_nothing_is_bundled(staged_payload: Path) -> None:

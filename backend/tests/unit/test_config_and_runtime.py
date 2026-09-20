@@ -22,8 +22,10 @@ import src as backend_pkg
 def test_runtime_is_frozen_false_by_default(monkeypatch):
     """Default environment (no sys.frozen, python.exe argv[0]) is treated as DEV."""
     # Cleared so the answer does not depend on where the suite is being run
-    # from: inside a flatpak the mode is deliberately not DEV.
+    # from: inside a flatpak or an installed deployment the mode is
+    # deliberately not DEV.
     monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.delenv("EDCA_PACKAGED", raising=False)
     orig_frozen = getattr(sys, "frozen", None)
     orig_argv0 = sys.argv[0]
     try:
@@ -115,6 +117,7 @@ def test_runtime_is_frozen_for_non_python_exe_path():
 def test_runtime_reports_not_packaged_in_a_source_checkout(monkeypatch):
     """A checkout keeps its derived files beside the packages that use them."""
     monkeypatch.delenv("FLATPAK_ID", raising=False)
+    monkeypatch.delenv("EDCA_PACKAGED", raising=False)
     orig_frozen = getattr(sys, "frozen", None)
     orig_argv0 = sys.argv[0]
     try:

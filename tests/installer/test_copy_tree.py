@@ -1,4 +1,4 @@
-"""Putting the payload on disk, and taking it off again.
+"""Putting the payload on disk, then taking it off again.
 
 British spelling is used in comments. No em dashes appear anywhere.
 """
@@ -15,7 +15,6 @@ from installer.ops.copy_tree import (
     copy_tree,
     count_files,
     delete_tree,
-    deployed_name,
     is_link,
     safe_destination,
 )
@@ -31,21 +30,13 @@ _TEXT = "bundled"
 
 
 def _tree(root: Path) -> Path:
-    """Stage a small payload: two files, one nested and one staged source."""
+    """Stage a small payload: two files, one of them nested."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "a.txt").write_text(_TEXT, encoding="utf-8")
     nested = root / "nested"
     nested.mkdir()
-    (nested / "b.py_").write_text(_TEXT, encoding="utf-8")
+    (nested / "b.py").write_text(_TEXT, encoding="utf-8")
     return root
-
-
-def test_a_staged_source_is_installed_under_its_real_extension() -> None:
-    assert deployed_name("main.py_") == "main.py"
-
-
-def test_any_other_name_is_installed_unchanged() -> None:
-    assert deployed_name("index.html") == "index.html"
 
 
 def test_count_files_counts_what_the_copy_would_write(tmp_path: Path) -> None:
@@ -77,9 +68,7 @@ def test_safe_destination_refuses_a_path_that_leaves_the_target(
         safe_destination(target, target / ".." / "escaped.txt")
 
 
-def test_copy_tree_writes_every_file_and_restores_the_extensions(
-    tmp_path: Path,
-) -> None:
+def test_copy_tree_writes_every_file(tmp_path: Path) -> None:
     source = _tree(tmp_path / "payload")
     target = tmp_path / "install"
 
@@ -177,7 +166,7 @@ def test_delete_tree_removes_everything_and_reports_progress(
 def test_delete_tree_leaves_what_it_cannot_remove(tmp_path: Path) -> None:
     """The caller defers the remains rather than failing the uninstall here."""
     root = _tree(tmp_path / "install")
-    locked = root / "nested" / "b.py_"
+    locked = root / "nested" / "b.py"
     locked.chmod(stat.S_IREAD)
     try:
         delete_tree(root)

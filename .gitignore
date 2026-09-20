@@ -268,3 +268,5 @@ EDColonisationAsst.exe
 # with it being absent; the packaged app gets a freshly written copy.
 /BUILD_ID
 
+# Session snapshots, local only
+.claude/

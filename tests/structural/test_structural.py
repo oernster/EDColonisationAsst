@@ -26,7 +26,7 @@ front end at all: a scan walking `*.py` only would have reported a clean
 repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is
 measured but not parsed: the import rules are Python only.
 
-Delivery scripts (`buildexe.py`, `buildinstaller.py`) are deliberately outside
+Delivery scripts (`buildruntime.py`, `buildinstaller.py`) are deliberately outside
 every scan here. They are linear recipes read top to bottom, where splitting a
 sequence of flags and steps across modules costs more than it buys. Do not add
 them.

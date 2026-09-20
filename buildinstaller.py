@@ -3,23 +3,28 @@
 
 Workflow (from the project root):
 
-1) Build the runtime:    python buildexe.py
+1) Build the runtime:    python buildruntime.py
 2) Build the installer:  python buildinstaller.py
 
 This script:
-- Ensures the frontend production bundle exists (npm run build).
-- Stages a curated payload under build/payload/ (backend sources, the
-  built frontend, icons, LICENSE, VERSION and the runtime EXE from
-  dist-runtime/).
+- Ensures the frontend production bundle exists (npm run build), since
+  buildruntime.py stages it into the archive.
+- Stages a small payload under build/payload/: the icons, LICENSE and
+  VERSION, which are what the setup program itself reads.
+- Embeds dist-runtime/edca-runtime.zip, which carries the application.
 - Compiles the PySide6 installer package into a single onefile EXE with
-  the payload embedded.
+  both of those embedded.
+
+The setup program is still compiled. The APPLICATION is not: it ships as a
+plain interpreter over readable Python inside that archive, because a
+Nuitka-compiled EDCA was quarantined on sight by Malwarebytes.
 
 The Nuitka entry point is installer_main.py at the repository root rather than
 a script inside installer/. A script is compiled with its own directory on the
 module search path, so compiling installer/app.py directly would leave the
 ``installer.*`` imports unresolvable. Compiling from the root also gives the
 payload one anchor that holds in both source and compiled runs: the installer
-resolves it relative to the installer package directory, and the data is
+resolves it relative to the installer package directory; the data is
 included at that same relative location below.
 
 Outputs:
@@ -55,7 +60,8 @@ LICENSE_FILE = PROJECT_ROOT / "LICENSE"
 BUILD_DIR = PROJECT_ROOT / "build"
 PAYLOAD_DIR = BUILD_DIR / "payload"
 RUNTIME_DIST_DIR = PROJECT_ROOT / "dist-runtime"
-RUNTIME_EXE = RUNTIME_DIST_DIR / f"{RUNTIME_EXE_NAME}.exe"
+RUNTIME_ARCHIVE_NAME = "edca-runtime.zip"
+RUNTIME_ARCHIVE = RUNTIME_DIST_DIR / RUNTIME_ARCHIVE_NAME
 DIST_DIR = PROJECT_ROOT / "dist-installer"
 
 VERSION_FALLBACK = "0.0.0"
@@ -72,11 +78,11 @@ PAYLOAD_FILES = (
     "VERSION",
 )
 
-# Project directories staged into the payload, if present.
-PAYLOAD_DIRS = (
-    "backend",
-    "frontend",
-)
+# Project directories staged into the payload. There are none: the application
+# travels inside the runtime archive that buildruntime.py writes, because an
+# unfrozen EDCA is thousands of .py files and Nuitka strips those out of a data
+# directory. What is left here is what the setup program itself reads.
+PAYLOAD_DIRS: tuple[str, ...] = ()
 
 # Directories excluded from the payload (dev, VC and coverage artefacts).
 PAYLOAD_IGNORE_DIRS = {
@@ -164,7 +170,7 @@ def _ensure_frontend_dist_built() -> None:
             return
         raise RuntimeError(
             "npm was not found on PATH and frontend/dist is missing. "
-            "Install Node.js/npm, or build the frontend on a machine that "
+            "Install Node.js/npm; else build the frontend on a machine that "
             "has npm first."
         )
 
@@ -210,10 +216,7 @@ def _ensure_payload_dir() -> Path:
             shutil.copy2(src, PAYLOAD_DIR / name)
             print(f"[buildinstaller] Payload file: {src}")
 
-    # The runtime EXE comes from dist-runtime/ (built by buildexe.py) and is
-    # staged under its plain name so the installed layout is unchanged.
-    shutil.copy2(RUNTIME_EXE, PAYLOAD_DIR / f"{RUNTIME_EXE_NAME}.exe")
-    print(f"[buildinstaller] Payload runtime: {RUNTIME_EXE}")
+    print(f"[buildinstaller] Runtime archive: {RUNTIME_ARCHIVE}")
 
     for name in PAYLOAD_DIRS:
         src = PROJECT_ROOT / name
@@ -222,43 +225,6 @@ def _ensure_payload_dir() -> Path:
         dst = PAYLOAD_DIR / name
         shutil.copytree(src, dst, dirs_exist_ok=True, ignore=_ignore_unwanted)
         print(f"[buildinstaller] Payload dir:  {src}")
-
-        # Ensure the built frontend assets are always present even if an
-        # ignore rule or tooling quirk skipped them.
-        if name == "frontend":
-            dist_src = src / "dist"
-            dist_dst = dst / "dist"
-            if dist_src.exists():
-                shutil.copytree(dist_src, dist_dst, dirs_exist_ok=True)
-                print(f"[buildinstaller] Payload frontend build: {dist_src}")
-            else:
-                print(
-                    "[buildinstaller] WARNING: frontend/dist not found while "
-                    "copying payload; /app/ will not serve the web UI."
-                )
-
-    # The tray controller must ship so installed shortcuts can start the app.
-    tray_payload = PAYLOAD_DIR / "backend" / "src" / "tray_app.py"
-    if not tray_payload.exists():
-        raise RuntimeError(
-            f"tray_app.py is missing from the payload ('{tray_payload}'). "
-            "Ensure backend/src/tray_app.py exists and is not excluded by "
-            "ignore rules."
-        )
-
-    # Work around Nuitka stripping *.py files from data directories: ship
-    # backend sources as *.py_ and let the installer rename them back on
-    # deployment (see installer/app.py).
-    backend_src_payload = PAYLOAD_DIR / "backend" / "src"
-    if backend_src_payload.exists():
-        renamed_count = 0
-        for py_file in backend_src_payload.rglob("*.py"):
-            py_file.rename(py_file.with_suffix(".py_"))
-            renamed_count += 1
-        print(
-            f"[buildinstaller] Renamed {renamed_count} backend sources to "
-            "*.py_ for payload shipping"
-        )
 
     if not any(PAYLOAD_DIR.iterdir()):
         raise RuntimeError(f"Staged payload directory '{PAYLOAD_DIR}' is empty.")
@@ -298,10 +264,10 @@ def build_installer() -> None:
         )
     if not ICON_FILE.exists():
         raise FileNotFoundError(f"Could not find application icon at: {ICON_FILE}")
-    if not RUNTIME_EXE.exists():
+    if not RUNTIME_ARCHIVE.exists():
         raise FileNotFoundError(
-            f"Could not find the runtime EXE at: {RUNTIME_EXE}\n"
-            "Run `python buildexe.py` first to build the runtime."
+            f"Could not find the runtime archive at: {RUNTIME_ARCHIVE}\n"
+            "Run `python buildruntime.py` first to stage the runtime."
         )
 
     version = read_version()
@@ -341,12 +307,13 @@ def build_installer() -> None:
         # resolves its payload relative to the installer package in both source
         # and compiled runs, so both find it in the same place.
         f"--include-data-dir={PAYLOAD_DIR}={INSTALLER_PACKAGE}/payload",
-        # The runtime EXE is also embedded as a dedicated data file so it is
-        # always present even if Nuitka strips executables from the payload
-        # data directory. It is anchored on the package for the same reason.
+        # The runtime archive carries the application itself: the interpreter,
+        # the dependencies and the sources. It is embedded as a data file of
+        # its own, anchored on the package, because Nuitka strips executables
+        # and .py files out of a data directory and would empty a staged tree.
         (
-            f"--include-data-file={RUNTIME_EXE}="
-            f"{INSTALLER_PACKAGE}/runtime/{RUNTIME_EXE_NAME}.exe"
+            f"--include-data-file={RUNTIME_ARCHIVE}="
+            f"{INSTALLER_PACKAGE}/runtime/{RUNTIME_ARCHIVE_NAME}"
         ),
     ]
 

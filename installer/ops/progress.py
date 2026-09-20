@@ -3,7 +3,7 @@
 An install copies every file in the payload and an uninstall removes them
 again, so both report their phase and a percentage rather than freezing behind
 a single status line. The file copy is by far the longest phase, so it is given
-a span of its own to report within rather than a single milestone, and the
+a span of its own to report within rather than a single milestone; the
 per-file granularity the original installer had is preserved inside that span.
 The callback is optional throughout: the operations are callable headlessly
 with no reporter attached. British spelling is used in comments. No em dashes
@@ -25,10 +25,14 @@ COMPLETE_PCT = 100
 COUNT_PCT = 2
 COUNT_MESSAGE = "Counting files..."
 COPY_START_PCT = 5
-COPY_END_PCT = 60
+COPY_END_PCT = 12
 COPY_MESSAGE = "Copying files..."
-RUNTIME_PCT = 68
-RUNTIME_MESSAGE = "Placing the application..."
+# Extracting the runtime is now the long phase, since it carries the
+# interpreter, the dependencies and the application. The payload copy beside it
+# is a handful of files the setup program itself reads.
+RUNTIME_START_PCT = 15
+RUNTIME_END_PCT = 70
+RUNTIME_MESSAGE = "Installing the application..."
 UNINSTALLER_PCT = 75
 UNINSTALLER_MESSAGE = "Writing the uninstaller..."
 REGISTER_PCT = 82

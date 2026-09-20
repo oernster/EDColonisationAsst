@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from installer.constants import LAUNCH_SCRIPT_NAME
 from installer.ops.commands import (
     CommandRunner,
     default_runner,
@@ -27,6 +28,7 @@ ICON_INDEX = 0
 
 _SHELL_OBJECT = "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{link}'); "
 _TARGET_CLAUSE = "$s.TargetPath = '{target}'; "
+_ARGUMENTS_CLAUSE = "$s.Arguments = '{arguments}'; "
 _WORKING_CLAUSE = "$s.WorkingDirectory = '{working}'; "
 _ICON_CLAUSE = "$s.IconLocation = '{icon},{index}'; "
 _SAVE_CLAUSE = "$s.Save()"
@@ -40,11 +42,22 @@ def _escaped(value: object) -> str:
     return str(value).replace(_QUOTE, _ESCAPED_QUOTE)
 
 
+def launch_arguments(exe_path: Path) -> str:
+    """Return the arguments a shortcut passes to the installed interpreter.
+
+    An installed EDCA is an interpreter plus a launch script rather than a
+    compiled executable, so the shortcut has to name the script. It is quoted
+    because an install directory may contain a space.
+    """
+    return f'"{exe_path.parent / LAUNCH_SCRIPT_NAME}"'
+
+
 def shortcut_script(exe_path: Path, link: Path, icon: Path | None) -> str:
     """Return the scripting-host command that writes one shortcut."""
     script = (
         _SHELL_OBJECT.format(link=_escaped(link))
         + _TARGET_CLAUSE.format(target=_escaped(exe_path))
+        + _ARGUMENTS_CLAUSE.format(arguments=_escaped(launch_arguments(exe_path)))
         + _WORKING_CLAUSE.format(working=_escaped(exe_path.parent))
     )
     if icon is not None:

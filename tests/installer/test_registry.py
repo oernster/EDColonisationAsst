@@ -11,6 +11,7 @@ from pathlib import Path
 
 from installer.constants import (
     APP_SHORT_NAME,
+    LAUNCH_SCRIPT_NAME,
     NO_BROWSER_FLAG,
     UNINSTALL_FLAG,
 )
@@ -129,9 +130,15 @@ def test_delete_key_is_silent_when_the_key_is_already_gone() -> None:
 def test_the_autostart_command_starts_the_runtime_without_a_browser(
     tmp_path: Path,
 ) -> None:
-    exe = tmp_path / "app.exe"
+    """An installed EDCA is an interpreter, so the entry names its script too.
 
-    assert autostart_command(exe) == f'"{exe}" {NO_BROWSER_FLAG}'
+    A Run entry does not inherit the install directory as its working
+    directory, so the script is given by its full path beside the executable.
+    """
+    exe = tmp_path / "app.exe"
+    script = tmp_path / LAUNCH_SCRIPT_NAME
+
+    assert autostart_command(exe) == f'"{exe}" "{script}" {NO_BROWSER_FLAG}'
 
 
 def test_autostart_can_be_enabled_then_disabled(

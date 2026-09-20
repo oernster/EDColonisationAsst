@@ -8,11 +8,16 @@ British spelling is used in comments. No em dashes appear anywhere.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import zipfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from installer.constants import EXE_NAME
+from installer.constants import EXE_NAME, RUNTIME_ARCHIVE_NAME, RUNTIME_DIR_NAME
 from installer.ops.commands import CommandResult
+
+# The version the staged payload claims, shared by every suite that asserts on
+# what the installer recorded.
+BUNDLED_VERSION = "2.9.0"
 
 
 class FakeRunner:
@@ -67,8 +72,24 @@ class RecordingProgress:
         return [pct for pct, _ in self.updates]
 
 
+def stage_runtime_archive(root: Path, entries: Mapping[str, bytes]) -> Path:
+    """Write a runtime archive under a staged installer tree and return it.
+
+    The runtime archive is how the whole application travels now: the
+    interpreter, its dependencies, the sources and the built front end. A test
+    stages a handful of named entries in place of the real 95 MB one.
+    """
+    runtime = root / RUNTIME_DIR_NAME
+    runtime.mkdir(exist_ok=True)
+    path = runtime / RUNTIME_ARCHIVE_NAME
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    return path
+
+
 class LinkChecker:
-    """Answers the link question for a named set of paths, and records asks."""
+    """Answers the link question for a named set of paths; records asks too."""
 
     def __init__(self, links: Sequence[Path] = ()) -> None:
         self.links = {Path(link) for link in links}

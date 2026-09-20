@@ -1,10 +1,11 @@
-"""The application payload the setup program carries, and finding it.
+"""The application payload the setup program carries, plus finding it.
 
-The payload is a plain directory tree rather than an archive, staged by
-buildinstaller.py and embedded as Nuitka data. Nuitka strips loose executables
-out of an included data directory, so the runtime executable is embedded a
-second time under its own directory and recovered from there when the copied
-payload turns out not to carry it.
+The payload is a plain directory tree staged by buildinstaller.py and embedded
+as Nuitka data: the icons, the licence and the version, which the setup program
+itself reads. The application is not in it. EDCA now ships as an interpreter
+over plain sources, several thousand files of exactly the two kinds Nuitka
+strips out of a data directory, so it travels as one archive under its own
+directory and is extracted into the install.
 
 A payload that cannot be found is fatal. The previous behaviour fell back to
 the repository root, which after the move into a subpackage would have resolved
@@ -19,11 +20,11 @@ from pathlib import Path
 
 from installer.constants import (
     BUILD_DIR_NAME,
-    EXE_NAME,
     ICON_FILE_NAME,
     LICENSE_FILE_NAME,
     PAYLOAD_DIR_NAME,
     PNG_FILE_NAME,
+    RUNTIME_ARCHIVE_NAME,
     RUNTIME_DIR_NAME,
     VERSION_FILE_NAME,
 )
@@ -68,7 +69,7 @@ def payload_candidates() -> tuple[Path, ...]:
 
 
 def find_payload_root() -> Path | None:
-    """Return the staged payload directory, or None when there is not one.
+    """Return the staged payload directory; None when there is not one.
 
     A directory that exists but holds nothing is not a payload: an empty stage
     would deploy an empty install and report success.
@@ -88,25 +89,27 @@ def find_payload_root() -> Path | None:
 
 
 def payload_root() -> Path:
-    """Return the staged payload directory, or fail loudly when there is none."""
+    """Return the staged payload directory; fail loudly when there is none."""
     found = find_payload_root()
     if found is None:
         raise PayloadError(PAYLOAD_MISSING_MESSAGE)
     return found
 
 
-def runtime_exe_candidates() -> tuple[Path, ...]:
-    """Return every place the runtime executable may be found, in order."""
-    candidates = [anchor / RUNTIME_DIR_NAME / EXE_NAME for anchor in _anchors()]
+def runtime_archive_candidates() -> tuple[Path, ...]:
+    """Return every place the runtime archive may be found, in order."""
+    candidates = [
+        anchor / RUNTIME_DIR_NAME / RUNTIME_ARCHIVE_NAME for anchor in _anchors()
+    ]
     found = find_payload_root()
     if found is not None:
-        candidates.append(found / EXE_NAME)
+        candidates.append(found / RUNTIME_ARCHIVE_NAME)
     return tuple(candidates)
 
 
-def bundled_runtime_exe() -> Path | None:
-    """Return the embedded runtime executable, or None when it is absent."""
-    for candidate in runtime_exe_candidates():
+def bundled_runtime_archive() -> Path | None:
+    """Return the embedded runtime archive; None when it is absent."""
+    for candidate in runtime_archive_candidates():
         if candidate.is_file():
             return candidate
     return None
@@ -132,7 +135,7 @@ def _resource_candidates(name: str) -> tuple[Path, ...]:
 
 
 def app_version() -> str:
-    """Return the bundled application version, or an empty string if absent."""
+    """Return the bundled application version; an empty string if absent."""
     for candidate in _resource_candidates(VERSION_FILE_NAME):
         text = _first_readable((candidate,))
         if text and text.strip():
@@ -162,7 +165,7 @@ def reflow_licence(text: str, width: int = REFLOW_WIDTH) -> str:
 
 
 def licence_text() -> str:
-    """Return the bundled licence text, or a fallback when it is absent."""
+    """Return the bundled licence text; a fallback when it is absent."""
     text = _first_readable(_resource_candidates(LICENSE_FILE_NAME))
     if not text:
         return LICENCE_HEADER + LICENCE_FALLBACK
@@ -170,7 +173,7 @@ def licence_text() -> str:
 
 
 def icon_file() -> Path | None:
-    """Return the bundled application .ico, or None when it is absent."""
+    """Return the bundled application .ico; None when it is absent."""
     for candidate in _resource_candidates(ICON_FILE_NAME):
         if candidate.is_file():
             return candidate
@@ -178,7 +181,7 @@ def icon_file() -> Path | None:
 
 
 def png_file() -> Path | None:
-    """Return the bundled application PNG, or None when it is absent."""
+    """Return the bundled application PNG; None when it is absent."""
     for candidate in _resource_candidates(PNG_FILE_NAME):
         if candidate.is_file():
             return candidate
@@ -186,6 +189,6 @@ def png_file() -> Path | None:
 
 
 def installed_icon(install_dir: Path) -> Path | None:
-    """Return the .ico inside an install directory, or None when absent."""
+    """Return the .ico inside an install directory; None when absent."""
     path = install_dir / ICON_FILE_NAME
     return path if path.is_file() else None

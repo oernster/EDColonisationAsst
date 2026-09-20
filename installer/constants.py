@@ -36,10 +36,16 @@ NO_BROWSER_FLAG = "--no-browser"
 # than an archive, so it is copied file by file on deploy.
 PAYLOAD_DIR_NAME = "payload"
 BUILD_DIR_NAME = "build"
-# Nuitka strips loose executables out of an included data directory, so the
-# runtime is embedded a second time under its own directory and recovered from
-# there when the copied payload turns out not to carry it.
+# Nuitka strips loose executables and .py files out of an included data
+# directory; the runtime is now an interpreter over plain sources, several
+# thousand of both. It therefore travels as one archive under its own
+# directory, which Nuitka carries untouched, then is extracted on deploy.
 RUNTIME_DIR_NAME = "runtime"
+RUNTIME_ARCHIVE_NAME = "edca-runtime.zip"
+
+# The script the shortcuts and the sign-in entry run. An installed EDCA is a
+# signed interpreter plus this, rather than a compiled executable.
+LAUNCH_SCRIPT_NAME = "edca_launch.py"
 LICENSE_FILE_NAME = "LICENSE"
 VERSION_FILE_NAME = "VERSION"
 
@@ -56,11 +62,6 @@ IGNORED_DIR_NAMES = (
     "tests",
     "node_modules",
 )
-
-# buildinstaller.py ships backend sources renamed so Nuitka does not strip
-# them from the data directory; the copy restores the real extension.
-STAGED_PY_SUFFIX = ".py_"
-PY_SUFFIX = ".py"
 
 # --- per-user locations (no administrator rights required) ------------------
 

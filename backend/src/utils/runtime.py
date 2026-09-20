@@ -21,6 +21,12 @@ import sys
 # runtime.common.
 _ENV_FLATPAK_ID = "FLATPAK_ID"
 
+# Set by the launch script of an installed Windows deployment. That deployment
+# ships a plain interpreter rather than a compiled executable, so neither
+# ``sys.frozen`` nor an executable name can say that the layout is fixed and
+# the dependencies are already in place. The launcher states it instead.
+_ENV_DEPLOYED = "EDCA_PACKAGED"
+
 # The application's reverse-DNS identity. It is the flatpak app id, the basename
 # of the installed desktop entry and the name of the installed icons, because a
 # desktop matches a running window to its launcher by that one string. The
@@ -97,6 +103,20 @@ def is_flatpak() -> bool:
     return bool(os.environ.get(_ENV_FLATPAK_ID))
 
 
+def is_deployed() -> bool:
+    """
+    Return True when an installed deployment's launcher started this process.
+
+    A Windows deployment runs a signed interpreter over plain sources, so it
+    is neither frozen nor a flatpak while being every bit as installed as
+    both: its layout is fixed, its dependencies are already there and it must
+    not write into its own directory. Its launch script sets this variable
+    before importing anything, which is the only statement of the fact that
+    cannot be inferred from the executable's name.
+    """
+    return bool(os.environ.get(_ENV_DEPLOYED))
+
+
 def get_runtime_mode() -> RuntimeMode:
     """
     Determine the current runtime mode.
@@ -112,10 +132,12 @@ def get_runtime_mode() -> RuntimeMode:
     Returns
     -------
     RuntimeMode
-        ``RuntimeMode.FROZEN`` when running inside a frozen executable or a
-        flatpak, otherwise ``RuntimeMode.DEV``.
+        ``RuntimeMode.FROZEN`` when running inside a frozen executable, a
+        flatpak or an installed deployment, otherwise ``RuntimeMode.DEV``.
     """
-    return RuntimeMode.FROZEN if is_frozen() or is_flatpak() else RuntimeMode.DEV
+    if is_frozen() or is_flatpak() or is_deployed():
+        return RuntimeMode.FROZEN
+    return RuntimeMode.DEV
 
 
 def is_packaged() -> bool:

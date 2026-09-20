@@ -23,12 +23,17 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from fakes import BUNDLED_VERSION, stage_runtime_archive
 
 from installer.constants import (
     ENV_APPDATA,
     ENV_LOCALAPPDATA,
     ENV_USERPROFILE,
+    EXE_NAME,
+    ICON_FILE_NAME,
+    LAUNCH_SCRIPT_NAME,
     PAYLOAD_DIR_NAME,
+    VERSION_FILE_NAME,
 )
 from installer.ops import payload as payload_module
 from installer.state.registry import RegistryKeys
@@ -92,6 +97,26 @@ def staged_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def payload_dir(staged_payload: Path) -> Path:
     """Return the staged payload directory itself."""
     return staged_payload / PAYLOAD_DIR_NAME
+
+
+@pytest.fixture()
+def bundle(staged_payload: Path, payload_dir: Path) -> Path:
+    """Stage a small payload plus the runtime archive that carries the app.
+
+    The payload is now only what the setup program itself reads: the icon and
+    the version. Everything the user runs arrives in the archive beside it.
+    """
+    (payload_dir / VERSION_FILE_NAME).write_text(BUNDLED_VERSION, encoding="utf-8")
+    (payload_dir / ICON_FILE_NAME).write_bytes(b"ico")
+    stage_runtime_archive(
+        staged_payload,
+        {
+            EXE_NAME: b"runtime",
+            LAUNCH_SCRIPT_NAME: b"launch",
+            "backend/src/main.py": b"print('hello')",
+        },
+    )
+    return staged_payload
 
 
 @pytest.fixture()

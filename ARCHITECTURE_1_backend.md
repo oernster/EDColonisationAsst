@@ -62,7 +62,7 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── app_runtime.py             # Packaged runtime orchestration
 │   │   ├── backend_server.py          # In-process uvicorn control and readiness
-│   │   ├── tray_ui.py                 # Frozen-runtime system tray UI
+│   │   ├── tray_ui.py                 # Packaged-runtime system tray UI
 │   │   ├── tray_fallback.py           # Stand-in window when there is no tray
 │   │   ├── app_singleton.py           # ApplicationInstanceLock
 │   │   ├── common.py                  # Shared runtime helpers
@@ -70,7 +70,7 @@ backend/
 │   │   ├── launcher_components.py     # Dev launcher orchestration and steps
 │   │   ├── launcher_view.py           # LaunchView interface and Qt window
 │   │   ├── dialogs.py                 # Showing a dialog with no window to show it over
-│   │   ├── splash.py                  # Frozen-runtime startup splash window
+│   │   ├── splash.py                  # Packaged-runtime startup splash window
 │   │   ├── startup_monitor.py         # Readiness polling and its status line
 │   │   ├── startup_report.py          # Startup progress read back off /api/health
 │   │   ├── help_menu.py               # About and Check for Updates, shared
@@ -169,15 +169,18 @@ Everything in this section lives in [`colonisation_db.py`](backend/src/repositor
 
 The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repositories/colonisation_db.py:42), which chooses:
 
-- **Dev mode** (non‑frozen): `backend/src/colonisation.db`, derived from that module's own location
-- **Packaged runtime** (a frozen EXE or a Flatpak): the per-user data
+- **Dev mode** (a source checkout): `backend/src/colonisation.db`, derived from that module's own location
+- **Packaged runtime** (an installed Windows deployment or a Flatpak): the per-user data
   directory that [`user_data.py`](backend/src/utils/user_data.py:1) reports.
   `%LOCALAPPDATA%\EDColonisationAsst\colonisation.db` on Windows;
   `$XDG_DATA_HOME/EDColonisationAsst/colonisation.db` elsewhere, falling
   back to `~/.local/share`. Inside a Flatpak the sandbox points
   `XDG_DATA_HOME` at its own writable directory, so no sandbox-specific
-  branch is needed. The predicate is `is_packaged()`, not `is_frozen()`:
-  a Flatpak is not frozen and must still not write into a read-only `/app`.
+  branch is needed. The predicate is `is_packaged()` rather than `is_frozen()`.
+  Neither packaged case is frozen any more: a Flatpak never was; an
+  installed Windows deployment is now a plain interpreter over readable
+  sources. Both have a fixed layout they must not write into, which is the
+  distinction that actually matters.
 
 To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationDatabase`](backend/src/repositories/colonisation_db.py:75):
 

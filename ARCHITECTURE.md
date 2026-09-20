@@ -52,7 +52,7 @@ At a glance:
 - The **backend** watches and parses Elite: Dangerous journal files, persists colonisation state in SQLite, reconstructs Fleet carrier state in memory and exposes REST APIs plus an AJAX long-poll live update endpoint.
 - The **frontend** is a React/TypeScript app (MUI, Zustand, Vite) that consumes those APIs to show system progress, shopping lists, carrier state and settings.
 
-- A **runtime layer** (Qt launcher, tray, packaged EXE) wraps the backend and serves the built frontend to end users, enforcing a single-instance guarantee per OS user.
+- A **runtime layer** (Qt launcher, tray, the installed deployment) wraps the backend and serves the built frontend to end users, enforcing a single-instance guarantee per OS user.
 
 ---
 
@@ -116,8 +116,9 @@ That document focuses on:
 - Runtime / launcher / tray stack:
   - `ApplicationInstanceLock` and single-instance behaviour.
   - Dev launcher window and tray controller.
-  - Packaged/frozen runtime (in-process uvicorn + Qt tray).
-- Deployment on each platform: the frozen Windows runtime, the Flatpak
+  - Packaged runtime (in-process uvicorn plus Qt tray), which on Windows is a
+    plain interpreter over readable sources rather than a compiled binary.
+- Deployment on each platform: the installed Windows runtime, the Flatpak
   build and the run-from-source helper scripts.
 - Frontend and runtime tests.
 
@@ -256,12 +257,24 @@ test in [tests/installer/](tests/installer) that fails if it does.
   instead of writing an unticked box over the user's choice.
   `test_repair_leaves_the_sign_in_setting_exactly_as_it_was`,
   `test_autostart_can_be_enabled_then_disabled`.
-- **The copy cannot write outside the install directory.** Every destination
-  is resolved and checked to be inside the target; links are skipped
-  rather than followed.
+- **Nothing is written outside the install directory.** Both writers are
+  guarded by the same check. The payload copy resolves every destination and
+  confirms it is inside the target, skipping links rather than following them;
+  the runtime extraction puts every archive member through that same check, so
+  an entry naming a path that climbs out of the target is refused rather than
+  followed.
   `test_safe_destination_refuses_a_path_that_leaves_the_target`,
   `test_copy_tree_skips_a_linked_file`,
-  `test_copy_tree_does_not_descend_into_a_linked_directory`.
+  `test_copy_tree_does_not_descend_into_a_linked_directory`,
+  `test_extract_runtime_refuses_an_entry_that_climbs_out_of_the_install`.
+- **A failed extraction stops the install.** The archive is the only thing
+  that delivers the application, so an extraction that fails is raised rather
+  than swallowed: reporting success over a stale install is indistinguishable
+  to the user from an install that worked. A MISSING archive is different and
+  is not fatal, since leaving a working install alone beats breaking it.
+  `test_extract_runtime_fails_loudly_when_the_install_cannot_be_written`,
+  `test_extract_runtime_fails_loudly_on_an_archive_it_cannot_read`,
+  `test_extract_runtime_keeps_an_install_when_no_archive_is_bundled`.
 - **A missing payload is a hard failure, never a fallback.** There is no
   last-resort guess at what to install.
   `test_payload_root_fails_loudly_when_there_is_nothing_to_install`,

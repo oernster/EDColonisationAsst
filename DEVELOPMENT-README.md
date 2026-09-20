@@ -146,16 +146,19 @@ BUILD_ID              # build marker written by buildruntime.py (gitignored)
 
 The `VERSION` file is the single source of truth for the application
 version. The backend reads it at runtime
-([backend/src/\_\_init\_\_.py](backend/src/__init__.py)), the build scripts
-stamp it into PE metadata and the installer displays it; nothing else
-hardcodes a version.
+([backend/src/\_\_init\_\_.py](backend/src/__init__.py)), `buildruntime.py`
+stages the file itself into the archive, `buildinstaller.py` stamps it into the
+setup program's PE metadata and the installer displays it; nothing else
+hardcodes a version. The application carries no PE metadata of its own any
+more, since its executable is a copy of `pythonw.exe`.
 
 ### Prerequisites (developer machine)
 
 - Windows 10/11 x64.
 - **Python 3.13** for a release build. The application itself runs on
-  3.11 or newer (`requires-python` in `backend/pyproject.toml`); the
-  shipped Windows binary is compiled on 3.13.
+  3.11 or newer (`requires-python` in `backend/pyproject.toml`); the shipped
+  Windows runtime is a copy of the interpreter the build machine runs, so
+  whichever version builds it is the version commanders get.
 - **Visual Studio 2022 Build Tools** with the *Desktop development with C++*
   workload (MSVC v143) and a recent Windows 10/11 SDK; see the compiler
   notes below.
@@ -246,8 +249,9 @@ Node is needed only if `frontend/dist` has to be built.
 
 It targets `org.freedesktop.Platform//25.08`, which ships Python 3.13. Nothing
 is compiled: the sandbox already provides its own interpreter and every
-dependency, which is the condition the frozen Windows build satisfies by other
-means, so what is packaged is the source tree. Inside the sandbox EDCA
+dependency, which is the condition the installed Windows build now satisfies
+the same way, by shipping an interpreter beside the sources, so what is
+packaged is the source tree. Inside the sandbox EDCA
 therefore takes the same path as the packaged Windows runtime, uvicorn
 in-process behind a Qt tray icon, rather than the source-checkout path of
 building a virtual environment and spawning processes.

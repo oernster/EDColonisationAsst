@@ -306,7 +306,10 @@ The dev launcher is two modules split along an interface it already had. `Launch
 - `Launcher`, which drives:
 
   - Python availability checks.
-  - Backend virtualenv creation (`backend/venv`).
+  - Backend virtualenv creation (`backend/venv`). That is the launcher's own
+    environment and is deliberately not the root `venv/` a developer works in:
+    the launcher exists to take somebody from a bare checkout to a running
+    application without their having set anything up first.
   - Backend dependency installation via `pip`.
   - Starting the tray controller (`backend/src/tray_app.py`) inside the venv.
   - Polling backend `/api/health` and `/app` until ready.
@@ -342,7 +345,7 @@ In DEV mode, this is the simplest way to start both backend and frontend with he
 - Creates a Qt app and instantiates `TrayController`.
 - Enters the Qt event loop.
 
-### 2.5 Packaged runtime (frozen EXE)
+### 2.5 Packaged runtime (the installed deployment)
 
 For Windows installers and similar packaged distributions, the main entrypoint is [`runtime_entry.py`](backend/src/runtime_entry.py:1) and the orchestration is in [`app_runtime.py`](backend/src/runtime/app_runtime.py:1). The two controllers it drives live in modules of their own and are re-exported from `app_runtime`, which stays the runtime stack's public surface.
 
@@ -351,7 +354,7 @@ Key classes:
 - `BackendServerController` ([`backend_server.py`](backend/src/runtime/backend_server.py:1)): starts/stops an in‑process `uvicorn.Server` hosting `fastapi_app`:
 
   - Uses a custom `_QuietUvicornConfig` that disables uvicorn’s own logging configuration (to avoid conflicts in certain frozen environments).
-  - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the EXE.
+  - In FROZEN mode, runs uvicorn in a **background thread** in the same process as the application.
   - `probe_ready()` runs a single non‑blocking readiness probe of `/api/health` and `/app/`; `wait_until_ready(timeout=...)` is the blocking wrapper around it for callers that need a synchronous wait.
   - The port is chosen rather than assumed. [`ports.py`](backend/src/utils/ports.py:1)
     probes against the same host the server will bind, because a port free on the
@@ -366,7 +369,7 @@ Key classes:
 - `StartupSplashWindow` ([`splash.py`](backend/src/runtime/splash.py:1)),
   `StartupMonitor` ([`startup_monitor.py`](backend/src/runtime/startup_monitor.py:1))
   and `StartupReport` ([`startup_report.py`](backend/src/runtime/startup_report.py:1)):
-  first‑run feedback in frozen mode:
+  first‑run feedback in the packaged runtime:
 
   - The splash shows the app icon, “by Oliver Ernster”, the version (from the top‑level `VERSION` file via `src.__version__`), a live status line and a progress bar.
   - `StartupMonitor` polls `BackendServerController.probe_ready()` on a Qt timer, so the UI thread never blocks; status progresses from “Starting the local backend...” to “Preparing the web interface...” to “Ready”.
@@ -378,7 +381,7 @@ Key classes:
   - The browser is opened only when both endpoints actually respond; on timeout the splash reports the problem and closes while the tray stays available.
   - Silent starts (`--no-browser`, used for login autostart) show no splash and open no browser.
 
-- `TrayUIController` ([`tray_ui.py`](backend/src/runtime/tray_ui.py:1)): simple Qt system tray UI in frozen mode, distinct from the dev tray in `tray_components.py`:
+- `TrayUIController` ([`tray_ui.py`](backend/src/runtime/tray_ui.py:1)): simple Qt system tray UI in packaged mode, distinct from the dev tray in `tray_components.py`:
 
   - Sets EDCA icon and tooltip.
   - Offers:
@@ -415,7 +418,7 @@ Key classes:
   than the activation is what carries the fix.
 
 - `UpdateCheckController` ([`update_check.py`](backend/src/runtime/update_check.py:1)):
-  the tray's update check, shared by the frozen and dev trays.
+  the tray's update check, shared by the packaged and dev trays.
 
   - Trigger: one check 3 seconds after construction, so it never contends
     with starting the backend. There is no repeating timer. **This is the only
@@ -515,16 +518,16 @@ they come from their wheels and the application as readable Python. It:
 - Ships as one archive that the setup program extracts, because Nuitka strips
   executables and `.py` files out of an included data directory. The spec lives
   in [buildruntime.py](buildruntime.py:1).
-
-It was a Nuitka onefile build until 3.5.0. Malwarebytes' heuristic quarantined
-that executable on sight under `Malware.AI.1329201734`, wherever it sat, while
-the identical application shipped unfrozen scanned clean across 6,399 files.
-Pinning the onefile extraction folder to one static path per version was an
-earlier attempt at the same problem and is gone with the compilation.
 - Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:144)).
 - Presents a system tray icon from which users can open/close EDCA.
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:
   - Additional launches open the existing browser UI rather than starting a new backend.
+
+It was a Nuitka onefile build until the release that removed the compilation. Malwarebytes' heuristic quarantined
+that executable on sight under `Malware.AI.1329201734`, wherever it sat, while
+the identical application shipped unfrozen scanned clean across 6,399 files.
+Pinning the onefile extraction folder to one static path per version was an
+earlier attempt at the same problem and is gone with the compilation.
 
 On Linux there are two routes. [`build_flatpak.sh`](build_flatpak.sh:1)
 packages the source tree against `org.freedesktop.Platform//25.08`, where

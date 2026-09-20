@@ -133,6 +133,12 @@ that:
 - `isolated_profile` redirects `USERPROFILE`, `LOCALAPPDATA` and `APPDATA`
   into a temporary tree, so shortcuts and install directories land there.
 
+A fourth fixture, `bundle`, builds on `staged_payload`: it stages the small
+payload the setup program reads plus a runtime archive holding a handful of
+named entries, standing in for the real 95 MB one. `stage_runtime_archive` in
+`fakes.py` writes that archive, so the suites that need one do not each build
+their own.
+
 Every external command goes through the hand-written `FakeRunner` in
 [tests/installer/fakes.py](tests/installer/fakes.py), so no test spawns a
 process, ends a real one or writes a real shortcut. The one place a genuinely

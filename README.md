@@ -80,15 +80,13 @@ through it is. Later launches skip straight past it.
 
 > **On SmartScreen warnings:** because this is not a code-signed commercial
 > product, Windows SmartScreen (and some antivirus tools) may warn that the
-> installer or runtime is from an unrecognised publisher. If you are unsure, you
-> can review the complete source code in this repository before choosing to run
+> installer is from an unrecognised publisher. If you are unsure, you can
+> review the complete source code in this repository before choosing to run
 > the installer.
 >
-> A heuristic scanner may also object to the runtime itself, which unpacks
-> before it runs. It unpacks to one fixed folder per version, under your user
-> cache directory, so if your security software quarantines something from
-> there you can restore it and exclude `EDColonisationAsst.exe` once rather
-> than meeting the same warning after every launch.
+> The application itself is not packed. What the installer puts down is an
+> ordinary Python interpreter with EDCA beside it as readable source, so there
+> is nothing for a heuristic scanner to unpack or object to.
 
 ### Upgrading and removing
 

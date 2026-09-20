@@ -374,15 +374,15 @@ and alternative workflows, see
 | Live updates | AJAX long-poll (`/api/changes/longpoll`) |
 | Desktop runtime | PySide6 tray and splash around an in-process uvicorn |
 | Setup program | A separate PySide6 application, standard library only besides Qt |
-| Packaging | Nuitka onefile, one EXE for the runtime and one for the installer |
+| Packaging | One compiled onefile setup program carrying the application as an archive |
 | Tests | pytest with a 100% statement and branch gate, vitest for the frontend |
 
 ### The three commands
 
 ```bash
-python -m pytest -q      # whole gated suite: backend + setup program (from the root)
-python buildexe.py       # build the runtime EXE
-python buildinstaller.py # stage the payload and build the installer EXE
+python -m pytest -q       # whole gated suite: backend + setup program (from the root)
+python buildruntime.py    # stage the runtime and write dist-runtime/edca-runtime.zip
+python buildinstaller.py  # stage the payload and build the installer EXE
 ```
 
 ### The documentation set

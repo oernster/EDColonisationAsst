@@ -501,16 +501,26 @@ For developers working from a clone:
 
 ### 3.2 Packaged/built runtime
 
-On Windows, a Nuitka/EXE‑based runtime:
+On Windows the installed runtime is an unfrozen deployment. Nothing is
+compiled: the install directory holds a plain interpreter, the dependencies as
+they come from their wheels and the application as readable Python. It:
 
-- Uses `runtime_entry.py` as the EXE entrypoint.
+- Uses [edca_launch.py](edca_launch.py:1) as the entry point, which puts the
+  install directory on the module search path, sets `EDCA_PACKAGED` and then
+  calls `runtime_entry.main()`.
 - Bundles the backend and uses in‑process uvicorn.
-- Unpacks itself into one static folder per version under the user cache
-  directory rather than into a fresh temporary folder on each launch. A onefile
-  build has to extract somewhere before it can run; a path that changes every
-  time cannot be excluded in a security product, which is how a heuristic
-  scanner came to quarantine part of the runtime during sign-in and stop the
-  application starting. The spec lives in [buildexe.py](buildexe.py:1).
+- Is reported as the packaged mode by `is_deployed()` reading that variable.
+  Nothing about the process could say so otherwise: `sys.frozen` is absent and
+  the executable is a renamed copy of `pythonw.exe`.
+- Ships as one archive that the setup program extracts, because Nuitka strips
+  executables and `.py` files out of an included data directory. The spec lives
+  in [buildruntime.py](buildruntime.py:1).
+
+It was a Nuitka onefile build until 3.5.0. Malwarebytes' heuristic quarantined
+that executable on sight under `Malware.AI.1329201734`, wherever it sat, while
+the identical application shipped unfrozen scanned clean across 6,399 files.
+Pinning the onefile extraction folder to one static path per version was an
+earlier attempt at the same problem and is gone with the compilation.
 - Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:144)).
 - Presents a system tray icon from which users can open/close EDCA.
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:
@@ -520,10 +530,10 @@ On Linux there are two routes. [`build_flatpak.sh`](build_flatpak.sh:1)
 packages the source tree against `org.freedesktop.Platform//25.08`, where
 the sandbox provides the interpreter and the dependencies, so the runtime
 takes the packaged path (in-process uvicorn behind a tray icon) exactly as
-the frozen Windows build does. `get_runtime_mode()` reports FROZEN inside a
+the installed Windows build does. `get_runtime_mode()` reports FROZEN inside a
 sandbox for that reason: the distinction the modes draw is whether the
-dependencies are installed and the layout fixed, not whether Nuitka
-compiled anything. [`cleanup_flatpak.sh`](cleanup_flatpak.sh:1) reverses it.
+dependencies are installed and the layout fixed, not whether anything was
+compiled. An installed Windows deployment now reports it on the same ground. [`cleanup_flatpak.sh`](cleanup_flatpak.sh:1) reverses it.
 
 The helper script [`run-edca-built.sh`](run-edca-built.sh:1) is the other
 route: it starts the backend from the checkout and serves the built

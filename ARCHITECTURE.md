@@ -138,7 +138,7 @@ anything. Before it existed the shape held by habit rather than by rule.
   An import deferred inside a function counts exactly as one at module level.
   `test_backend_layers_import_only_inwards`.
 - **The setup program is a separate program.** It imports nothing from
-  `backend/`, which is what keeps the compiled onefile down to PySide6 plus the
+  `backend/`, which is what keeps its compiled onefile down to PySide6 plus the
   standard library. `test_the_setup_program_imports_nothing_from_the_application`.
 - **No file exceeds 400 lines.** The rule arrived with an allowlist of the
   nineteen that were already over it, which could only shrink and which a
@@ -147,7 +147,7 @@ anything. Before it existed the shape held by habit rather than by rule.
   exception. `test_modules_within_line_limit`.
 
 The size scan reads TypeScript as well as Python, because four of the nineteen
-were front-end components. `buildexe.py` and `buildinstaller.py` are outside
+were front-end components. `buildruntime.py` and `buildinstaller.py` are outside
 every scan: they are linear recipes read top to bottom.
 
 ---
@@ -158,7 +158,7 @@ The `installer/` package is a second, self-contained program that ships the
 first one. It imports nothing from `backend/` and is deliberately
 dependency-light: process detection is `tasklist`, version comparison is a
 tuple compare and shortcuts are written through the Windows scripting host, so
-the compiled onefile pulls in nothing beyond PySide6 and the standard library.
+its compiled onefile pulls in nothing beyond PySide6 and the standard library.
 
 It follows the same shape as the application, for the same reason.
 
@@ -215,9 +215,12 @@ still resolves. A payload that cannot be found is a hard failure: the previous
 last-resort fallback to the project root would, after the move into a
 subpackage, have installed the installer's own sources.
 
-Nuitka strips loose executables out of an included data directory, so the
-runtime executable is embedded a second time under `installer/runtime` and
-recovered from there when the copied payload turns out not to carry it.
+The application is not in that payload. It travels as
+`installer/runtime/edca-runtime.zip`, embedded separately, because Nuitka
+strips executables and `.py` files out of an included data directory and an
+unfrozen EDCA is several thousand of both. On install the archive is extracted
+into the install directory, every member resolved against the target first so
+an entry that would climb out of it is refused rather than followed.
 
 ### Invariants and what enforces them
 
@@ -309,9 +312,9 @@ phase spans and the per-file progress) is gated:
 - **Development workflows and tooling**  
   [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md)  
   - How to run backend and frontend in development.
-  - The Windows build pipeline: `python buildexe.py` (runtime EXE) then
-    `python buildinstaller.py` (GUI installer), with the installer UI
-    sources under `installer/`.
+  - The Windows build pipeline: `python buildruntime.py` (the runtime
+    archive) then `python buildinstaller.py` (GUI installer), with the
+    installer UI sources under `installer/`.
   - Lint/type-checking commands.
 
 - **Testing**  

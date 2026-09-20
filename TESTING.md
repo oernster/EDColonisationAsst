@@ -158,7 +158,7 @@ Four rules:
   stays free of `api` and `runtime`; `api` stays free of `runtime`. The walk is
   over the whole syntax tree, so an import deferred inside a function counts
   exactly as one at module level.
-- The setup program imports nothing from `backend/`, which is what keeps the
+- The setup program imports nothing from `backend/`, which is what keeps its
   compiled onefile down to PySide6 plus the standard library.
 - No file exceeds 400 lines. The rule arrived with an allowlist of the nineteen
   files that were already over it, which could only shrink and which a staleness
@@ -170,7 +170,7 @@ front-end components, so a scan that walked `*.py` only would have reported a
 clean repository while `FleetCarriersPanel.tsx` sat at 752 lines. TypeScript is
 measured but not parsed: the import rules are Python only.
 
-`buildexe.py` and `buildinstaller.py` are outside every scan. They are linear
+`buildruntime.py` and `buildinstaller.py` are outside every scan. They are linear
 recipes read top to bottom, where splitting a sequence of flags and steps
 across modules costs more than it buys.
 

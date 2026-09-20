@@ -22,62 +22,92 @@ The whole Windows build pipeline is two scripts at the project root, run in
 order:
 
 ```powershell
-# 1) Build the self-contained runtime EXE
-python buildexe.py
+# 1) Stage the runtime and archive it
+python buildruntime.py
 
 # 2) Stage the payload and build the GUI installer EXE
 python buildinstaller.py
 ```
 
 Run both from the project root with a Python environment that has
-`backend/requirements-dev.txt` installed (this includes Nuitka and PySide6).
+`backend/requirements-dev.txt` installed, which brings in PySide6 plus the
+Nuitka that builds the setup program.
 
-### What buildexe.py does
+### Why the application is no longer compiled
 
-[buildexe.py](buildexe.py) compiles
-[backend/src/runtime_entry.py](backend/src/runtime_entry.py) with Nuitka
-(onefile, PySide6 plugin) into a self-contained runtime that embeds Python
-and every backend dependency. It also:
+EDCA used to ship as a Nuitka onefile executable. Malwarebytes' heuristic
+quarantined that executable on sight under `Malware.AI.1329201734`, wherever it
+sat: out of the onefile extraction folder, out of `%LOCALAPPDATA%` and out of
+an ordinary Downloads folder while doing nothing. The detection was static rather
+than behavioural: an on-demand scan of the file at rest flagged it. A fresh
+build with a newer Nuitka was flagged the same way. The identical
+application shipped unfrozen scanned clean across 6,399 files.
 
-- Refreshes `BUILD_ID` (UTC timestamp + short git SHA) so installed builds
+An application a security product deletes cannot be given to a community;
+asking every commander to add an exclusion is not a product either. So EDCA now ships
+the way it runs: a plain interpreter, the runtime dependencies as they come
+from their wheels and the application as readable Python. The SETUP PROGRAM is
+still compiled with Nuitka; only the application stopped being.
+
+### What buildruntime.py does
+
+[buildruntime.py](buildruntime.py) stages a complete deployment tree under
+`build/runtime/` and writes it out as one archive. It:
+
+- Refreshes `BUILD_ID` (UTC timestamp plus short git SHA) so installed builds
   can be identified via `/api/health`.
-- Reads the canonical version from the top-level `VERSION` file and stamps
-  it into the EXE's PE metadata (product/file version, company, copyright).
-- Bundles `VERSION` and `BUILD_ID` inside the EXE.
-- Keeps all Nuitka intermediates under `build/` (gitignored).
-- Pins where the onefile runtime unpacks itself:
-  `{CACHE_DIR}/Oliver Ernster/EDColonisationAsst/{VERSION}`, one static folder
-  per version, rather than Nuitka's default of a fresh
-  `Temp\onefile_<pid>_<time>` on every launch. The default gives the unpacked
-  runtime a new path each run, so a security product that flags it cannot be
-  told to trust it: Malwarebytes quarantined `runtime_entry.dll` out of such a
-  folder during sign-in and the application did not start. A static path can be
-  excluded once; the cached contents also make later launches faster. The
-  product name is not used in the path because it carries a colon, which
-  Windows paths cannot.
+- Copies the base interpreter, skipping the parts an installed EDCA never uses
+  (the test suite, IDLE, the Tk stack, the bundled documentation).
+- Installs `backend/requirements.txt` into that interpreter, minus the
+  build-only requirements: Nuitka compiled the old runtime and is imported by
+  nothing at run time.
+- Prunes the Qt modules EDCA does not use. The tray, the splash and three
+  dialogs need Core, Gui and Widgets; the rest is weight a commander downloads
+  once and never runs. Measured saving: 471 MB.
+- Copies `pythonw.exe` to `EDColonisationAsst.exe`, so the taskbar and the tray
+  carry the application's own name rather than the interpreter's.
+- Stages the application beside it: `backend/src`, the built `frontend/dist`,
+  the icons, `LICENSE`, `VERSION`, `BUILD_ID` and
+  [edca_launch.py](edca_launch.py).
+- Writes `dist-runtime/edca-runtime.zip`.
 
-Output: `dist-runtime/EDColonisationAsst.exe`
+Measured on the first green build: a 259 MB tree, a 95 MB archive.
 
-Set `EDCA_DEBUG_CONSOLE=1` in the environment before building to produce a
-debug build with an attached console.
+The tree travels as an archive rather than as loose files because Nuitka strips
+executables and `.py` files out of an included data directory; an unfrozen
+EDCA is several thousand of exactly those two kinds.
+
+Output: `dist-runtime/edca-runtime.zip`
+
+### What edca_launch.py does
+
+An installed EDCA has no compiled entry point, so
+[edca_launch.py](edca_launch.py) does the two things a frozen build got for
+free: it puts the install directory on the module search path and sets
+`EDCA_PACKAGED`, which is how `backend.src.utils.runtime.is_deployed` knows
+this is an installed layout rather than a developer's checkout. Every module
+that decides where it writes reads that answer, so the variable is set before
+the application is imported. The shortcuts and the sign-in entry both run this
+script rather than the executable alone.
 
 ### What buildinstaller.py does
 
 [buildinstaller.py](buildinstaller.py):
 
-1. Requires `dist-runtime/EDColonisationAsst.exe` (fails fast with a hint to
-   run `python buildexe.py` first).
+1. Requires `dist-runtime/edca-runtime.zip` (fails fast with a hint to run
+   `python buildruntime.py` first).
 2. Ensures the frontend production bundle exists, running `npm run build`
    when npm is available (an existing `frontend/dist` is accepted when npm
    is absent).
-3. Stages a fresh curated payload under `build/payload/`: backend sources
-   (shipped as `*.py_` so Nuitka does not strip them; the installer renames
-   them back on deploy), the built frontend, icons, `LICENSE`, `VERSION`
-   and the runtime EXE.
+3. Stages a small payload under `build/payload/`: the icons, `LICENSE` and
+   `VERSION`. That is what the SETUP PROGRAM itself reads; the application
+   is not in it.
 4. Compiles the PySide6 installer package with Nuitka (onefile) from the
    root entry point [installer_main.py](installer_main.py), with
-   `--include-package=installer` and the payload embedded at
-   `installer/payload`, stamping the same PE metadata from `VERSION`.
+   `--include-package=installer`, the payload embedded at
+   `installer/payload` and the runtime archive embedded at
+   `installer/runtime/edca-runtime.zip`, stamping the PE metadata from
+   `VERSION`.
 
    The entry point is at the repository root rather than inside the package
    because a script is compiled with its own directory on the module search
@@ -85,13 +115,18 @@ debug build with an attached console.
    imports unresolvable. Compiling from the root also gives the payload one
    anchor that holds in both source and compiled runs.
 
+On install, the setup program extracts that archive into the install directory,
+resolving every member against the target first, so an entry that would climb
+out of it is refused rather than followed.
+
 Output: `dist-installer/EDColonisationAsstInstaller.exe`
 
 ### Build system layout
 
 ```text
-buildexe.py           # runtime EXE build (Nuitka onefile)
+buildruntime.py       # runtime staging + edca-runtime.zip (nothing compiled)
 buildinstaller.py     # payload staging + installer EXE build
+edca_launch.py        # what an installed EDCA runs (shipped in the archive)
 installer_main.py     # installer entry point (Nuitka compiles this)
 installer/
 ├── app.py            # composition root
@@ -102,11 +137,11 @@ installer/
 ├── shared/           # resource anchoring and crash logging, no Qt
 └── ui/               # the themed window, its dialogs, its themes and the worker thread
 tests/installer/      # the setup program's suite (run from the root)
-build/                # Nuitka intermediates + staged payload (gitignored)
-dist-runtime/         # EDColonisationAsst.exe (gitignored)
+build/                # staged runtime tree, staged payload, Nuitka intermediates (gitignored)
+dist-runtime/         # edca-runtime.zip (gitignored)
 dist-installer/       # EDColonisationAsstInstaller.exe (gitignored)
 VERSION               # single source of truth for the app version
-BUILD_ID              # build marker written by buildexe.py (gitignored)
+BUILD_ID              # build marker written by buildruntime.py (gitignored)
 ```
 
 The `VERSION` file is the single source of truth for the application
@@ -142,7 +177,9 @@ hardcodes a version.
 ### Windows compiler requirements for Nuitka
 
 Nuitka compiles Python to C and needs a platform C/C++ compiler. This
-project is tested with **MSVC**, not Cygwin GCC.
+project is tested with **MSVC**, not Cygwin GCC. Only the setup program is
+compiled now, so this applies to `buildinstaller.py` alone;
+`buildruntime.py` needs no compiler at all.
 
 For Python 3.13 (the current default):
 
@@ -168,7 +205,8 @@ On a Windows test machine:
    **Install** (default target: `%LOCALAPPDATA%\EDColonisationAssistant`;
    no elevation required).
 2. Confirm the install directory contains `EDColonisationAsst.exe`,
-   `backend/`, `frontend/dist/` and `_uninstall/`.
+   `edca_launch.py`, `backend/`, `frontend/dist/`, the interpreter's `Lib/`
+   and `_uninstall/`.
 3. Launch via the Start Menu / Desktop shortcut:
    - The startup splash appears (icon, author, version, live status).
    - A tray icon appears (Open Web UI / Help / Exit).
@@ -245,8 +283,8 @@ because that is where the commander's database lives.
 [backend/requirements-flatpak.txt](backend/requirements-flatpak.txt) mirrors
 `backend/requirements.txt` with two differences, both forced rather than chosen:
 
-- Nuitka and shiboken6 are absent. Nuitka builds the Windows executable and is
-  never imported at runtime; shiboken6 arrives with PySide6.
+- Nuitka and shiboken6 are absent. Nuitka builds the Windows setup program and
+  is never imported at runtime; shiboken6 arrives with PySide6.
 - PyYAML is 6.0.3 rather than 6.0.1. The runtime ships Python 3.13 and 6.0.1
   published no wheel for it, not even a pure-Python one, so the offline download
   fails outright rather than falling back.
@@ -633,9 +671,13 @@ mobile browser: that API is restricted to a secure context.
 
 ## Runtime behaviour of the installed app
 
-The Start Menu / Desktop shortcuts point at `EDColonisationAsst.exe`, which:
+The Start Menu / Desktop shortcuts run `EDColonisationAsst.exe` with
+`edca_launch.py` as its argument. That executable is a renamed `pythonw.exe`
+and the script is what makes the install importable; between them they start
+the application, which:
 
-- Detects FROZEN mode and starts an in-process `uvicorn.Server` hosting the
+- Detects the packaged mode from `EDCA_PACKAGED` and starts an in-process
+  `uvicorn.Server` hosting the
   FastAPI app on `http://127.0.0.1:47021`. That port is a preference, not a
   promise: the port a previous run recorded is tried first, then the configured
   one, then the remaining candidates, then whatever the operating system will

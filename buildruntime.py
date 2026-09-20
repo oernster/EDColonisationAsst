@@ -207,12 +207,20 @@ def _install_dependencies(target: Path) -> None:
     print(f"[buildruntime] Installing {len(requirements)} requirement(s)")
     site_packages = target / "Lib" / "site-packages"
     site_packages.mkdir(parents=True, exist_ok=True)
+    # --no-warn-conflicts because a --target install is not an environment
+    # install: pip still checks what it writes against the packages of the
+    # interpreter it happens to be running from, so unrelated tools installed
+    # there are reported as conflicting with pins that never went near them.
+    # The report is alarming, names projects with nothing to do with EDCA and
+    # says nothing about whether the staged tree is correct. pip's exit code,
+    # checked below, is what actually settles that.
     command = [
         sys.executable,
         "-m",
         "pip",
         "install",
         "--disable-pip-version-check",
+        "--no-warn-conflicts",
         "--no-compile",
         "--target",
         str(site_packages),

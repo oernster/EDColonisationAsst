@@ -43,9 +43,7 @@ or a tablet on the same network as their HUD.
 
 It is not for you if you want squadron-wide or shared tracking: Elite Dangerous
 writes journals per player on the local machine, so EDCA can only ever see your
-own contributions and does not pretend otherwise. Windows is the only platform
-with a downloadable installer; on Linux you build a Flatpak from a checkout
-(see [Install and run on Linux](#install-and-run-on-linux)) or run from source.
+own contributions and does not pretend otherwise. There is no macOS build.
 It does nothing at all when the game is not writing journals.
 
 ---
@@ -119,8 +117,21 @@ install directory, the shortcuts and the sign-in entry.
 
 ## Install and run on Linux
 
-There is no downloadable Linux package. You build a Flatpak from a checkout,
-which needs `git`, `python3` and `node`:
+Download `edcolonisationasst.flatpak` from the **Releases** page and install it:
+
+```bash
+flatpak install --user edcolonisationasst.flatpak
+flatpak run uk.co.oernster.EDColonisationAsst
+```
+
+It needs the Freedesktop 25.08 runtime, which Flatpak fetches from Flathub the
+first time. To remove it later, `flatpak uninstall --user
+uk.co.oernster.EDColonisationAsst`.
+
+### Building it yourself instead
+
+You can build the Flatpak from a checkout, which needs `git`, `python3` and
+`node`:
 
 ```bash
 git clone https://github.com/oernster/EDColonisationAsst.git

@@ -135,9 +135,9 @@
     <section id="download">
       <div class="eyebrow">Get EDCA</div>
       <h2 class="section-title">Download EDCA</h2>
-      <p class="section-sub">Download the newest release with one click on Windows; on
-        Linux you build the Flatpak yourself. Free and open source under LGPL-3.0; it runs
-        entirely on your machine and nothing leaves your PC.</p>
+      <p class="section-sub">Download the newest release with one click on Windows or
+        Linux. Free and open source under LGPL-3.0; it runs entirely on your machine and
+        nothing leaves your PC.</p>
       <span class="dl-version" id="dl-version">Latest release</span>
       <div class="downloads">
         <div class="dl-card">
@@ -154,10 +154,11 @@
           <div class="ico">&#128039;</div>
           <h3>Linux</h3>
           <p class="req">Any distribution with Flatpak</p>
-          <a class="btn ghost" href="https://github.com/oernster/EDColonisationAsst#install-and-run-on-linux">
-            How to build it</a>
-          <p class="meta">Flatpak, built from a checkout</p>
-          <p class="how">There is no downloadable Linux package. Clone the repository and run <code>./build_flatpak.sh</code>, which builds the app, installs it and writes a <code>.flatpak</code> file you can copy to another machine. You can also run it straight from source.</p>
+          <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest/download/edcolonisationasst.flatpak">
+            Download for Linux</a>
+          <p class="meta" data-asset="edcolonisationasst.flatpak">Flatpak bundle (.flatpak)</p>
+          <p class="meta">Needs the Freedesktop 25.08 runtime, which Flatpak fetches from Flathub the first time.</p>
+          <p class="how">Install it with <code>flatpak install --user edcolonisationasst.flatpak</code>, then start it from your applications menu or with <code>flatpak run uk.co.oernster.EDColonisationAsst</code>. You can still <a href="https://github.com/oernster/EDColonisationAsst#install-and-run-on-linux">build it yourself</a> from a checkout instead; running it straight from source also works.</p>
         </div>
       </div>
       <p class="dl-links">

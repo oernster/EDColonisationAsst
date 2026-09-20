@@ -52,7 +52,7 @@
       "name": "Which platforms does EDCA support?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Windows and Linux. On Windows, EDCA ships as an installer you download from the Releases page. On Linux there is no downloadable package: you build a Flatpak from a checkout with the script in the repository or run it straight from source."
+        "text": "Windows and Linux. On Windows, EDCA ships as an installer you download from the Releases page. On Linux it ships as a Flatpak bundle on that same page: install it with flatpak install --user edcolonisationasst.flatpak. It needs the Freedesktop 25.08 runtime, which Flatpak fetches from Flathub the first time. You can still build it yourself from a checkout or run it straight from source."
       }
     },
     {
@@ -116,7 +116,7 @@
       "name": "How do I update or uninstall EDCA?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "EDCA checks for a new version once each time it starts, from the tray, then prompts you when one is out, with a direct download of the installer plus the choice to skip that version or decide later. You can also ask at any time with Check for Updates in the tray Help menu, which tells you the answer straight away. On Windows, run the installer over your existing installation and it upgrades in one pass, offering to close EDCA first if it is running; to remove it, use Apps and features, which clears the install folder, the shortcuts and the sign-in entry. On Linux, rebuild the Flatpak from a newer checkout to upgrade and run cleanup_flatpak.sh to remove it, which leaves your database and your settings alone unless you ask it to purge them."
+        "text": "EDCA checks for a new version once each time it starts, from the tray, then prompts you when one is out, with a direct download of the installer plus the choice to skip that version or decide later. You can also ask at any time with Check for Updates in the tray Help menu, which tells you the answer straight away. On Windows, run the installer over your existing installation and it upgrades in one pass, offering to close EDCA first if it is running; to remove it, use Apps and features, which clears the install folder, the shortcuts and the sign-in entry. On Linux, download the newer bundle and install it over the top; rebuilding from a newer checkout works too. To remove it, run flatpak uninstall --user uk.co.oernster.EDColonisationAsst, which leaves your database and your settings where they are. If you built it from a checkout, cleanup_flatpak.sh does the same and clears the build artefacts with it, purging your data only when you ask it to."
       }
     }
   ]
@@ -159,7 +159,7 @@
         </div>
         <div class="card">
           <h3>Which platforms does EDCA support?</h3>
-          <p>Windows and Linux. On Windows, EDCA ships as an installer you download from the Releases page. On Linux there is no downloadable package: you build a Flatpak from a checkout with the script in the repository or run it straight from source.</p>
+          <p>Windows and Linux. On Windows, EDCA ships as an installer you download from the Releases page. On Linux it ships as a Flatpak bundle on that same page: install it with <code>flatpak install --user edcolonisationasst.flatpak</code>. It needs the Freedesktop 25.08 runtime, which Flatpak fetches from Flathub the first time. You can still build it yourself from a checkout or run it straight from source.</p>
         </div>
         <div class="card">
           <h3>What does EDCA track?</h3>
@@ -191,7 +191,7 @@
         </div>
         <div class="card">
           <h3>How do I update or uninstall EDCA?</h3>
-          <p>EDCA checks for a new version once each time it starts, from the tray, then prompts you when one is out, with a direct download of the installer plus the choice to skip that version or decide later. You can also ask at any time with Check for Updates in the tray Help menu, which tells you the answer straight away. On Windows, run the installer over your existing installation and it upgrades in one pass, offering to close EDCA first if it is running; to remove it, use Apps and features, which clears the install folder, the shortcuts and the sign-in entry. On Linux, rebuild the Flatpak from a newer checkout to upgrade and run cleanup_flatpak.sh to remove it, which leaves your database and your settings alone unless you ask it to purge them.</p>
+          <p>EDCA checks for a new version once each time it starts, from the tray, then prompts you when one is out, with a direct download of the installer plus the choice to skip that version or decide later. You can also ask at any time with Check for Updates in the tray Help menu, which tells you the answer straight away. On Windows, run the installer over your existing installation and it upgrades in one pass, offering to close EDCA first if it is running; to remove it, use Apps and features, which clears the install folder, the shortcuts and the sign-in entry. On Linux, download the newer bundle and install it over the top; rebuilding from a newer checkout works too. To remove it, run flatpak uninstall --user uk.co.oernster.EDColonisationAsst, which leaves your database and your settings where they are. If you built it from a checkout, cleanup_flatpak.sh does the same and clears the build artefacts with it, purging your data only when you ask it to.</p>
         </div>
       </div>
     </section>

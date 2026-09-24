@@ -13,7 +13,7 @@ from __future__ import annotations
 APP_DISPLAY_NAME = "Elite: Dangerous Colonisation Assistant"
 APP_TAGLINE = "Colonisation support for Commanders"
 APP_PUBLISHER = "Oliver Ernster"
-APP_URL = "https://oernster.github.io/EDColonisationAsst/"
+APP_URL = "https://ernster.dev/EDColonisationAsst/"
 
 # The spaceless identifier used for the per-user install directory. This is the
 # historical name and must not change: an existing installation is found by it.

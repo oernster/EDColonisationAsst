@@ -410,6 +410,8 @@ If you have cloned the repository and want to build or run EDCA from source:
   frontend and packaged-runtime architecture
 - [`TECH_DEBT.md`](TECH_DEBT.md) - what is still open, what is deliberately left
   and what only looks like debt
+- [`DECISIONS-TRADEOFFS.md`](DECISIONS-TRADEOFFS.md) sets out the decisions EDCA
+  rests on, with what each one gains and what it costs
 - [`PROJECT_SETUP.md`](PROJECT_SETUP.md) - first-time environment setup notes
 - [`GameGlass-Integration.md`](GameGlass-Integration.md) - how a GameGlass shard
   or other embedded web view talks to the backend API

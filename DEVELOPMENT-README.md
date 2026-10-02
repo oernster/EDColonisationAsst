@@ -11,6 +11,7 @@ Related documents:
 - [ARCHITECTURE_2_frontend_and_runtime.md](ARCHITECTURE_2_frontend_and_runtime.md) - frontend and packaged-runtime architecture
 - [TESTING.md](TESTING.md) - how to run the tests and the coverage gate
 - [TECH_DEBT.md](TECH_DEBT.md) - what is still open, what is deliberately left and what only looks like debt
+- [DECISIONS-TRADEOFFS.md](DECISIONS-TRADEOFFS.md) - the decisions EDCA rests on, with what each gains and costs
 - [PROJECT_SETUP.md](PROJECT_SETUP.md) - first-time environment setup notes
 - [GameGlass-Integration.md](GameGlass-Integration.md) - GameGlass shard integration
 
@@ -429,7 +430,9 @@ ruff check --config backend/pyproject.toml backend/src
 flake8 backend/src
 ```
 
-The pre-commit hook runs all of these, so a clean run here means a clean hook.
+The pre-commit hook runs the ruff and flake8 commands above (black it runs as a
+formatter over the staged files), so a clean run here means a clean hook. It
+does not run isort, mypy or pylint.
 
 The front end is linted too, by ESLint:
 
@@ -457,10 +460,11 @@ chmod +x .githooks/pre-commit
 
 It formats staged Python files with black, lints the Python surface and the
 front end, then runs a bare `pytest -q` from the repository root, which is
-the full gate: both suites under the 100% coverage requirement. It resolves its interpreter from the root
-`venv/`, the environment that actually carries the tooling. If that
-environment is missing pytest or black it fails with a named error rather
-than falling through to `PATH`.
+the full gate: both suites under the 100% coverage requirement. It prefers the
+interpreter in the root `venv/`, the environment that actually carries the
+tooling, taking `python3` or `python` from `PATH` only when that environment is
+absent. An interpreter missing pytest, black, flake8 or ruff stops it with a
+named error.
 
 ---
 

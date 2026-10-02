@@ -220,8 +220,9 @@ ruff check --config backend/pyproject.toml backend/src
 flake8 backend/src
 ```
 
-The pre-commit hook runs every one of these before the suite, so a clean run
-here means a clean hook.
+The pre-commit hook runs the ruff and flake8 commands here before the suite,
+having formatted the staged files with black, so a clean run here means a
+clean hook.
 
 The front end is linted too, by ESLint:
 
@@ -244,7 +245,8 @@ commit formats staged Python files with black, lints the Python surface and
 the front end, then runs a bare `pytest -q` from the repository root. That is the same command documented
 above and the same gate: both suites, 100% coverage, exit code or nothing.
 
-The interpreter is resolved once, from the root `venv/`, which is where the
-tooling lives. If that environment is absent or lacks pytest and black the
-hook stops with a named error rather than falling through to whatever is on
-`PATH`, so the check that runs is never silently a different check.
+The interpreter is resolved once and used for every step. The root `venv/` is
+preferred, since that is where the tooling lives; only when it is absent does
+the hook take `python3` or `python` from `PATH`. Whichever it picks must carry
+pytest, black, flake8 and ruff, otherwise the hook stops with a named error
+rather than running a lesser check.

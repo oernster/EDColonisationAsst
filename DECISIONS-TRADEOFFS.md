@@ -157,6 +157,24 @@ read again from the start.
   mid-line never produces a parse error.
 - **Costs:** the reader keeps a position and a buffer for every file.
 
+### Notifications first, with polling behind them in shipped builds
+
+Live updates come from the operating system's file notifications. Every
+shipped build, the Windows install and the Flatpak alike, also polls the
+newest journal several times a second and reads it when it has changed. A
+source checkout does not poll.
+
+- **Rather than:** notifications alone, which operating systems report
+  inconsistently for a file the game keeps appending to; polling alone, which
+  costs more and reacts later; deciding by whether the build was compiled,
+  which left the safety net switched off in every build that ships, since
+  none of them is.
+- **Gains:** the page keeps following the journal when notifications miss an
+  append or the watcher cannot start at all.
+- **Costs:** a small, constant amount of work while EDCA runs; a developer
+  running from source does not exercise the poller day to day, so the suite
+  checks it under each shipped build's conditions instead.
+
 ### The first import happens in the background
 
 On a first run every journal already on the machine is read once, while the
@@ -359,8 +377,8 @@ Closing that window is the same as choosing Exit.
 
 ### An unusual port, then a short list, then any
 
-The backend tries the port a previous run recorded, then the configured one
-(47021 unless changed), then a short list of other known ports, then whatever
+The backend tries the port a previous run recorded, then the configured one,
+then a short list of other known ports, then whatever
 the operating system will give. The port chosen is recorded for next time. A
 port Windows has reserved is told apart from one that is in use.
 
@@ -568,11 +586,16 @@ asserting is first moved out of them.
 No mocking library is used. Tests use real SQLite databases in temporary
 folders, the ASGI test client for endpoints and hand-written fakes. The setup
 program's tests write only to a scratch registry key and a temporary profile.
+Most watcher tests use a fake file watcher; one starts the real one on a
+temporary folder and fails unless a journal append reaches EDCA through it.
 
-- **Rather than:** mocks.
+- **Rather than:** mocks; fakes everywhere. A watcher that fails to start is
+  treated as non-fatal, so with fakes alone a library that cannot start on the
+  shipped interpreter passed every test.
 - **Gains:** a passing test means the real thing works; no test touches a real
   installation.
-- **Costs:** fakes are written by hand.
+- **Costs:** fakes are written by hand; the real-watcher test waits on the
+  filesystem rather than returning at once.
 
 ### Small modules
 
@@ -598,8 +621,9 @@ file.
 
 ### A broad exception handler says why
 
-Every exception handler that catches broadly carries a written reason;
-handlers that can be narrowed to the errors they can actually raise are.
+Every exception handler that catches broadly and swallows the error has a
+written reason; handlers that can be narrowed to the errors they can actually raise
+are.
 
 - **Rather than:** silent broad handlers.
 - **Gains:** a reader can tell a deliberate catch from a careless one.
@@ -608,12 +632,12 @@ handlers that can be narrowed to the errors they can actually raise are.
 ### The commit hook runs the real gate
 
 The pre-commit hook formats staged Python, lints the Python and the front end,
-then runs the full suite under the coverage gate. It uses one interpreter from
-the project's own environment and stops with a named error if that is
-missing. Type checking and the front-end test suite are left out of it.
+then runs the full suite under the coverage gate. It uses one interpreter for
+every step, preferring the project's own environment; it stops with a named
+error if that interpreter lacks any of the tools. Type checking and the
+front-end test suite are left out of it.
 
-- **Rather than:** a lighter check; one that silently uses whatever is on the
-  path.
+- **Rather than:** a lighter check; one that silently runs without its tools.
 - **Gains:** a commit cannot land below the gate; the check that runs is the
   one documented.
 - **Costs:** each commit waits for the suite; front-end types and tests are

@@ -24,7 +24,8 @@ Replaces manual tracking with automatic, journal-driven state.
 - Updates automatically as you play
 - Tells you when a newer release exists. EDCA checks automatically once per
   run, from the tray, which is the machine it is installed on; a prompt
-  offers Download (the installer itself), Skip This Version or Later; a
+  offers Download (the installer on Windows, the Flatpak bundle on Linux),
+  Skip This Version or Later; a
   skipped version is not raised again. You can also ask at any time, from
   the tray's **Help** menu, being told the answer either way: the offer,
   that you are already on the latest version or that GitHub could not be
@@ -90,7 +91,7 @@ through it is. Later launches skip straight past it.
 
 EDCA tells you when an upgrade exists. Once per run, shortly after it starts,
 the tray compares the running version against the latest GitHub release and
-offers you the installer if there is a newer one. To ask at any time, use
+offers you the download for your platform if there is a newer one. To ask at any time, use
 **Help** then **Check for Updates** in the tray, which reports straight away
 whatever the answer turns out to be.
 

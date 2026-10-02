@@ -53,6 +53,8 @@ EDColonisationAsst/
 ├── ARCHITECTURE_1_backend.md # Backend architecture detail
 ├── ARCHITECTURE_2_frontend_and_runtime.md # Frontend + runtime detail
 ├── TECH_DEBT.md              # Standing record of open internal debt
+├── DECISIONS-TRADEOFFS.md    # The decisions EDCA rests on and what each costs
+├── PROJECT_SETUP.md          # This guide
 ├── GameGlass-Integration.md  # GameGlass shard integration
 ├── VERSION                   # Single source of truth for the version
 ├── pytest.ini                # Root pytest + coverage gate (backend + installer)
@@ -63,6 +65,7 @@ EDColonisationAsst/
 ├── build_flatpak.sh          # Linux Flatpak build (offline wheels)
 ├── cleanup_flatpak.sh        # Removes what build_flatpak.sh produced
 ├── generate_icons.py         # Every icon and the site's social card, from one master
+├── stamp_assets.py           # Versions the site's stylesheet links by content hash
 ├── installer_main.py         # Setup program entry point (Nuitka compiles this)
 ├── installer/                # The setup program, a separate PySide6 application
 │   ├── ops/                  # side effects, no Qt (payload, copy, shortcuts, processes)
@@ -70,7 +73,7 @@ EDColonisationAsst/
 │   ├── shared/               # resource anchoring and crash logging, no Qt
 │   └── ui/                   # the themed window, its dialogs and the worker thread
 ├── tests/installer/          # Setup program suite (inside the same 100% gate)
-├── tests/structural/         # Layering, domain purity and the module size cap
+├── tests/structural/         # Layering, the setup program's separation, the size cap
 ├── backend/                  # Python FastAPI backend
 │   ├── src/                  # models, services, repositories, api, utils, runtime
 │   ├── tests/unit/           # pytest suite (100% gate; see TESTING.md)

@@ -510,7 +510,7 @@ This API-focused description is intended to be sufficient for shard authors to i
 
 These endpoints expose the commander’s Fleet carrier data derived from Elite: Dangerous journal files. They are **optional** for GameGlass shards: use them if you want to display the carrier hold and market orders in addition to colonisation data.
 
-Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`, `CarrierJumpRequest` and `CarrierJumpCancelled` events, together with the commander's own `Docked`, `Undocked` and market transactions, by the backend logic in [`carrier_service.py`](backend/src/services/carrier_service.py:1) and surfaced via the carrier API routes in [`carriers.py`](backend/src/api/carriers.py:60).
+Fleet carrier state is reconstructed in memory from `CarrierLocation`, `CarrierStats`, `CarrierTradeOrder`, `CarrierJumpRequest` and `CarrierJumpCancelled` events, together with the commander's own `Docked`, `Undocked` and market transactions, by the backend logic in [`carrier_service.py`](backend/src/services/carrier_service.py:1) and surfaced via the carrier API routes in [`carriers.py`](backend/src/api/carriers.py:37).
 
 ### 5.1. Current docking context
 
@@ -523,7 +523,7 @@ Returns whether the commander is currently docked at a Fleet carrier and (if so)
 
 **Response Shape (simplified)**
 
-Based on [`CurrentCarrierResponse`](backend/src/models/api_models.py:129):
+Based on [`CurrentCarrierResponse`](backend/src/models/api_models.py:121):
 
 ```json
 {
@@ -587,7 +587,7 @@ shard should label rather than hide the panel when it is `false`.
 
 **Response Shape (simplified)**
 
-Based on [`CarrierStateResponse`](backend/src/models/api_models.py:144) and [`CarrierState`](backend/src/models/carriers.py:1):
+Based on [`CarrierStateResponse`](backend/src/models/api_models.py:136) and [`CarrierState`](backend/src/models/carriers.py:1):
 
 ```json
 {
@@ -697,7 +697,7 @@ Returns the commander's own carriers and (where detectable) squadron carriers, i
 
 **Response Shape (simplified)**
 
-Based on [`MyCarriersResponse`](backend/src/models/api_models.py:156):
+Based on [`MyCarriersResponse`](backend/src/models/api_models.py:148):
 
 ```json
 {

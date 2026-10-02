@@ -236,7 +236,7 @@ The runtime code lives under [`backend/src/runtime`](backend/src/runtime:1) and 
 
 ### 2.1 ApplicationInstanceLock (single instance)
 
-[`ApplicationInstanceLock`](backend/src/runtime/app_singleton.py:31) provides a **mutex‑like singleton** per user:
+[`ApplicationInstanceLock`](backend/src/runtime/app_singleton.py:80) provides a **mutex‑like singleton** per user:
 
 - **Windows**:
   - Lock file under `%LOCALAPPDATA%\EDColonisationAsst\<app_id>.lock`.
@@ -518,7 +518,7 @@ they come from their wheels and the application as readable Python. It:
 - Ships as one archive that the setup program extracts, because Nuitka strips
   executables and `.py` files out of an included data directory. The spec lives
   in [buildruntime.py](buildruntime.py:1).
-- Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:144)).
+- Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:266)).
 - Presents a system tray icon from which users can open/close EDCA.
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:
   - Additional launches open the existing browser UI rather than starting a new backend.

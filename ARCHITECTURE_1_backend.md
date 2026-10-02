@@ -14,7 +14,7 @@ This document focuses on the **Python backend** of the Elite: Dangerous Colonisa
   - Pydantic v2 + `pydantic-settings` in [`backend/src/config.py`](backend/src/config.py:1)
   - YAML configuration in [`backend/config.yaml`](backend/config.yaml:1)
   - Inara credentials and preferences in `backend/commander.yaml` (user-created from the example)
-- **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
+- **Persistence**: SQLite via `sqlite3` in [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:86)
 - **File watching**: `watchdog` in [`FileWatcher`](backend/src/services/file_watcher.py:1)
 - **HTTP client**: the standard library's `urllib.request`, for one call only. [`github_release_source.py`](backend/src/services/github_release_source.py:1) asks the public GitHub releases API what the latest version is; nothing else under `backend/src` performs an outbound request and the Inara path (section 7) is dormant. `httpx` is a dependency of both the runtime and the dev requirements (the ASGI test client uses it), deliberately not used for the update check: the standard library already does one GET, so the shipped runtime carries no import for it.
 - **Live updates**: AJAX long-polling via [`backend/src/api/changes.py`](backend/src/api/changes.py:1) backed by [`ChangeBus`](backend/src/services/change_bus.py:1)
@@ -35,6 +35,9 @@ backend/
 ├── src/
 │   ├── __init__.py                    # Package root, defines __version__
 │   ├── main.py                        # FastAPI app, lifespan, entrypoint
+│   ├── runtime_entry.py               # Packaged runtime entrypoint
+│   ├── launcher.py                    # Dev launcher entrypoint
+│   ├── tray_app.py                    # Dev tray entrypoint
 │   ├── config.py                      # Pydantic settings and config loader
 │   ├── constants.py                   # Defaults shared across the backend
 │   ├── api/
@@ -137,17 +140,17 @@ On startup, the lifespan context manager `lifespan(app)`:
 1. Loads configuration via [`get_config()`](backend/src/config.py:1).
 2. Constructs core components:
 
-   - [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80)
-   - [`DataAggregator`](backend/src/services/data_aggregator.py:37)
+   - [`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:86)
+   - [`DataAggregator`](backend/src/services/data_aggregator.py:36)
    - [`SystemTracker`](backend/src/services/system_tracker.py:1)
-   - [`JournalParser`](backend/src/services/journal_parser.py:71)
-   - [`FileWatcher`](backend/src/services/file_watcher.py:39)
+   - [`JournalParser`](backend/src/services/journal_parser.py:86)
+   - [`FileWatcher`](backend/src/services/file_watcher.py:44)
 
 3. Stores them on `app.state` and wires dependencies:
 
-   - [`set_dependencies`](backend/src/api/routes.py:35) for REST routes.
+   - [`set_dependencies`](backend/src/api/routes.py:32) for REST routes.
 
-4. Decides whether this is a first run by reading [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:182) once (`total_sites == 0`), then **schedules the initial journal ingestion as a background task** (`_startup_ingestion` via `asyncio.create_task`) rather than awaiting it inline.
+4. Decides whether this is a first run by reading [`repository.get_stats()`](backend/src/repositories/colonisation_repository.py:185) once (`total_sites == 0`), then **schedules the initial journal ingestion as a background task** (`_startup_ingestion` via `asyncio.create_task`) rather than awaiting it inline.
 
    This is a deliberate readiness guarantee. ASGI lifespan startup runs **before** uvicorn begins serving requests, so any blocking work here delays `/api/health` and freezes the packaged runtime's startup splash. Walking the full journal history can take minutes on a large journal folder, so it must never sit on the readiness path. The background task:
 
@@ -167,7 +170,7 @@ Because the heavy ingestion is off the readiness path, `test_lifespan_readiness.
 
 Everything in this section lives in [`colonisation_db.py`](backend/src/repositories/colonisation_db.py:1). It runs once, at repository construction, before any query and outside the repository lock, which is what lets it sit in a module of its own.
 
-The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repositories/colonisation_db.py:42), which chooses:
+The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repositories/colonisation_db.py:53), which chooses:
 
 - **Dev mode** (a source checkout): `backend/src/colonisation.db`, derived from that module's own location
 - **Packaged runtime** (an installed Windows deployment or a Flatpak): the per-user data
@@ -182,7 +185,7 @@ The colonisation SQLite DB is located via [`resolve_db_file()`](backend/src/repo
   sources. Both have a fixed layout they must not write into, which is the
   distinction that actually matters.
 
-To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationDatabase`](backend/src/repositories/colonisation_db.py:75):
+To ensure **new installs** and incompatible schema changes start from a clean slate, [`ColonisationDatabase`](backend/src/repositories/colonisation_db.py:81):
 
 - Defines a schema version constant:
 
@@ -330,7 +333,7 @@ The status side lives in [`backend/src/models/carrier_status.py`](backend/src/mo
 
 ## 5. Repository and persistence
 
-[`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:80) abstracts the SQLite DB for colonisation data. It owns the queries and the locking; the file location and schema live in [`colonisation_db.py`](backend/src/repositories/colonisation_db.py:1) and the row-to-model translation in [`colonisation_mapping.py`](backend/src/repositories/colonisation_mapping.py:1).
+[`ColonisationRepository`](backend/src/repositories/colonisation_repository.py:86) abstracts the SQLite DB for colonisation data. It owns the queries and the locking; the file location and schema live in [`colonisation_db.py`](backend/src/repositories/colonisation_db.py:1) and the row-to-model translation in [`colonisation_mapping.py`](backend/src/repositories/colonisation_mapping.py:1).
 
 - Table `construction_sites` holds a row per depot, with `commodities` stored as JSON.
 - Table `metadata` stores `db_schema_version` and future metadata keys.
@@ -373,7 +376,7 @@ Concurrency, which the split deliberately left where it was:
 
 ### 6.1 Parser
 
-[`JournalParser`](backend/src/services/journal_parser.py:71) owns which events matter, how a file is walked and how a line is dispatched. The per-event parsing lives in three modules beside it, grouped by how much work each group does.
+[`JournalParser`](backend/src/services/journal_parser.py:86) owns which events matter, how a file is walked and how a line is dispatched. The per-event parsing lives in three modules beside it, grouped by how much work each group does.
 
 - `parse_file(path) -> list[JournalEvent]`:
   - Iterates lines in `Journal.*.log` and calls `parse_line()`.
@@ -464,7 +467,7 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
 >
 > The web UI has none, for one reason: it is served over the local network and designed to be read from a tablet beside the cockpit, so it cannot know whether the device reading it is the machine EDCA is installed on. Every offer it made was an offer to download a package the device might have no way to install. The tray runs on the machine that can act on the answer. Two surfaces also meant one release could raise two prompts, each with a skip the other could not see.
 
-[`DataAggregator`](backend/src/services/data_aggregator.py:37) provides high-level views over `ConstructionSite` data:
+[`DataAggregator`](backend/src/services/data_aggregator.py:36) provides high-level views over `ConstructionSite` data:
 
 - `aggregate_by_system(system_name) -> SystemColonisationData`:
 

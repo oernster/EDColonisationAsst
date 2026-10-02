@@ -3,12 +3,12 @@
 
 Workflow (from the project root):
 
-1) Build the runtime:    python buildruntime.py
+1) Build the runtime:    python buildexe.py
 2) Build the installer:  python buildinstaller.py
 
 This script:
 - Ensures the frontend production bundle exists (npm run build), since
-  buildruntime.py stages it into the archive.
+  buildexe.py stages it into the archive.
 - Stages a small payload under build/payload/: the icons, LICENSE and
   VERSION, which are what the setup program itself reads.
 - Embeds dist-runtime/edca-runtime.zip, which carries the application.
@@ -79,7 +79,7 @@ PAYLOAD_FILES = (
 )
 
 # Project directories staged into the payload. There are none: the application
-# travels inside the runtime archive that buildruntime.py writes, because an
+# travels inside the runtime archive that buildexe.py writes, because an
 # unfrozen EDCA is thousands of .py files and Nuitka strips those out of a data
 # directory. What is left here is what the setup program itself reads.
 PAYLOAD_DIRS: tuple[str, ...] = ()
@@ -267,7 +267,7 @@ def build_installer() -> None:
     if not RUNTIME_ARCHIVE.exists():
         raise FileNotFoundError(
             f"Could not find the runtime archive at: {RUNTIME_ARCHIVE}\n"
-            "Run `python buildruntime.py` first to stage the runtime."
+            "Run `python buildexe.py` first to stage the runtime."
         )
 
     version = read_version()

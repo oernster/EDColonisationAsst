@@ -391,7 +391,7 @@ and alternative workflows, see
 
 ```bash
 python -m pytest -q       # whole gated suite: backend + setup program (from the root)
-python buildruntime.py    # stage the runtime and write dist-runtime/edca-runtime.zip
+python buildexe.py        # stage the runtime and write dist-runtime/edca-runtime.zip
 python buildinstaller.py  # stage the payload and build the installer EXE
 ```
 

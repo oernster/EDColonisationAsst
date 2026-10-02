@@ -24,7 +24,7 @@ order:
 
 ```powershell
 # 1) Stage the runtime and archive it
-python buildruntime.py
+python buildexe.py
 
 # 2) Stage the payload and build the GUI installer EXE
 python buildinstaller.py
@@ -50,9 +50,9 @@ the way it runs: a plain interpreter, the runtime dependencies as they come
 from their wheels and the application as readable Python. The SETUP PROGRAM is
 still compiled with Nuitka; only the application stopped being.
 
-### What buildruntime.py does
+### What buildexe.py does
 
-[buildruntime.py](buildruntime.py) stages a complete deployment tree under
+[buildexe.py](buildexe.py) stages a complete deployment tree under
 `build/runtime/` and writes it out as one archive. It:
 
 - Refreshes `BUILD_ID` (UTC timestamp plus short git SHA) so installed builds
@@ -96,7 +96,7 @@ script rather than the executable alone.
 [buildinstaller.py](buildinstaller.py):
 
 1. Requires `dist-runtime/edca-runtime.zip` (fails fast with a hint to run
-   `python buildruntime.py` first).
+   `python buildexe.py` first).
 2. Ensures the frontend production bundle exists, running `npm run build`
    when npm is available (an existing `frontend/dist` is accepted when npm
    is absent).
@@ -125,7 +125,7 @@ Output: `dist-installer/EDColonisationAsstInstaller.exe`
 ### Build system layout
 
 ```text
-buildruntime.py       # runtime staging + edca-runtime.zip (nothing compiled)
+buildexe.py           # runtime staging + edca-runtime.zip (nothing compiled)
 buildinstaller.py     # payload staging + installer EXE build
 edca_launch.py        # what an installed EDCA runs (shipped in the archive)
 installer_main.py     # installer entry point (Nuitka compiles this)
@@ -142,12 +142,12 @@ build/                # staged runtime tree, staged payload, Nuitka intermediate
 dist-runtime/         # edca-runtime.zip (gitignored)
 dist-installer/       # EDColonisationAsstInstaller.exe (gitignored)
 VERSION               # single source of truth for the app version
-BUILD_ID              # build marker written by buildruntime.py (gitignored)
+BUILD_ID              # build marker written by buildexe.py (gitignored)
 ```
 
 The `VERSION` file is the single source of truth for the application
 version. The backend reads it at runtime
-([backend/src/\_\_init\_\_.py](backend/src/__init__.py)), `buildruntime.py`
+([backend/src/\_\_init\_\_.py](backend/src/__init__.py)), `buildexe.py`
 stages the file itself into the archive, `buildinstaller.py` stamps it into the
 setup program's PE metadata and the installer displays it; nothing else
 hardcodes a version. The application carries no PE metadata of its own any
@@ -183,7 +183,7 @@ more, since its executable is a copy of `pythonw.exe`.
 Nuitka compiles Python to C and needs a platform C/C++ compiler. This
 project is tested with **MSVC**, not Cygwin GCC. Only the setup program is
 compiled now, so this applies to `buildinstaller.py` alone;
-`buildruntime.py` needs no compiler at all.
+`buildexe.py` needs no compiler at all.
 
 For Python 3.13 (the current default):
 

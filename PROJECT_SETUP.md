@@ -59,7 +59,7 @@ EDColonisationAsst/
 ├── VERSION                   # Single source of truth for the version
 ├── pytest.ini                # Root pytest + coverage gate (backend + installer)
 ├── .flake8                   # flake8 at 88, matching black
-├── buildruntime.py           # Windows runtime staging + edca-runtime.zip
+├── buildexe.py               # Windows runtime staging + edca-runtime.zip
 ├── buildinstaller.py         # Windows GUI installer build (Nuitka)
 ├── edca_launch.py            # what an installed EDCA runs, shipped in the archive
 ├── build_flatpak.sh          # Linux Flatpak build (offline wheels)
@@ -92,7 +92,7 @@ EDColonisationAsst/
 ```
 
 `BUILD_ID` also appears at the root after a build. It is written by
-`buildruntime.py` and gitignored, so it is build output rather than source.
+`buildexe.py` and gitignored, so it is build output rather than source.
 
 ## Setup steps
 

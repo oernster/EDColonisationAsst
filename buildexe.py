@@ -175,7 +175,7 @@ def _interpreter_source() -> Path:
 def _copy_interpreter(target: Path) -> None:
     """Copy the interpreter, leaving out what an installed EDCA never runs."""
     source = _interpreter_source()
-    print(f"[buildruntime] Interpreter: {source}")
+    print(f"[buildexe] Interpreter: {source}")
 
     def ignore(directory: str, names: list[str]) -> set[str]:
         skipped = {name for name in names if name in INTERPRETER_SKIP_DIRS}
@@ -204,7 +204,7 @@ def _runtime_requirements() -> list[str]:
 def _install_dependencies(target: Path) -> None:
     """Install the runtime dependencies into the staged tree."""
     requirements = _runtime_requirements()
-    print(f"[buildruntime] Installing {len(requirements)} requirement(s)")
+    print(f"[buildexe] Installing {len(requirements)} requirement(s)")
     site_packages = target / "Lib" / "site-packages"
     site_packages.mkdir(parents=True, exist_ok=True)
     # --no-warn-conflicts because a --target install is not an environment
@@ -295,7 +295,7 @@ def _copy_application(target: Path) -> None:
             dirs_exist_ok=True,
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
-        print(f"[buildruntime] Staged {source_name}")
+        print(f"[buildexe] Staged {source_name}")
 
     # backend is a package in the installed layout, as it is in a checkout.
     (target / "backend" / "__init__.py").touch()
@@ -318,7 +318,7 @@ def _archive(target: Path, version: str) -> Path:
         archive.unlink()
 
     files = [path for path in target.rglob("*") if path.is_file()]
-    print(f"[buildruntime] Archiving {len(files)} files for {version}")
+    print(f"[buildexe] Archiving {len(files)} files for {version}")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
         for path in files:
             bundle.write(path, path.relative_to(target).as_posix())
@@ -333,7 +333,7 @@ def build_runtime() -> None:
     version = read_version()
     build_id = write_build_id()
     subprocess.run([sys.executable, str(PROJECT_ROOT / "stamp_assets.py")], check=True)
-    print(f"[buildruntime] Staging {APP_SHORT_NAME} v{version} ({build_id})")
+    print(f"[buildexe] Staging {APP_SHORT_NAME} v{version} ({build_id})")
 
     if RUNTIME_DIR.exists():
         shutil.rmtree(RUNTIME_DIR)
@@ -342,16 +342,16 @@ def build_runtime() -> None:
     _copy_interpreter(RUNTIME_DIR)
     _install_dependencies(RUNTIME_DIR)
     saved = _prune_qt(RUNTIME_DIR)
-    print(f"[buildruntime] Pruned unused Qt modules, saving {saved} MB")
+    print(f"[buildexe] Pruned unused Qt modules, saving {saved} MB")
     exe = _name_the_executable(RUNTIME_DIR)
-    print(f"[buildruntime] Application executable: {exe.name}")
+    print(f"[buildexe] Application executable: {exe.name}")
     _copy_application(RUNTIME_DIR)
 
     archive = _archive(RUNTIME_DIR, version)
     tree_mb = _directory_bytes(RUNTIME_DIR) / BYTES_PER_MB
     archive_mb = archive.stat().st_size / BYTES_PER_MB
     print(
-        f"[buildruntime] Staged tree: {tree_mb:.0f} MB, "
+        f"[buildexe] Staged tree: {tree_mb:.0f} MB, "
         f"archive: {archive_mb:.0f} MB at {archive}"
     )
 
@@ -361,7 +361,7 @@ def main() -> int:
         build_runtime()
         return 0
     except Exception as exc:  # noqa: BLE001
-        print(f"[buildruntime] ERROR: {exc}", file=sys.stderr)
+        print(f"[buildexe] ERROR: {exc}", file=sys.stderr)
         return 1
 
 

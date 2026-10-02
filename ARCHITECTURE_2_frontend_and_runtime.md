@@ -517,7 +517,7 @@ they come from their wheels and the application as readable Python. It:
   the executable is a renamed copy of `pythonw.exe`.
 - Ships as one archive that the setup program extracts, because Nuitka strips
   executables and `.py` files out of an included data directory. The spec lives
-  in [buildruntime.py](buildruntime.py:1).
+  in [buildexe.py](buildexe.py:1).
 - Serves the built frontend from `frontend/dist` mounted at `/app` (see [`main.py`](backend/src/main.py:266)).
 - Presents a system tray icon from which users can open/close EDCA.
 - Enforces the single‑instance contract via `ApplicationInstanceLock`:

@@ -148,7 +148,7 @@ anything. Before it existed the shape held by habit rather than by rule.
   exception. `test_modules_within_line_limit`.
 
 The size scan reads TypeScript as well as Python, because four of the nineteen
-were front-end components. `buildruntime.py` and `buildinstaller.py` are outside
+were front-end components. `buildexe.py` and `buildinstaller.py` are outside
 every scan: they are linear recipes read top to bottom.
 
 ---
@@ -325,7 +325,7 @@ phase spans and the per-file progress) is gated:
 - **Development workflows and tooling**  
   [`DEVELOPMENT.md`](DEVELOPMENT.md)  
   - How to run backend and frontend in development.
-  - The Windows build pipeline: `python buildruntime.py` (the runtime
+  - The Windows build pipeline: `python buildexe.py` (the runtime
     archive) then `python buildinstaller.py` (GUI installer), with the
     installer UI sources under `installer/`.
   - Lint/type-checking commands.

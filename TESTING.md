@@ -103,6 +103,12 @@ otherwise.
   [backend/tests/unit/test_runtime_components.py](backend/tests/unit/test_runtime_components.py)).
 - Repository tests use **real SQLite databases** in pytest `tmp_path`
   directories, never mocked connections.
+- Most watcher tests replace the watchdog Observer with a fake. One does not:
+  [`test_file_watcher_real_observer.py`](backend/tests/unit/test_file_watcher_real_observer.py)
+  starts a real Observer on a `tmp_path` directory with the polling fallback
+  held off, appends to a journal and waits for the handler to see it. The
+  watcher treats a failed start as non-fatal, so without this test a watchdog
+  that cannot start on the running interpreter passes the whole suite.
 - FastAPI endpoints are tested through the ASGI test client, not by
   calling handlers directly.
 - Qt widget behaviour is not unit-tested (see the omit rationale above);

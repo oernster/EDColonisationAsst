@@ -332,6 +332,7 @@ def build_runtime() -> None:
 
     version = read_version()
     build_id = write_build_id()
+    subprocess.run([sys.executable, str(PROJECT_ROOT / "stamp_assets.py")], check=True)
     print(f"[buildruntime] Staging {APP_SHORT_NAME} v{version} ({build_id})")
 
     if RUNTIME_DIR.exists():

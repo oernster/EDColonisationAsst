@@ -67,8 +67,8 @@ async def test_start_watching_skips_existing_scan_when_disabled(
 ) -> None:
     """process_existing=False must not run the full existing-file scan."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    # Polling only starts in the frozen runtime; keep it off so no task leaks.
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    # Polling only starts in a packaged runtime; keep it off so no task leaks.
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
 
@@ -90,7 +90,7 @@ async def test_start_watching_runs_existing_scan_by_default(
 ) -> None:
     """The default (process_existing=True) still performs the scan."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
 

@@ -28,11 +28,11 @@ from tests.unit._test_coverage_file_watcher_support import (
 )
 
 
-def test_start_polling_disabled_outside_frozen_runtime(
+def test_start_polling_disabled_outside_packaged_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Polling is a packaged-runtime feature only."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
     watcher = _make_watcher()
 
     watcher._start_polling_if_enabled(tmp_path)
@@ -44,7 +44,7 @@ def test_start_polling_skips_when_task_already_active(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A live poller task is never replaced."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: True)
     watcher = _make_watcher()
     pending = _PendingTask()
     watcher._poll_task = pending  # type: ignore[assignment]
@@ -54,11 +54,11 @@ def test_start_polling_skips_when_task_already_active(
     assert watcher._poll_task is pending
 
 
-async def test_start_polling_creates_task_when_frozen(
+async def test_start_polling_creates_task_when_packaged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In frozen mode a real poller task is created."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
+    """In a packaged runtime a real poller task is created."""
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: True)
     watcher = _make_watcher()
 
     watcher._start_polling_if_enabled(tmp_path)
@@ -75,7 +75,7 @@ async def test_start_polling_handles_create_task_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A create_task failure is logged and leaves no poller task behind."""
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: True)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: True)
     watcher = _make_watcher()
 
     def not_a_coroutine(directory: Path) -> object:

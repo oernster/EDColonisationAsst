@@ -176,7 +176,7 @@ async def test_start_watching_restarts_dead_observer(
 ) -> None:
     """A dead observer triggers stop_watching then a fresh start."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
     dead = _NotAliveObserver()
@@ -198,7 +198,7 @@ async def test_start_watching_survives_clock_failure(
     """A failing datetime.now leaves started_at as None without raising."""
     with monkeypatch.context() as mp:
         mp.setattr(fw_module, "Observer", _HealthyObserver)
-        mp.setattr(polling_module, "is_frozen", lambda: False)
+        mp.setattr(polling_module, "is_packaged", lambda: False)
         mp.setitem(sys.modules, "datetime", _broken_datetime_module())
 
         watcher = _make_watcher()
@@ -213,7 +213,7 @@ async def test_start_watching_records_error_when_observer_not_alive(
 ) -> None:
     """An observer that never comes alive is recorded as a watchdog error."""
     monkeypatch.setattr(fw_module, "Observer", _NotAliveObserver)
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
     await watcher.start_watching(tmp_path)
@@ -227,7 +227,7 @@ async def test_start_watching_records_error_when_observer_start_fails(
 ) -> None:
     """An exception from Observer.start is captured and the observer cleared."""
     monkeypatch.setattr(fw_module, "Observer", _FailingStartObserver)
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
     await watcher.start_watching(tmp_path)
@@ -242,7 +242,7 @@ async def test_start_watching_logs_existing_file_processing_errors(
 ) -> None:
     """Failures while processing existing journals must not abort startup."""
     monkeypatch.setattr(fw_module, "Observer", _HealthyObserver)
-    monkeypatch.setattr(polling_module, "is_frozen", lambda: False)
+    monkeypatch.setattr(polling_module, "is_packaged", lambda: False)
 
     watcher = _make_watcher()
 

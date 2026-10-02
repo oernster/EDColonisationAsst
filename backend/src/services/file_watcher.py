@@ -72,7 +72,7 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         self._loop: asyncio.AbstractEventLoop = loop or asyncio.get_event_loop()
 
         # Fallback polling for environments where watchdog events are unreliable.
-        # It starts only when is_frozen() is true (see file_watcher_polling).
+        # It starts only when is_packaged() is true (see file_watcher_polling).
         self._poll_task: asyncio.Task[None] | None = None
         # Short interval so the fallback picks up a journal append promptly
         # when watchdog does not report it.
@@ -224,7 +224,7 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         )
 
         # Always attempt to start watchdog but treat failures as non-fatal.
-        # The polling fallback, where is_frozen() enables it, can still
+        # The polling fallback, where is_packaged() enables it, can still
         # provide live-ish updates.
         self._watchdog_last_error = None
         try:
@@ -263,7 +263,7 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
             # Deliberately broad, the reason the polling fallback exists. watchdog
             # sits on OS notification APIs whose failures are platform-specific and
             # open-ended. Recording the error and falling through to polling (where
-            # is_frozen() enables it) is what keeps live updates working.
+            # is_packaged() enables it) is what keeps live updates working.
             self._watchdog_last_error = f"{type(exc).__name__}: {exc}"
             logger.exception(
                 "Failed to start watchdog observer: %s", self._watchdog_last_error
@@ -285,8 +285,8 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         finally:
             # Watchdog can fail to deliver events on some systems (or deliver only
             # directory events). As a safety net, also poll for file mtime changes
-            # and process the newest journal; this starts only when is_frozen()
-            # is true.
+            # and process the newest journal; this starts only when
+            # is_packaged() is true.
             self._start_polling_if_enabled(directory)
 
     async def stop_watching(self) -> None:

@@ -1,8 +1,9 @@
 """The journal polling fallback, kept beside the watcher that mixes it in.
 
-`FileWatcher` takes its live updates from watchdog. When `is_frozen()` reports
-a frozen runtime it also starts this poller, as a safety net against OS
-notification APIs that report journal appends unreliably. That fallback is a
+`FileWatcher` takes its live updates from watchdog. When `is_packaged()` reports
+a packaged runtime (a frozen executable, an installed deployment or a flatpak)
+it also starts this poller, as a safety net against OS notification APIs that
+report journal appends unreliably. That fallback is a
 self-contained capability: a task, an interval and three pieces of last-seen
 state. It lives here as a mixin rather than a collaborator so the state stays
 on the watcher instance, which is where the status endpoint and the tests
@@ -16,7 +17,7 @@ from datetime import UTC
 from pathlib import Path
 
 from ..utils.logger import get_logger
-from ..utils.runtime import is_frozen
+from ..utils.runtime import is_packaged
 
 logger = get_logger(__name__)
 
@@ -29,9 +30,12 @@ class PollingFallbackMixin:
     """
 
     def _start_polling_if_enabled(self, directory: Path) -> None:
-        """Start the polling fallback task (only when is_frozen() is true)."""
-        # Only enable in frozen runtime to avoid duplicate work during dev.
-        if not is_frozen():
+        """Start the polling fallback task (only when is_packaged() is true)."""
+        # Every shipped build is packaged and none is frozen: the installed
+        # Windows build runs a plain interpreter over edca_launch.py while the
+        # flatpak runs python3 -m. A source checkout skips the poller to avoid
+        # duplicate work during development.
+        if not is_packaged():
             return
         if self._poll_task is not None and not self._poll_task.done():
             return

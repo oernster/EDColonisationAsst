@@ -146,7 +146,7 @@ async def lifespan(app: FastAPI):
         - Repeat run (persisted DB under %LOCALAPPDATA%): only a bounded
           tail sync of the most recent journals. The full history is already
           persisted; live changes are handled by watchdog (plus the polling
-          fallback when is_frozen() holds), so re-scanning everything on
+          fallback when is_packaged() holds), so re-scanning everything on
           every launch is unnecessary.
         """
         try:
@@ -192,7 +192,7 @@ async def lifespan(app: FastAPI):
     # the background _startup_ingestion task above, so starting the watcher
     # stays fast and never blocks readiness. Watchdog still delivers live
     # updates from here on; the polling fallback joins it only when
-    # is_frozen() holds.
+    # is_packaged() holds.
     try:
         try:
             await file_watcher.start_watching(journal_dir, process_existing=False)

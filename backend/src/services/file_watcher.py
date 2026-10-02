@@ -71,11 +71,11 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         # Event loop used to schedule async processing from watchdog threads.
         self._loop: asyncio.AbstractEventLoop = loop or asyncio.get_event_loop()
 
-        # Fallback polling for environments where watchdog events are unreliable
-        # (observed in some packaged/installed contexts).
+        # Fallback polling for environments where watchdog events are unreliable.
+        # It starts only when is_frozen() is true (see file_watcher_polling).
         self._poll_task: asyncio.Task[None] | None = None
-        # Smaller interval improves perceived immediacy in packaged mode where
-        # watchdog may be unavailable.
+        # Short interval so the fallback picks up a journal append promptly
+        # when watchdog does not report it.
         self._poll_interval_s: float = 0.25
         self._poll_last_path: Path | None = None
         self._poll_last_mtime: float | None = None
@@ -149,9 +149,9 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
             "task_done": done,
             "task_exception": exc,
             "last_checked_at": self._poll_last_checked_at,
-            "last_seen_file": str(self._poll_last_path)
-            if self._poll_last_path
-            else None,
+            "last_seen_file": (
+                str(self._poll_last_path) if self._poll_last_path else None
+            ),
             "last_seen_mtime": self._poll_last_mtime,
             "last_error": self._poll_last_error,
             "interval_s": self._poll_interval_s,
@@ -224,7 +224,8 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         )
 
         # Always attempt to start watchdog but treat failures as non-fatal.
-        # The polling fallback can still provide live-ish updates.
+        # The polling fallback, where is_frozen() enables it, can still
+        # provide live-ish updates.
         self._watchdog_last_error = None
         try:
             from datetime import datetime
@@ -261,8 +262,8 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
         except Exception as exc:
             # Deliberately broad, the reason the polling fallback exists. watchdog
             # sits on OS notification APIs whose failures are platform-specific and
-            # open-ended. Recording the error and falling through to polling is what
-            # keeps live updates working.
+            # open-ended. Recording the error and falling through to polling (where
+            # is_frozen() enables it) is what keeps live updates working.
             self._watchdog_last_error = f"{type(exc).__name__}: {exc}"
             logger.exception(
                 "Failed to start watchdog observer: %s", self._watchdog_last_error
@@ -282,9 +283,10 @@ class FileWatcher(PollingFallbackMixin, IFileWatcher):
             # traceback and then dropped.
             logger.exception("Error while processing existing journals")
         finally:
-            # In the packaged runtime, watchdog can fail to deliver events on some
-            # systems (or deliver only directory events). As a safety net, also
-            # poll for file mtime changes and process the newest journal.
+            # Watchdog can fail to deliver events on some systems (or deliver only
+            # directory events). As a safety net, also poll for file mtime changes
+            # and process the newest journal; this starts only when is_frozen()
+            # is true.
             self._start_polling_if_enabled(directory)
 
     async def stop_watching(self) -> None:

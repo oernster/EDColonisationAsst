@@ -145,8 +145,9 @@ async def lifespan(app: FastAPI):
           long-poll UI to refetch and populate progressively.
         - Repeat run (persisted DB under %LOCALAPPDATA%): only a bounded
           tail sync of the most recent journals. The full history is already
-          persisted; live changes are handled by watchdog and polling,
-          so re-scanning everything on every launch is unnecessary.
+          persisted; live changes are handled by watchdog (plus the polling
+          fallback when is_frozen() holds), so re-scanning everything on
+          every launch is unnecessary.
         """
         try:
             if db_is_empty:
@@ -189,8 +190,9 @@ async def lifespan(app: FastAPI):
     #
     # process_existing=False: the initial full-history catch-up is owned by
     # the background _startup_ingestion task above, so starting the watcher
-    # stays fast and never blocks readiness. Watchdog plus the polling
-    # fallback still deliver live updates from here on.
+    # stays fast and never blocks readiness. Watchdog still delivers live
+    # updates from here on; the polling fallback joins it only when
+    # is_frozen() holds.
     try:
         try:
             await file_watcher.start_watching(journal_dir, process_existing=False)

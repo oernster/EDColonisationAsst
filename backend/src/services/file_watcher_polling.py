@@ -1,7 +1,8 @@
 """The journal polling fallback, kept beside the watcher that mixes it in.
 
-`FileWatcher` prefers watchdog and falls back to polling in the packaged
-runtime, where OS notification APIs have proved unreliable. That fallback is a
+`FileWatcher` takes its live updates from watchdog. When `is_frozen()` reports
+a frozen runtime it also starts this poller, as a safety net against OS
+notification APIs that report journal appends unreliably. That fallback is a
 self-contained capability: a task, an interval and three pieces of last-seen
 state. It lives here as a mixin rather than a collaborator so the state stays
 on the watcher instance, which is where the status endpoint and the tests
@@ -28,7 +29,7 @@ class PollingFallbackMixin:
     """
 
     def _start_polling_if_enabled(self, directory: Path) -> None:
-        """Start the polling fallback task (packaged runtime only)."""
+        """Start the polling fallback task (only when is_frozen() is true)."""
         # Only enable in frozen runtime to avoid duplicate work during dev.
         if not is_frozen():
             return

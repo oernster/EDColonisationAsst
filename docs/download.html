@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download - EDCA</title>
+<meta name="description" content="Download EDCA for Windows or Linux: an installer on Windows, a Flatpak bundle on Linux. Free and open source under LGPL-3.0.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="assets/site.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="EDCA">
+<meta property="og:title" content="Download - EDCA">
+<meta property="og:description" content="Download EDCA for Windows or Linux: an installer on Windows, a Flatpak bundle on Linux. Free and open source under LGPL-3.0.">
+<meta property="og:url" content="https://ernster.dev/EDColonisationAsst/download.html">
+<meta property="og:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_GB">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Download - EDCA">
+<meta name="twitter:description" content="Download EDCA for Windows or Linux: an installer on Windows, a Flatpak bundle on Linux. Free and open source under LGPL-3.0.">
+<meta name="twitter:image" content="https://ernster.dev/EDColonisationAsst/assets/social-card.png">
+<link rel="canonical" href="https://ernster.dev/EDColonisationAsst/download.html">
+<meta name="author" content="Oliver Ernster">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0f1013">
+</head>
+<body>
+  <div class="topbar">
+    <div class="wrap">
+      <a class="brand" href="./"><img src="assets/edca-icon.png" alt="">EDCA</a>
+      <nav>
+      <a href="./">Home</a>
+      <a href="features.html">Features</a>
+      <a href="why.html">Why it exists</a>
+      <a href="download.html" aria-current="page">Download</a>
+    </nav>
+      <span class="spacer"></span>
+      <a href="https://github.com/oernster/EDColonisationAsst">GitHub</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="page-head">
+      <h1>Download</h1>
+    </header>
+
+    <section id="download">
+      <div class="eyebrow">Get EDCA</div>
+      <h2 class="section-title">Download EDCA</h2>
+      <p class="section-sub">Download the newest release with one click on Windows or
+        Linux. Free and open source under LGPL-3.0; it runs entirely on your machine and
+        nothing leaves your PC.</p>
+      <span class="dl-version" id="dl-version">Latest release</span>
+      <div class="downloads">
+        <div class="dl-card">
+          <div class="ico">&#129695;</div>
+          <h3>Windows</h3>
+          <p class="req">Windows 10 or 11, 64-bit</p>
+          <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest/download/EDColonisationAsstInstaller.exe">
+            Download for Windows</a>
+          <p class="meta" data-asset="EDColonisationAsstInstaller.exe">Installer (.exe)</p>
+          <p class="meta">Windows may show a SmartScreen warning when you run this: <a href="/windows-smartscreen.html">here's why</a>.</p>
+          <p class="how">Run the installer: there is nothing to configure and EDCA opens in your browser when it starts. Already have it? The same installer upgrades in place, in one pass.</p>
+        </div>
+        <div class="dl-card">
+          <div class="ico">&#128039;</div>
+          <h3>Linux</h3>
+          <p class="req">Any distribution with Flatpak</p>
+          <a class="btn primary" href="https://github.com/oernster/EDColonisationAsst/releases/latest/download/edcolonisationasst.flatpak">
+            Download for Linux</a>
+          <p class="meta" data-asset="edcolonisationasst.flatpak">Flatpak bundle (.flatpak)</p>
+          <p class="meta">Needs the Freedesktop 25.08 runtime, which Flatpak fetches from Flathub the first time.</p>
+          <p class="how">Install it with <code>flatpak install --user edcolonisationasst.flatpak</code>, then start it from your applications menu or with <code>flatpak run uk.co.oernster.EDColonisationAsst</code>. You can still <a href="https://github.com/oernster/EDColonisationAsst#install-and-run-on-linux">build it yourself</a> from a checkout instead; running it straight from source also works.</p>
+        </div>
+      </div>
+      <p class="dl-links">
+        <a id="dl-whats-new" href="https://github.com/oernster/EDColonisationAsst/releases/latest">What is new in this release</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/oernster/EDColonisationAsst/releases">All releases</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://github.com/oernster/EDColonisationAsst">Source on GitHub</a>
+      </p>
+    </section>
+
+    <footer>
+      <p class="mono">EDCA &middot; Elite Dangerous Colonisation Assistant</p>
+      <p>
+        Built by Oliver Ernster &middot; released under the GNU Lesser General Public Licence v3.0 (LGPL-3.0)
+        &middot; <a href="https://github.com/oernster/EDColonisationAsst">github.com/oernster/EDColonisationAsst</a>
+      </p>
+      <p>Elite Dangerous is a trademark of Frontier Developments plc. EDCA is an unofficial, fan-made tool and is not affiliated with Frontier Developments.</p>
+    </footer>
+
+  </div>
+<script>
+    // The download button never goes stale: it points at GitHub's releases/latest/download
+    // redirect, which always serves the newest release's asset (the asset name is version-free
+    // by design). This script only decorates the page with live details: the version chip and
+    // the installer's size, fetched from the GitHub API. If the call fails (offline,
+    // rate-limited), the static text above stands on its own.
+    (function () {
+        var api = 'https://api.github.com/repos/oernster/EDColonisationAsst/releases/latest';
+        fetch(api).then(function (r) {
+            if (!r.ok) { throw new Error('release lookup failed'); }
+            return r.json();
+        }).then(function (rel) {
+            var version = (rel.tag_name || '').replace(/^v/, '');
+            if (version) {
+                document.getElementById('dl-version').textContent = 'Version ' + version;
+            }
+            if (rel.html_url) {
+                document.getElementById('dl-whats-new').href = rel.html_url;
+            }
+            (rel.assets || []).forEach(function (asset) {
+                var meta = document.querySelector('[data-asset="' + asset.name + '"]');
+                if (meta && asset.size) {
+                    var mb = (asset.size / (1024 * 1024)).toFixed(1);
+                    meta.textContent = meta.textContent + ' · ' + mb + ' MB';
+                }
+            });
+        }).catch(function () { /* The static page already says everything essential. */ });
+    })();
+</script>
+</body>
+</html>

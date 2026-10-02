@@ -308,3 +308,28 @@ footer .mono { font-family: var(--mono); }
 }
 .next-step strong { font-size: 17px; color: var(--text); }
 .next-step p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+/* ---------------------------------------------------------------------------
+   Features hub and detail pages.
+
+   Features is the overview: headline cards, then a gateway card for each page
+   with the detail. A detail page opens with a trail back to the hub and closes
+   with the way on: back to the hub, then its siblings.
+   --------------------------------------------------------------------------- */
+
+/* A card holding several paragraphs shows the break between them. */
+.card p + p { margin-top: 10px; }
+/* The button that leads from a gateway card to its own page sits at the
+   card's foot, so the buttons line up whatever the length above them. */
+.gateways .card { display: flex; flex-direction: column; }
+.gateways .card .feat-cta { margin-top: auto; padding-top: 18px; }
+
+/* Where a detail page sits: the hub, then itself. The lead-in after it gives
+   up most of its top padding, since the trail already opens the page. */
+.crumb { padding: 32px 0 0; font-size: 14px; color: var(--muted); }
+.crumb a { color: var(--accent-soft); }
+.crumb a:hover { color: var(--accent); }
+.crumb + .page-head { padding-top: 20px; }
+
+/* The way on from the foot of a detail page; the buttons reuse .cta. */
+.onward { padding-top: 0; }

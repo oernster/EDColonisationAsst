@@ -3,7 +3,7 @@
 How to run the test suites and what the coverage gate means.
 
 Related documents: [README.md](README.md),
-[DEVELOPMENT-README.md](DEVELOPMENT-README.md),
+[DEVELOPMENT.md](DEVELOPMENT.md),
 [ARCHITECTURE_1_backend.md](ARCHITECTURE_1_backend.md).
 
 ---

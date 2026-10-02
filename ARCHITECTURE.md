@@ -323,7 +323,7 @@ phase spans and the per-file progress) is gated:
 ## 4. Other useful documentation
 
 - **Development workflows and tooling**  
-  [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md)  
+  [`DEVELOPMENT.md`](DEVELOPMENT.md)  
   - How to run backend and frontend in development.
   - The Windows build pipeline: `python buildruntime.py` (the runtime
     archive) then `python buildinstaller.py` (GUI installer), with the

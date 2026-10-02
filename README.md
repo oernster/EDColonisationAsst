@@ -147,7 +147,7 @@ inside the sandbox with no network access, then installs the result and writes
 `flatpak run uk.co.oernster.EDColonisationAsst` or from your applications menu.
 The package managers that install step covers, plus what to do on a
 distribution outside them, are described in
-[DEVELOPMENT-README.md](DEVELOPMENT-README.md).
+[DEVELOPMENT.md](DEVELOPMENT.md).
 
 `./cleanup_flatpak.sh` removes everything the build produced and uninstalls the
 app; pass `--purge-data` to delete your colonisation database and settings too,
@@ -173,12 +173,12 @@ in. To open the HUD on a tablet you have to let that port through on your own
 network; the port is whichever one EDCA managed to bind rather than always
 47021. How to read the port it settled on, plus commands for ufw, firewalld,
 nftables and NixOS, are in
-[DEVELOPMENT-README.md](DEVELOPMENT-README.md#reaching-it-from-a-tablet-on-the-same-network).
+[DEVELOPMENT.md](DEVELOPMENT.md#reaching-it-from-a-tablet-on-the-same-network).
 
 You do not have to package it at all: see
 [Run from source on Linux](#run-from-source-on-linux) below. For what to do on a
 distribution where PySide6 is awkward, plus the build itself, see
-[DEVELOPMENT-README.md](DEVELOPMENT-README.md).
+[DEVELOPMENT.md](DEVELOPMENT.md).
 
 ---
 
@@ -369,7 +369,7 @@ same route.
 
 For full Linux prerequisites and advanced usage, including environment variables
 and alternative workflows, see
-[`DEVELOPMENT-README.md`](DEVELOPMENT-README.md).
+[`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 ---
 
@@ -399,7 +399,7 @@ python buildinstaller.py  # stage the payload and build the installer EXE
 
 If you have cloned the repository and want to build or run EDCA from source:
 
-- [`DEVELOPMENT-README.md`](DEVELOPMENT-README.md) - how to build the Windows
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) - how to build the Windows
   release, run the backend and frontend from source and set up the dev
   environment
 - [`TESTING.md`](TESTING.md) - how to run the test suites, with a 100% coverage

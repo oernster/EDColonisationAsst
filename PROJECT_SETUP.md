@@ -4,7 +4,7 @@ First-time environment setup for working on the Elite: Dangerous
 Colonisation Assistant from a source checkout.
 
 Related documents: [README.md](README.md) (end-user overview),
-[DEVELOPMENT-README.md](DEVELOPMENT-README.md) (build pipeline and dev
+[DEVELOPMENT.md](DEVELOPMENT.md) (build pipeline and dev
 workflows), [TESTING.md](TESTING.md) (test suites and the coverage gate),
 [ARCHITECTURE.md](ARCHITECTURE.md) (system design front door).
 
@@ -26,7 +26,7 @@ workflows), [TESTING.md](TESTING.md) (test suites and the coverage gate),
 
 - Visual Studio 2022 Build Tools with the *Desktop development with C++*
   workload (MSVC v143) and a recent Windows 10/11 SDK. See the compiler
-  notes in [DEVELOPMENT-README.md](DEVELOPMENT-README.md).
+  notes in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ### Elite: Dangerous journals
 
@@ -47,7 +47,7 @@ journals live somewhere unusual.
 ```text
 EDColonisationAsst/
 ├── README.md                 # End-user overview and doc index
-├── DEVELOPMENT-README.md     # Build pipeline and dev workflows
+├── DEVELOPMENT.md     # Build pipeline and dev workflows
 ├── TESTING.md                # Test suites and the coverage gate
 ├── ARCHITECTURE.md           # Architecture front door
 ├── ARCHITECTURE_1_backend.md # Backend architecture detail
@@ -202,6 +202,6 @@ about the lines black itself produced.
 
 ## Next steps
 
-- Building the Windows release: [DEVELOPMENT-README.md](DEVELOPMENT-README.md)
+- Building the Windows release: [DEVELOPMENT.md](DEVELOPMENT.md)
 - Understanding the internals: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Adding code and tests: [TESTING.md](TESTING.md)

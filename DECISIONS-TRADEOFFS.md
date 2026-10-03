@@ -543,8 +543,8 @@ Steam's folder, use the network and talk to the desktop's tray service.
 
 ### The website versions its own files
 
-The site's stylesheet and script links carry a hash of their content, so a
-browser fetches a changed file at once. The version and download sizes are
+The site's stylesheet link carries a hash of the file's content, so a browser
+fetches a changed stylesheet at once. The version and download sizes are
 read live from the releases API rather than written into the pages.
 
 - **Rather than:** relying on cache expiry; stamping a version into the pages.

@@ -147,9 +147,10 @@ their own.
 
 Every external command goes through the hand-written `FakeRunner` in
 [tests/installer/fakes.py](tests/installer/fakes.py), so no test spawns a
-process, ends a real one or writes a real shortcut. The one place a genuinely
-unreachable branch remains is marked `# pragma: no cover` with a one-line
-reason.
+process, ends a real one or writes a real shortcut. The branches no test can
+reach (six defensive `OSError` handlers in `installer/ops` and
+`installer/shared`) are each marked `# pragma: no cover` with a comment saying
+why.
 
 `tests/` is deliberately **not** a Python package: `backend/tests` already
 claims the top-level name `tests`, so a second package of that name would
@@ -242,8 +243,9 @@ types.
 
 With the shared hook enabled (`git config core.hooksPath .githooks`), every
 commit formats staged Python files with black, lints the Python surface and
-the front end, then runs a bare `pytest -q` from the repository root. That is the same command documented
-above and the same gate: both suites, 100% coverage, exit code or nothing.
+the front end, then runs `python -m pytest -q` from the repository root. That
+is the same command documented above and the same gate: both suites, 100%
+coverage, exit code or nothing.
 
 The interpreter is resolved once and used for every step. The root `venv/` is
 preferred, since that is where the tooling lives; only when it is absent does

@@ -294,6 +294,7 @@ Journal event models are in [`backend/src/models/journal_events.py`](backend/src
 - `DockedEvent`
 - `UndockedEvent`
 - `CommanderEvent`
+- `LoadGameEvent` (the credit balance the session loaded with)
 - `MarketTransactionEvent` (both `MarketBuy` and `MarketSell`, direction carried as a flag)
 - Fleet carrier events:
   - `CarrierLocationEvent`
@@ -568,8 +569,9 @@ movement in the carrier's balance across the journal window and attaches **no
 cause to any of them**. That is deliberate and is not a gap to be filled later:
 the game emits no upkeep event; nothing in the journal separates upkeep from
 a tritium purchase or from trade income. Reconstructing upkeep was measured
-against 635 readings and does not work, so the history reports what moved and
-when, saying nothing about why.
+against six months of real journals and does not work: of seventy downward
+movements not one fell on a weekly cadence. So the history reports what moved
+and when, saying nothing about why.
 
 Key colonisation endpoints:
 

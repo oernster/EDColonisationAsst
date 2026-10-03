@@ -534,9 +534,8 @@ Based on [`CurrentCarrierResponse`](backend/src/models/api_models.py:121):
     "name": "MIDNIGHT ELOQUENCE",
     "callsign": "X7J-BQG",
     "docking_access": "squadron",
-    "allow_notorious": true,
     "last_seen_system": "Lupus Dark Region BQ-Y d66",
-    "last_seen_station": "X7J-BQG",
+    "last_seen_timestamp": "2025-01-01T12:00:00Z",
     "services": [
       "dock",
       "commodities",
@@ -598,9 +597,8 @@ Based on [`CarrierStateResponse`](backend/src/models/api_models.py:136) and [`Ca
       "name": "MIDNIGHT ELOQUENCE",
       "callsign": "X7J-BQG",
       "docking_access": "squadron",
-      "allow_notorious": true,
       "last_seen_system": "Lupus Dark Region BQ-Y d66",
-      "last_seen_station": "X7J-BQG",
+      "last_seen_timestamp": "2025-01-01T12:00:00Z",
       "services": [
         "dock",
         "commodities",
@@ -708,9 +706,8 @@ Based on [`MyCarriersResponse`](backend/src/models/api_models.py:148):
       "name": "MIDNIGHT ELOQUENCE",
       "callsign": "X7J-BQG",
       "docking_access": "squadron",
-      "allow_notorious": true,
       "last_seen_system": "Lupus Dark Region BQ-Y d66",
-      "last_seen_station": "X7J-BQG",
+      "last_seen_timestamp": "2025-01-01T12:00:00Z",
       "services": [
         "dock",
         "commodities",
@@ -730,9 +727,8 @@ Based on [`MyCarriersResponse`](backend/src/models/api_models.py:148):
       "name": "SQUADRON CARRIER",
       "callsign": "AB1-CDE",
       "docking_access": "squadron",
-      "allow_notorious": false,
       "last_seen_system": "LHS 1234",
-      "last_seen_station": "AB1-CDE",
+      "last_seen_timestamp": "2025-01-01T12:00:00Z",
       "services": [
         "dock",
         "commodities"

@@ -47,7 +47,7 @@ journals live somewhere unusual.
 ```text
 EDColonisationAsst/
 ├── README.md                 # End-user overview and doc index
-├── DEVELOPMENT.md     # Build pipeline and dev workflows
+├── DEVELOPMENT.md            # Build pipeline and dev workflows
 ├── TESTING.md                # Test suites and the coverage gate
 ├── ARCHITECTURE.md           # Architecture front door
 ├── ARCHITECTURE_1_backend.md # Backend architecture detail

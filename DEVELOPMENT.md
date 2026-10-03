@@ -72,7 +72,7 @@ still compiled with Nuitka; only the application stopped being.
   [edca_launch.py](edca_launch.py).
 - Writes `dist-runtime/edca-runtime.zip`.
 
-Measured on the first green build: a 259 MB tree, a 95 MB archive.
+The archive comes to about 95 MB.
 
 The tree travels as an archive rather than as loose files because Nuitka strips
 executables and `.py` files out of an included data directory; an unfrozen
@@ -459,7 +459,7 @@ chmod +x .githooks/pre-commit
 ```
 
 It formats staged Python files with black, lints the Python surface and the
-front end, then runs a bare `pytest -q` from the repository root, which is
+front end, then runs `python -m pytest -q` from the repository root, which is
 the full gate: both suites under the 100% coverage requirement. It prefers the
 interpreter in the root `venv/`, the environment that actually carries the
 tooling, taking `python3` or `python` from `PATH` only when that environment is

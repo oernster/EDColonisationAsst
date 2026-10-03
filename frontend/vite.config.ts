@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// Must match DEFAULT_BACKEND_PORT in backend/src/utils/ports.py. Deliberately
+// Must match DEFAULT_BACKEND_PORT in backend/src/constants.py. Deliberately
 // an unusual port: the obvious ones (8000, 8080, 5000, 3000) are what every
 // other development server reaches for, so they are the ones most likely to be
 // taken or reserved by the operating system.
@@ -28,10 +28,6 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${BACKEND_PORT}`,
         changeOrigin: true,
-      },
-      '/ws': {
-        target: `ws://localhost:${BACKEND_PORT}`,
-        ws: true,
       },
     },
   },

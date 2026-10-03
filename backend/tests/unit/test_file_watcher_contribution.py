@@ -21,6 +21,7 @@ from tests.unit._test_file_watcher_support import (
 @pytest.mark.asyncio
 async def test_journal_file_handler_handles_colonisation_contributions_array(
     repository: ColonisationRepository,
+    tmp_path: Path,
 ):
     """_process_file should handle ColonisationContribution with Contributions array
     schema."""
@@ -160,6 +161,11 @@ async def test_journal_file_handler_handles_colonisation_contributions_array(
             self.calls.append(file_path)
             return list(self._events)
 
+        def parse_line(self, line: str):
+            # The tail reader hands over one line at a time; replay the
+            # events in order, one per placeholder line.
+            return self._events.pop(0) if self._events else None
+
     updated_systems: list[str] = []
 
     async def _callback(system_name: str) -> None:
@@ -174,8 +180,9 @@ async def test_journal_file_handler_handles_colonisation_contributions_array(
         loop=asyncio.get_running_loop(),
     )
 
-    fake_path = Path("Journal.2025-12-15T203720.01.log")
-    await handler._process_file(fake_path)
+    journal = tmp_path / "Journal.2025-12-15T203720.01.log"
+    journal.write_text("{}\n" * len(events), encoding="utf-8")
+    await handler._process_file(journal)
 
     # Tracker should now reflect the final docked state in the construction system
     assert system_tracker.get_current_system() == "Lupus Dark Region BQ-Y d66"

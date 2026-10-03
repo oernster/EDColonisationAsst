@@ -24,6 +24,7 @@ from tests.unit._test_coverage_journal_ingestion_support import (
     depot_event,
     docked_event,
     make_handler,
+    write_journal_lines,
     seeded_site,
 )
 
@@ -74,7 +75,9 @@ async def test_depot_with_unresolved_system_skips_notification(
     # returns a non-empty system name so this defensive branch needs a fake.
     handler._projector.project_depot = unresolved_depot  # type: ignore[method-assign]
 
-    await handler._process_file(tmp_path / "Journal.unresolved.log")
+    await handler._process_file(
+        write_journal_lines(tmp_path / "Journal.unresolved.log", count=1)
+    )
 
     assert callback.calls == []
     assert handler.last_depot_market_ids == [1234]
@@ -99,7 +102,9 @@ async def test_contribution_without_known_site(tmp_path: Path) -> None:
         loop, parser=ListParser([contribution]), repo=repo, callback=callback
     )
 
-    await handler._process_file(tmp_path / "Journal.contribution.log")
+    await handler._process_file(
+        write_journal_lines(tmp_path / "Journal.contribution.log", count=1)
+    )
 
     assert repo.contributions == [(321, "steel", 30)]
     assert callback.calls == []

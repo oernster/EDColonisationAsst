@@ -384,6 +384,19 @@ feature reads it, so the Settings UI does not expose it. Do not commit real
 API keys. The commander's name is not stored anywhere: it is read from the
 journal files (`/api/journal/status`).
 
+That path holds for a source checkout. Every packaged runtime (the installed
+Windows deployment, the flatpak, a frozen build) reads and writes
+`config.yaml` in the per-user configuration folder instead:
+`%APPDATA%\EDColonisationAsst` on Windows, `$XDG_CONFIG_HOME/EDColonisationAsst`
+(or `~/.config/EDColonisationAsst`) elsewhere. The setup program overwrites the
+whole runtime archive, the shipped `backend/config.yaml` included, on every
+upgrade, reinstall and repair, so a user's file kept there was lost each time.
+An absent file means defaults; the first Settings save creates it. A save
+writes to a temporary file and replaces the real one only once complete. A
+damaged file is kept aside as `config.yaml.damaged` (then `.damaged.1` and so
+on, never overwriting an earlier copy), the log says so and the save goes
+ahead from a clean file.
+
 ### Testing
 
 See [TESTING.md](TESTING.md). Short version, from the **repository root**:

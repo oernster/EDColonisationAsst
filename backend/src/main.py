@@ -13,6 +13,7 @@ from .api.carriers import router as carriers_router
 from .api.changes import router as changes_router
 from .api.health import router as health_router
 from .api.journal import router as journal_router
+from .api.request_guard import RequestGuardMiddleware, local_machine_names
 from .api.routes import router as colonisation_router, set_dependencies
 from .api.settings import router as settings_router
 from .config import get_config
@@ -255,6 +256,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+# Added last so it runs first: a forged Host or a foreign Origin on a write is
+# refused before CORS or any route sees the request. See api/request_guard.py.
+app.add_middleware(
+    RequestGuardMiddleware,
+    allowed_origins=config.server.cors_origins,
+    machine_names=local_machine_names(),
 )
 
 # Serve the built frontend (React/Vite) as static files if available.

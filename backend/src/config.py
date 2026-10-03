@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-import sys
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -95,34 +94,6 @@ class AppConfig(BaseSettings):
     inara: InaraConfig = Field(default_factory=InaraConfig)
 
 
-def _is_frozen() -> bool:
-    """
-    Return True if the current process is a frozen executable.
-
-    This mirrors the logic in utils.runtime.is_frozen() but is kept local to
-    avoid import-time dependencies from this low-level config module.
-    """
-    # Primary detection: explicit flag set by freezer.
-    if bool(getattr(sys, "frozen", False)):
-        return True
-
-    # Fallback: argv[0] points at a non-Python .exe
-    try:
-        exe_path = Path(sys.argv[0])
-        if exe_path.suffix.lower() == ".exe" and not exe_path.stem.lower().startswith(
-            "python"
-        ):
-            return True
-    except (TypeError, ValueError):
-        # sys.argv[0] is not always a usable path string: an embedded host can
-        # leave it empty or non-string (TypeError); a null byte in it
-        # raises ValueError. Either way we cannot tell, so report not frozen,
-        # which is the safe answer because it keeps the source layout.
-        return False
-
-    return False
-
-
 def _get_user_config_dir() -> Path:
     """
     Return the per-user configuration directory for the packaged runtime.
@@ -152,36 +123,27 @@ def get_config_paths() -> tuple[Path, Path]:
     """
     Compute the locations of config.yaml and commander.yaml.
 
-    - In development (non-frozen) mode we keep using the source layout:
+    - A source checkout keeps using its own tree:
         backend/config.yaml
         backend/commander.yaml
 
-    - In the packaged (frozen) runtime we store configuration alongside
-      the installed executable so that the DB, logs and config all live
-      under the single install directory (e.g. AppData\\Local\\EDColonisationAssistant).
-
-    - Inside a flatpak neither of those is writable: the staged application
-      lives under a read-only ``/app``. Saving the journal directory is the one
-      setting the user must change, so it goes to the per-user configuration
-      directory, which the sandbox points at its own writable location.
+    - Every packaged runtime (frozen, flatpak or an installed deployment)
+      keeps them in the per-user configuration directory. The install tree
+      is the wrong place on every one of them: a flatpak's ``/app`` is
+      read-only and the Windows setup program overwrites every file of the
+      runtime archive, the shipped ``backend/config.yaml`` included, on each
+      upgrade, reinstall and repair. Keeping the user's file there lost the
+      saved journal folder and any host, port or CORS edit every time. No
+      seed is copied in: an absent file means defaults (which are what the
+      shipped file holds); the first save creates it.
     """
     # Late for the same reason as the import in _default_journal_directory: a
     # top-level import of anything under utils would be circular. By call time
-    # utils is fully imported. This is what keeps one definition of the sandbox
-    # test rather than a second local mirror like _is_frozen above.
-    from .utils.runtime import is_flatpak
+    # utils is fully imported. This keeps one definition of "packaged".
+    from .utils.runtime import is_packaged
 
-    if is_flatpak():
+    if is_packaged():
         base_dir = _get_user_config_dir()
-    elif _is_frozen():
-        # Directory containing the running EXE (install root when packaged).
-        try:
-            base_dir = Path(sys.argv[0]).resolve().parent
-        except (OSError, TypeError, ValueError):
-            # As in _is_frozen, plus resolve() itself hitting the filesystem
-            # (OSError). Fall back to the source layout rather than leave the
-            # configuration paths undefined.
-            base_dir = Path(__file__).resolve().parents[2]
     else:
         # backend/src/config.py -> src -> backend
         base_dir = Path(__file__).parent.parent

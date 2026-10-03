@@ -13,10 +13,14 @@ Two pieces of state per file make that safe:
   newline, retained and retried on the next pass rather than parsed as a
   truncated JSON object.
 
-The first sight of a file goes through the parser's whole-file path; every
-pass after that is a seek to the stored offset. A file that has shrunk has
-been truncated or rotated, so it cannot be a superset of what was already
-read and the state for it is discarded.
+The first sight of a file is the same read from offset zero, so it gets the
+same partial-line retention and the same tolerance of bad bytes as every later
+pass. It used to go through the parser's whole-file path, which set the
+offset to the size measured AFTER parsing (skipping whatever the game appended
+meanwhile). It also parsed a half-written last line as broken JSON before
+skipping it; one byte that was not UTF-8 lost it the whole file. A file that has
+shrunk has been truncated or rotated, so it cannot be a superset of what was
+already read and the state for it is discarded.
 
 `JournalFileHandler` in src.services.journal_ingestion owns the watchdog side
 and delegates every read here.
@@ -36,7 +40,7 @@ class JournalTailReader:
 
     Responsibilities:
     - Track a byte offset and a partial-line buffer per journal file.
-    - Choose between a whole-file parse and a tail parse from that offset.
+    - Parse what lies past that offset, starting at zero on first sight.
     - Absorb the failures of a file being written while it is read.
     """
 
@@ -71,33 +75,13 @@ class JournalTailReader:
                 offset = 0
                 partial = b""
 
-            if offset <= 0:
-                return self._parse_whole_file(file_path, key, current_size)
-
             try:
                 return self._parse_tail(file_path, key, offset, partial)
             except OSError:
-                # Cannot open, seek or read: fall back to a whole-file parse
-                # rather than lose the file until it next changes.
-                return self._parse_whole_file(file_path, key, current_size)
-
-    def _parse_whole_file(
-        self,
-        file_path: Path,
-        key: str,
-        fallback_size: int,
-    ) -> list[JournalEvent]:
-        """Parse the entire file and mark the offset at its end.
-
-        The size is read again rather than reused: the parse takes time and
-        the game may have appended during it, so the earlier reading would
-        skip those bytes on the next pass. `fallback_size` covers the file
-        disappearing between the two.
-        """
-        events = self._parser.parse_file(file_path)
-        self.offsets[key] = self._size_of(file_path, default=fallback_size)
-        self.partials[key] = b""
-        return events
+                # Cannot open, seek or read. Nothing was consumed, so the
+                # stored state is left as it was and the next pass retries
+                # from the same place rather than skipping anything.
+                return []
 
     def _parse_tail(
         self,
@@ -114,9 +98,10 @@ class JournalTailReader:
         """
         # This read blocks the event loop, deliberately: it seeks to the
         # stored offset and takes only what the game has appended since the
-        # last pass, which is a handful of lines. The whole-file branch is the
-        # expensive one: the first thing worth moving off the loop if this
-        # ever becomes a problem.
+        # last pass, which is a handful of lines. The first sight of a file
+        # reads all of it: the first thing worth moving off the loop if this
+        # ever becomes a problem. The offset advances by exactly the bytes
+        # read, so anything appended after this read is the next pass's.
         with open(file_path, "rb") as handle:
             handle.seek(offset)
             chunk = handle.read()

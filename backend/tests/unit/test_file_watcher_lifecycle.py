@@ -85,6 +85,7 @@ async def test_file_watcher_start_raises_for_missing_directory(
 @pytest.mark.asyncio
 async def test_journal_file_handler_process_file_updates_tracker_and_repository(
     repository: ColonisationRepository,
+    tmp_path: Path,
 ):
     """_process_file should drive tracker updates, site creation and callbacks for
     legacy
@@ -193,6 +194,11 @@ async def test_journal_file_handler_process_file_updates_tracker_and_repository(
             self.calls.append(file_path)
             return list(self._events)
 
+        def parse_line(self, line: str):
+            # The tail reader hands over one line at a time; replay the
+            # events in order, one per placeholder line.
+            return self._events.pop(0) if self._events else None
+
     updated_systems: list[str] = []
 
     async def _callback(system_name: str) -> None:
@@ -207,8 +213,9 @@ async def test_journal_file_handler_process_file_updates_tracker_and_repository(
         loop=asyncio.get_running_loop(),
     )
 
-    fake_path = Path("Journal.2025-01-01T000000.01.log")
-    await handler._process_file(fake_path)
+    journal = tmp_path / "Journal.2025-01-01T000000.01.log"
+    journal.write_text("{}\n" * len(events), encoding="utf-8")
+    await handler._process_file(journal)
 
     # Tracker should now reflect the final docked state in Beta System
     assert system_tracker.get_current_system() == "Beta System"

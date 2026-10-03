@@ -5,6 +5,17 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, computed_field
 
+# A delivered amount can exceed the required one (the game accepts a surplus),
+# so every progress percentage is capped here rather than reporting 150%.
+FULL_PERCENT = 100.0
+
+
+def _percent(done: int, required: int) -> float:
+    """Progress as a percentage, full when nothing is required, never over."""
+    if required == 0:
+        return FULL_PERCENT
+    return min(FULL_PERCENT, (done / required) * FULL_PERCENT)
+
 
 class CommodityStatus(str, Enum):
     """Status of a commodity requirement"""
@@ -39,10 +50,8 @@ class Commodity(BaseModel):
     @computed_field
     @property
     def progress_percentage(self) -> float:
-        """Calculate progress percentage"""
-        if self.required_amount == 0:
-            return 100.0
-        return (self.provided_amount / self.required_amount) * 100.0
+        """Calculate progress percentage, capped at full"""
+        return _percent(self.provided_amount, self.required_amount)
 
     @computed_field
     @property
@@ -94,15 +103,9 @@ class ConstructionSite(BaseModel):
     @property
     def commodities_progress_percentage(self) -> float:
         """Calculate overall commodity progress"""
-        if not self.commodities:
-            return 100.0
-
         total_required = sum(c.required_amount for c in self.commodities)
-        if total_required == 0:
-            return 100.0
-
         total_provided = sum(c.provided_amount for c in self.commodities)
-        return (total_provided / total_required) * 100.0
+        return _percent(total_provided, total_required)
 
 
 class SystemColonisationData(BaseModel):
@@ -166,7 +169,5 @@ class CommodityAggregate(BaseModel):
     @computed_field
     @property
     def progress_percentage(self) -> float:
-        """Calculate progress percentage"""
-        if self.total_required == 0:
-            return 100.0
-        return (self.total_provided / self.total_required) * 100.0
+        """Calculate progress percentage, capped at full"""
+        return _percent(self.total_provided, self.total_required)

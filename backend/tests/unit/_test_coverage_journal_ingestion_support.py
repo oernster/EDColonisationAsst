@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from pathlib import Path
 from typing import Any, List, Optional
 from src.models.colonisation import ConstructionSite
 from src.models.journal_events import (
@@ -85,23 +86,35 @@ class FakeRepository:
 
 
 class ListParser:
-    """Parser fake that returns a fixed list of events from parse_file."""
+    """Parser fake that replays a fixed list of events.
+
+    parse_file returns them all; parse_line hands out the next one per line,
+    which is the seam the tail reader uses. A file read through the handler
+    therefore needs one line per event: see write_journal_lines.
+    """
 
     def __init__(self, events: List[JournalEvent]) -> None:
         self.events = list(events)
+        self._pending = list(events)
 
     def parse_file(self, file_path: Any) -> List[JournalEvent]:
         return list(self.events)
 
     def parse_line(self, line: str) -> Optional[JournalEvent]:
-        return None
+        return self._pending.pop(0) if self._pending else None
 
 
-class RaisingFileParser(ListParser):
-    """Parser fake whose parse_file always raises."""
+def write_journal_lines(path: Path, count: int) -> Path:
+    """Write a journal of `count` placeholder lines for ListParser to replay."""
+    path.write_text("{}\n" * count, encoding="utf-8")
+    return path
 
-    def parse_file(self, file_path: Any) -> List[JournalEvent]:
-        raise RuntimeError("parse boom")
+
+class ExplodingTracker(FakeSystemTracker):
+    """Tracker whose location update raises, failing the file being ingested."""
+
+    def update_from_location(self, event: Any) -> None:
+        raise RuntimeError("tracker boom")
 
 
 class MarkerRaisingLineParser(JournalParser):

@@ -17,6 +17,8 @@ from __future__ import annotations
 from collections.abc import Callable
 import json
 from typing import Any
+import urllib.error
+import urllib.parse
 import urllib.request
 
 from ..models.update_info import ReleaseAsset, ReleaseInfo
@@ -30,9 +32,15 @@ logger = get_logger(__name__)
 # invisible here and cannot prompt anybody to upgrade to it. That guard is the
 # endpoint's own contract, which is why there is deliberately no client-side
 # re-check of the draft and prerelease flags.
-RELEASES_API_URL = (
-    "https://api.github.com/repos/oernster/EDColonisationAsst/releases/latest"
-)
+_SCHEME = "https"
+_API_HOST = "api.github.com"
+_SITE_HOST = "github.com"
+_REPOSITORY = "oernster/EDColonisationAsst"
+
+RELEASES_API_URL = f"{_SCHEME}://{_API_HOST}/repos/{_REPOSITORY}/releases/latest"
+
+# Every URL the tray may open (the release page, an asset) lives under this.
+_TRUSTED_PATH_PREFIX = f"/{_REPOSITORY}/"
 
 ACCEPT_HEADER = "application/vnd.github+json"
 
@@ -42,6 +50,45 @@ REQUEST_TIMEOUT_S = 5.0
 
 # Whatever performs the request. Injected so no test ever reaches the network.
 Opener = Callable[..., Any]
+
+
+def is_trusted_release_url(url: str) -> bool:
+    """Whether a URL from the payload is this project's page on github.com.
+
+    The tray hands the URL straight to the desktop to open, so a payload
+    naming a `file:` URL or another site would be opened as given. Only
+    HTTPS on github.com itself, with no credentials and under this
+    repository, is kept.
+    """
+    parts = urllib.parse.urlsplit(url)
+    return (
+        parts.scheme == _SCHEME
+        and parts.netloc == _SITE_HOST
+        and parts.path.startswith(_TRUSTED_PATH_PREFIX)
+    )
+
+
+class SameHostRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only when it stays on the host asked.
+
+    GitHub redirects a renamed repository within its API host; anything that
+    leaves it is refused rather than followed to wherever it points.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if (
+            urllib.parse.urlsplit(newurl).netloc
+            != urllib.parse.urlsplit(req.full_url).netloc
+        ):
+            raise urllib.error.HTTPError(
+                newurl, code, "Redirect off the API host refused", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _default_opener() -> Opener:
+    """urlopen's behaviour, except that redirects may not change host."""
+    return urllib.request.build_opener(SameHostRedirectHandler()).open
 
 
 def _text(value: object) -> str | None:
@@ -66,7 +113,11 @@ def _read_assets(raw: object) -> tuple[ReleaseAsset, ...]:
             continue
         name = _text(entry.get("name"))
         download_url = _text(entry.get("browser_download_url"))
-        if name is not None and download_url is not None:
+        if (
+            name is not None
+            and download_url is not None
+            and is_trusted_release_url(download_url)
+        ):
             found.append(ReleaseAsset(name=name, download_url=download_url))
     return tuple(found)
 
@@ -77,7 +128,7 @@ def parse_release(payload: object) -> ReleaseInfo | None:
         return None
     tag = _text(payload.get("tag_name"))
     page_url = _text(payload.get("html_url"))
-    if tag is None or page_url is None:
+    if tag is None or page_url is None or not is_trusted_release_url(page_url):
         return None
     version = tag[1:] if tag[:1] in ("v", "V") else tag
     return ReleaseInfo(
@@ -95,7 +146,7 @@ class GitHubReleaseSource(ReleaseSource):
         opener: Opener | None = None,
         url: str = RELEASES_API_URL,
     ) -> None:
-        self._opener = opener if opener is not None else urllib.request.urlopen
+        self._opener = opener if opener is not None else _default_opener()
         self._url = url
 
     def latest_release(self) -> ReleaseInfo | None:
@@ -121,5 +172,7 @@ __all__ = [
     "RELEASES_API_URL",
     "REQUEST_TIMEOUT_S",
     "GitHubReleaseSource",
+    "SameHostRedirectHandler",
+    "is_trusted_release_url",
     "parse_release",
 ]

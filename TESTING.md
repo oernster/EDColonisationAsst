@@ -170,7 +170,11 @@ Four rules:
 - `repositories` stays free of `api`, `services` and `runtime`; `services`
   stays free of `api` and `runtime`; `api` stays free of `runtime`. The walk is
   over the whole syntax tree, so an import deferred inside a function counts
-  exactly as one at module level.
+  exactly as one at module level. It reads every spelling of an import:
+  `from .. import api`, the absolute `src.` and `backend.src.` forms and a
+  literal `importlib.import_module` or `__import__` call. A set of planted
+  violations, one per spelling and written to a temporary tree, proves that
+  each is reported; before them the walk missed all four.
 - The setup program imports nothing from `backend/`, which is what keeps its
   compiled onefile down to PySide6 plus the standard library.
 - No file exceeds 400 lines. The rule arrived with an allowlist of the nineteen

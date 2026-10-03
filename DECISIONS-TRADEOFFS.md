@@ -108,7 +108,23 @@ can open the page.
 - **Gains:** the tablet use the product is designed around works without a
   configuration change.
 - **Costs:** anyone on the local network who can reach the port can read the
-  page. EDCA is not meant to be exposed to the internet and says so.
+  page and change its settings, the journal folder included; there is no
+  sign-in. EDCA is not meant to be exposed to the internet and says so.
+
+### Requests must name this machine; writes must come from its own page
+
+Every request must carry a Host that is an IP address, `localhost` or this
+machine's own name; a write that names an Origin must be the page's own or a
+configured CORS origin.
+
+- **Rather than:** answering any Host and any Origin. A web page can rebind its
+  own domain to 127.0.0.1 and then read everything, CORS being no defence for
+  a page the browser thinks is same-origin; a bodiless cross-origin POST needs
+  no preflight, so any site could make EDCA wipe and rebuild its database.
+- **Gains:** neither attack works; the tablet still reaches the page by the
+  PC's LAN address.
+- **Costs:** a name that is not this machine's own (a hosts-file alias, say)
+  is refused. Nothing here authenticates a LAN peer.
 
 ## Reading the journals
 

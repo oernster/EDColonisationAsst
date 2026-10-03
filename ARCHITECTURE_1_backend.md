@@ -232,6 +232,15 @@ the one that used to be there pointed at a Linux Steam Proton prefix.
 usual Saved Games locations and the Steam/Proton prefixes. Setting the key in
 the YAML or the journal directory in the Settings page overrides the probe.
 
+Every view reads the same answer.
+[`get_journal_directory()`](backend/src/utils/journal.py:139) returns the
+configured directory (whose default is the probe's result) and is what the
+commander header and the carrier endpoints use, beside the watcher, health and
+reload, which read the configuration directly. It used to re-run the probe, so
+a user with a folder set in Settings saw sites from that folder and the header
+and carriers from another. A configured folder that does not exist is reported
+rather than swapped for the detected one.
+
 The import is deliberately **late**, inside the function rather than at module
 level: `utils/__init__` imports the logger, the logger imports config, so a
 top-level import here is circular.
@@ -382,6 +391,7 @@ Concurrency, which the split deliberately left where it was:
 - `parse_file(path) -> list[JournalEvent]`:
   - Iterates lines in `Journal.*.log` and calls `parse_line()`.
   - One unreadable line is logged and skipped; one unreadable file yields an empty list. Neither abandons the rest.
+  - Decodes with replacement, so a byte that is not UTF-8 costs the line it is on rather than every event in the file.
 
 - `parse_line(line: str) -> Optional[JournalEvent]`:
   - Parses JSON and reads the timestamp.
@@ -406,7 +416,7 @@ The fifteen events, by module:
 `parse_contribution` supports both:
 
   - Legacy flat schema (`Commodity`, `TotalQuantity`).
-  - New `ColonisationContribution` with `Contributions: [{Name, Name_Localised, Amount}]`.
+  - New `ColonisationContribution` with `Contributions: [{Name, Name_Localised, Amount}]`. Every item becomes a `ContributionItem` on the event's `items`; the projector records each one. This shape states no cumulative total, so each delivery's amount stands in as a lower bound. The repository keeps the larger of that and what it holds; the next depot snapshot carries the real total. Summing deliveries would double-count whenever a journal is re-read.
   - Anything else raises `ValueError`, which `parse_line` turns into a warning and a `None`.
 
 ### 6.2 Ingestion and system tracking
@@ -431,12 +441,12 @@ Ingestion is three collaborators, split so that the watchdog boundary, the readi
   4. Tracks which systems were updated and invokes the optional `update_callback(system_name)`; in production this bumps the in-process change sequence used by AJAX long-polling.
   5. Records best-effort diagnostics through `_record_diagnostics`, the single guarded write behind `/api/watcher/status`. A failure there never interrupts ingestion.
 
-[`JournalTailReader`](backend/src/services/journal_tail_reader.py:34) keeps a byte offset and a partial-line buffer per file, so the first sight of a file is a whole-file parse and every pass after it reads only what the game has appended. A partial final line (the game mid-write) is retained and retried rather than parsed as truncated JSON; a file that has shrunk has been rotated, so its state is discarded and the file re-read.
+[`JournalTailReader`](backend/src/services/journal_tail_reader.py:34) keeps a byte offset and a partial-line buffer per file, so every pass, the first sight of a file included (from offset zero), reads only what lies past the offset and advances it by exactly the bytes it read. The first sight used to be a whole-file parse that skipped whatever the game appended during it, dropped a half-written last line and lost the whole file to one bad byte. A read that fails consumes nothing and is retried on the next pass. A partial final line (the game mid-write) is retained and retried rather than parsed as truncated JSON; a file that has shrunk has been rotated, so its state is discarded and the file re-read.
 
 [`ColonisationProjector`](backend/src/services/colonisation_projection.py:40) owns the repository writes:
 
 - `project_docked` creates a placeholder `ConstructionSite` or upgrades an existing one's metadata, which is what reflects a renamed site.
-- `project_depot` converts raw commodity payloads into `Commodity` models and merges the snapshot with any existing site, ensuring progress values never regress. It returns the resolved system name, since depot events frequently omit `StarSystem`.
+- `project_depot` converts raw commodity payloads into `Commodity` models and merges the snapshot with any existing site, ensuring progress values never regress: commodity amounts and overall progress take the larger value; completion and failure stay reported once reported, because journal files are taken in modification order and a stale snapshot can be projected last. A commodity with no internal name is keyed by its localised name; one with neither is skipped rather than collapsing into a single row. It returns the resolved system name, since depot events frequently omit `StarSystem`.
 - `project_contribution` calls `repository.update_commodity`.
 
 ### 6.3 First‑run vs incremental ingestion
@@ -548,7 +558,12 @@ when the commander is aboard, which makes it the wrong anchor.
 
 The state endpoint answers for the carrier whether or not the commander is on
 it, rebuilding from the last time they were, returning 404 only when no
-carrier can be resolved from the journal window at all.
+carrier can be resolved from the journal window at all. Not aboard, "their
+carrier" is the one the newest `CarrierStats` names (`find_own_carrier_docking`),
+matched to a docking by id or callsign; it used to be the last carrier docked
+at, so one visit to somebody else's carrier replaced the commander's own. Only
+a journal with no `CarrierStats` at all falls back to the last carrier docked
+at.
 
 ### 8.2 The carrier hold
 
@@ -598,7 +613,9 @@ Key colonisation endpoints:
 - `GET /api/sites`: global list of in‑progress and completed sites.
 - `GET /api/sites/{market_id}`: detail view of a single site.
 - `GET /api/stats`: high-level stats from the repository.
-- `POST /api/debug/reload-journals`: explicit full re‑import using the same pipeline as the first‑run preload.
+- `POST /api/debug/reload-journals`: explicit full re‑import using the same pipeline as the first‑run preload. It answers 404 and clears nothing when the journal folder is missing or holds no journal files; only then is the database cleared and rebuilt.
+
+Every request passes [`request_guard.py`](backend/src/api/request_guard.py:1) first. A Host that is not an IP literal, `localhost` or this machine's own name is refused with 400, which defeats DNS rebinding while keeping tablet access by LAN address. A write (`POST`, `PUT`, `PATCH`, `DELETE`) that names an Origin other than the page's own or a configured CORS origin is refused with 403, because a bodiless cross-origin POST needs no preflight. Neither rule authenticates anyone: a LAN peer can still read and write.
 
 Live updates:
 

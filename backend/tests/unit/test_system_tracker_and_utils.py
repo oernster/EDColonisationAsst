@@ -6,7 +6,6 @@ import logging
 import os
 import types
 
-import pytest
 
 from src.models.journal_events import LocationEvent, FSDJumpEvent, DockedEvent
 from src.services.system_tracker import SystemTracker
@@ -230,14 +229,14 @@ def test_setup_logging_and_get_logger():
     logger.debug("This is a debug message from test_setup_logging_and_get_logger")
 
 
-def test_get_journal_directory_raises_when_saved_games_missing():
-    """Windows-only: get_journal_directory should raise when Saved Games path cannot be
+def test_find_journal_directory_is_none_when_saved_games_missing():
+    """Windows-only: detection finds nothing when the Saved Games path cannot be
     determined."""
     import src.utils.journal as journal_mod  # local import to patch safely
     import src.utils.windows as windows_mod  # patch the Windows helper in use
 
     # Make this test deterministic cross-platform by forcing the Windows branch.
-    # (On Linux/macOS, get_journal_directory() would otherwise use Proton/Wine
+    # (On Linux/macOS, find_journal_directory() would otherwise use Proton/Wine
     # auto-detection and never consult windows_mod.)
     orig_os_name = getattr(journal_mod.os, "name", None)
     try:
@@ -246,8 +245,7 @@ def test_get_journal_directory_raises_when_saved_games_missing():
         orig_get_saved_games = windows_mod.get_saved_games_path
         try:
             windows_mod.get_saved_games_path = lambda: None  # type: ignore[assignment]
-            with pytest.raises(FileNotFoundError):
-                journal_mod.get_journal_directory()
+            assert journal_mod.find_journal_directory() is None
         finally:
             windows_mod.get_saved_games_path = (
                 orig_get_saved_games  # type: ignore[assignment]
@@ -257,8 +255,8 @@ def test_get_journal_directory_raises_when_saved_games_missing():
             setattr(journal_mod.os, "name", orig_os_name)
 
 
-def test_get_journal_directory_raises_when_journal_folder_missing(tmp_path: Path):
-    """Windows-only: get_journal_directory should raise when the
+def test_find_journal_directory_is_none_when_journal_folder_missing(tmp_path: Path):
+    """Windows-only: detection finds nothing when the
     Frontier/Elite Dangerous folder is missing."""
     import src.utils.journal as journal_mod  # local import to patch safely
     import src.utils.windows as windows_mod  # patch the Windows helper in use
@@ -277,8 +275,7 @@ def test_get_journal_directory_raises_when_journal_folder_missing(tmp_path: Path
             windows_mod.get_saved_games_path = (
                 lambda: saved_games  # type: ignore[assignment]
             )
-            with pytest.raises(FileNotFoundError):
-                journal_mod.get_journal_directory()
+            assert journal_mod.find_journal_directory() is None
         finally:
             windows_mod.get_saved_games_path = (
                 orig_get_saved_games  # type: ignore[assignment]
@@ -322,10 +319,8 @@ def test_find_journal_directory_uses_linux_steam_compat(monkeypatch, tmp_path: P
     assert detected == journal_dir
 
 
-def test_get_journal_directory_linux_error_message_lists_candidates(monkeypatch):
-    """Linux path: get_journal_directory should raise with a helpful error message when
-    no
-    dirs exist."""
+def test_find_journal_directory_linux_is_none_when_no_candidate_exists(monkeypatch):
+    """Linux path: detection finds nothing when no candidate directory exists."""
     import src.utils.journal as journal_mod  # local import to patch safely
 
     fake_os = types.SimpleNamespace(
@@ -335,12 +330,4 @@ def test_get_journal_directory_linux_error_message_lists_candidates(monkeypatch)
 
     monkeypatch.setattr(journal_mod, "os", fake_os, raising=False)
 
-    with pytest.raises(FileNotFoundError) as excinfo:
-        journal_mod.get_journal_directory()
-
-    message = str(excinfo.value)
-    assert (
-        "Could not auto-detect the Elite Dangerous journal directory on Linux."
-        in message
-    )
-    assert "Tried the following locations:" in message
+    assert journal_mod.find_journal_directory() is None

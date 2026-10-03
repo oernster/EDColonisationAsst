@@ -34,8 +34,29 @@ class ColonisationConstructionDepotEvent(JournalEvent):
     )
 
 
+class ContributionItem(BaseModel):
+    """One commodity delivered by a ColonisationContribution."""
+
+    commodity: str = Field(description="Commodity name")
+    commodity_localised: str | None = Field(
+        None, description="Localized commodity name"
+    )
+    quantity: int = Field(description="Quantity contributed")
+    total_quantity: int = Field(
+        description=(
+            "Total now provided, as far as the event says. The array shape "
+            "states no total, so there it is this delivery: a lower bound."
+        )
+    )
+
+
 class ColonisationContributionEvent(JournalEvent):
-    """ColonisationContribution event - player contribution"""
+    """ColonisationContribution event - player contribution.
+
+    The flat fields describe the first commodity delivered, which is all the
+    legacy shape carries. The newer shape can deliver several at once; `items`
+    then holds every one of them, the first included.
+    """
 
     market_id: int = Field(description="Market ID")
     commodity: str = Field(description="Commodity name")
@@ -45,6 +66,23 @@ class ColonisationContributionEvent(JournalEvent):
     quantity: int = Field(description="Quantity contributed")
     total_quantity: int = Field(description="Total quantity now provided")
     credits_received: int = Field(description="Credits received for contribution")
+    items: list[ContributionItem] = Field(
+        default_factory=list,
+        description="Every commodity delivered; empty for the legacy shape",
+    )
+
+    def deliveries(self) -> list[ContributionItem]:
+        """Every commodity this event delivered, oldest shape included."""
+        if self.items:
+            return list(self.items)
+        return [
+            ContributionItem(
+                commodity=self.commodity,
+                commodity_localised=self.commodity_localised,
+                quantity=self.quantity,
+                total_quantity=self.total_quantity,
+            )
+        ]
 
 
 class LocationEvent(JournalEvent):

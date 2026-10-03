@@ -38,6 +38,39 @@ def find_latest_docked_carrier(events: list[JournalEvent]) -> DockedEvent | None
     return None
 
 
+def find_own_carrier_docking(events: list[JournalEvent]) -> DockedEvent | None:
+    """Return the newest docking at the commander's OWN carrier, if any.
+
+    Only the owner's journal carries CarrierStats, so the newest one names the
+    commander's carrier. The answer is the newest Docked at that carrier,
+    matched by id (or by callsign where Docked.MarketID and CarrierID differ).
+    With CarrierStats present but no docking at that carrier in the window
+    there is no answer: the last carrier docked at could be anybody's. Showing
+    a stranger's carrier as "yours" is the defect this replaces.
+
+    Only when the journal has no CarrierStats at all is the last carrier
+    docked at the best guess available, as it always was.
+    """
+    stats = next(
+        (e for e in reversed(events) if isinstance(e, CarrierStatsEvent)), None
+    )
+    if stats is None:
+        return find_latest_docked_carrier(events)
+
+    own_ids = {stats.carrier_id, stats.market_id} - {None}
+    callsign = (stats.callsign or "").strip().lower()
+    for event in reversed(events):
+        if not isinstance(event, DockedEvent):
+            continue
+        if event.station_type != _FLEET_CARRIER:
+            continue
+        if event.market_id in own_ids:
+            return event
+        if callsign and event.station_name.strip().lower() == callsign:
+            return event
+    return None
+
+
 def _docked_event_for_market(
     events: list[JournalEvent],
     market_id: int | None,
@@ -57,8 +90,8 @@ def _docking_from_location(
 ) -> DockedEvent | None:
     """Read a Location event as a docking, when it reports one at a carrier.
 
-    A Location arrives on starting the game and on returning to the main menu,
-    and it states where the commander is and whether they are docked. When
+    A Location arrives on starting the game and on returning to the main menu;
+    it states where the commander is and whether they are docked. When
     that place is a carrier it is the only evidence of the docking, because
     the Docked event happened in a previous session.
     """
@@ -89,16 +122,16 @@ def _docking_from_location(
 def find_current_carrier_docking(events: list[JournalEvent]) -> DockedEvent | None:
     """Return the carrier the commander is docked at RIGHT NOW, if any.
 
-    The newest event that settles the question decides it, and the search
-    stops there. Anything older describes a docking that has since ended.
+    The newest event that settles the question decides it; the search stops
+    there. Anything older describes a docking that has since ended.
 
     This distinction is the whole point. Asking only for the newest
-    Docked-at-a-carrier event answers a different question, and answers this
+    Docked-at-a-carrier event answers a different question; it answers this
     one wrongly the moment the commander docks anywhere else: the application
     went on reporting a commander as standing on their carrier while they
     were docked at a station in another system entirely.
 
-    Four events settle it. A Docked names where they are, and only counts if
+    Four events settle it. A Docked names where they are; it only counts if
     that place is a carrier. An Undocked ends any docking. An FSDJump means
     they are in open space in another system. A Location states both where
     they are and whether they are docked, which is how a session that began
@@ -133,8 +166,8 @@ def find_latest_carrier_stats_for_market_id(
 ) -> CarrierStatsEvent | None:
     """Return the latest CarrierStatsEvent for the given carrier market id.
 
-    CarrierStats uses CarrierID, which is usually the same as Docked.MarketID,
-    but not always. Prefer explicit matching when possible.
+    CarrierStats uses CarrierID, which is usually (not always) the same as
+    Docked.MarketID. Prefer explicit matching when possible.
     """
     for event in reversed(events):
         if not isinstance(event, CarrierStatsEvent):

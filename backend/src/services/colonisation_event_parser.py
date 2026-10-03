@@ -26,6 +26,7 @@ from typing import Any
 from ..models.journal_events import (
     ColonisationConstructionDepotEvent,
     ColonisationContributionEvent,
+    ContributionItem,
 )
 from ..utils.logger import get_logger
 
@@ -141,13 +142,14 @@ def parse_contribution(
           ]
         }
 
-    For the array form we currently materialise a single
-    ColonisationContributionEvent for the first contribution item.
-    The per-commodity cumulative total is not present in this shape,
-    so we treat the provided amount as both quantity and
-    total_quantity. Downstream repository logic stores the maximum
-    observed provided_amount and will be corrected by subsequent
-    depot snapshots if needed.
+    For the array form every item becomes a ContributionItem under
+    `items`; the flat fields repeat the first. The per-commodity
+    cumulative total is not present in this shape, so each delivery's
+    amount stands in for it. That is a lower bound, never an overstatement:
+    the repository keeps the larger of it and what it already holds; the
+    next depot snapshot carries the real total. Summing deliveries instead
+    would count a delivery twice whenever a journal is re-read, which the
+    startup tail sync and a reload both do.
     """
     logger.info("Parsing ColonisationContributionEvent: %s", data)
 
@@ -167,28 +169,21 @@ def parse_contribution(
 
     # Newer schema: list of contribution objects under "Contributions".
     contributions = data.get("Contributions")
-    if isinstance(contributions, list) and contributions:
-        first = contributions[0]
-        name = first.get("Name") or first.get("Commodity") or ""
-        # Fallback to raw name if no localised copy is present.
-        name_localised = first.get("Name_Localised") or first.get(
-            "Commodity_Localised", name
-        )
-        amount = int(first.get("Amount", 0))
-
+    items = (
+        _contribution_items(contributions) if isinstance(contributions, list) else []
+    )
+    if items:
+        first = items[0]
         return ColonisationContributionEvent(
             timestamp=timestamp,
             event=data["event"],
             market_id=data["MarketID"],
-            commodity=name,
-            commodity_localised=name_localised,
-            quantity=amount,
-            # No explicit cumulative total is exposed in this schema.
-            # Use the observed amount as a best-effort stand-in; the
-            # repository layer will merge this with depot snapshots
-            # using max() so any later, higher total will win.
-            total_quantity=amount,
+            commodity=first.commodity,
+            commodity_localised=first.commodity_localised,
+            quantity=first.quantity,
+            total_quantity=first.total_quantity,
             credits_received=data.get("CreditsReceived", 0),
+            items=items,
             raw_data=data,
         )
 
@@ -200,6 +195,32 @@ def parse_contribution(
         data,
     )
     raise ValueError("Unsupported ColonisationContribution schema")
+
+
+def _contribution_items(entries: list[Any]) -> list[ContributionItem]:
+    """Every usable commodity of a `Contributions` array, in order.
+
+    An entry that is not an object or names no commodity cannot be recorded
+    against anything, so it is skipped rather than failing the others.
+    """
+    items: list[ContributionItem] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("Name") or entry.get("Commodity") or ""
+        if not name:
+            continue
+        amount = int(entry.get("Amount", 0))
+        items.append(
+            ContributionItem(
+                commodity=name,
+                commodity_localised=entry.get("Name_Localised")
+                or entry.get("Commodity_Localised", name),
+                quantity=amount,
+                total_quantity=amount,
+            )
+        )
+    return items
 
 
 __all__ = ["parse_construction_depot", "parse_contribution"]

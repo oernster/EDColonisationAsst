@@ -137,7 +137,10 @@ anything. Before it existed the shape held by habit rather than by rule.
   and `runtime`; `services` stays free of `api` and `runtime`; `api` stays free
   of `runtime`. `IColonisationRepository` designs that seam and this guards it.
   An import deferred inside a function counts exactly as one at module level.
-  `test_backend_layers_import_only_inwards`.
+  Every spelling counts too: `from .. import api`, `src.` and `backend.src.`
+  absolute imports and a literal `importlib.import_module` or `__import__`.
+  `test_backend_layers_import_only_inwards`, with planted violations proving
+  each spelling is caught in `test_every_spelling_of_an_outward_import_is_caught`.
 - **The setup program is a separate program.** It imports nothing from
   `backend/`, which is what keeps its compiled onefile down to PySide6 plus the
   standard library. `test_the_setup_program_imports_nothing_from_the_application`.

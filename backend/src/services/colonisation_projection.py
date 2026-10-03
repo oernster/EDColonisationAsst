@@ -41,8 +41,9 @@ class ColonisationProjector:
     """Writes colonisation events into the repository without losing state.
 
     Responsibilities:
-    - Merge depot snapshots with the stored site so progress never regresses.
-    - Record contributions against the commodity they deliver.
+    - Merge depot snapshots with the stored site so progress never regresses
+      and a completed or failed site stays so.
+    - Record contributions against every commodity they deliver.
     - Upgrade placeholder site metadata from Docked events.
     """
 
@@ -78,6 +79,7 @@ class ColonisationProjector:
             current_station=self._current_station(),
         )
 
+        progress, complete, failed = _merge_progress(event, existing_site)
         await self._repository.add_construction_site(
             ConstructionSite(
                 market_id=event.market_id,
@@ -85,9 +87,9 @@ class ColonisationProjector:
                 station_type=station_type,
                 system_name=system_name,
                 system_address=system_address,
-                construction_progress=event.construction_progress,
-                construction_complete=event.construction_complete,
-                construction_failed=event.construction_failed,
+                construction_progress=progress,
+                construction_complete=complete,
+                construction_failed=failed,
                 commodities=_merge_commodities(existing_site, snapshot),
             )
         )
@@ -98,20 +100,20 @@ class ColonisationProjector:
         self,
         event: ColonisationContributionEvent,
     ) -> None:
-        """Record a ColonisationContribution against its commodity."""
-        await self._repository.update_commodity(
-            market_id=event.market_id,
-            commodity_name=event.commodity,
-            provided_amount=event.total_quantity,
-        )
-
-        logger.info(
-            "Contribution recorded: %s %s (total: %s, credits: %s)",
-            event.quantity,
-            event.commodity_localised or event.commodity,
-            event.total_quantity,
-            event.credits_received,
-        )
+        """Record every commodity a ColonisationContribution delivered."""
+        for item in event.deliveries():
+            await self._repository.update_commodity(
+                market_id=event.market_id,
+                commodity_name=item.commodity,
+                provided_amount=item.total_quantity,
+            )
+            logger.info(
+                "Contribution recorded: %s %s (total: %s, credits: %s)",
+                item.quantity,
+                item.commodity_localised or item.commodity,
+                item.total_quantity,
+                event.credits_received,
+            )
 
     async def project_docked(self, event: DockedEvent) -> None:
         """Project a Docked event that occurred at a construction site.
@@ -203,13 +205,48 @@ class ColonisationProjector:
             return None
 
 
+def _merge_progress(
+    event: ColonisationConstructionDepotEvent,
+    existing_site: ConstructionSite | None,
+) -> tuple[float, bool, bool]:
+    """Progress, completion and failure that a stale snapshot cannot undo.
+
+    Journal files are taken in modification order, which the game does not
+    promise matches event order, so the snapshot projected last is not always
+    the newest. Progress therefore never falls; completion and failure are
+    terminal for a market, so once reported they stay reported. A stale
+    snapshot used to turn a completed site back into one at 25%.
+    """
+    if existing_site is None:
+        return (
+            event.construction_progress,
+            event.construction_complete,
+            event.construction_failed,
+        )
+    return (
+        max(existing_site.construction_progress, event.construction_progress),
+        existing_site.construction_complete or event.construction_complete,
+        existing_site.construction_failed or event.construction_failed,
+    )
+
+
 def _snapshot_commodities(
     event: ColonisationConstructionDepotEvent,
 ) -> dict[str, Commodity]:
-    """Commodities carried by one depot snapshot, keyed by name."""
+    """Commodities carried by one depot snapshot, keyed by name.
+
+    The internal name is the key; a resource that omits it falls back to its
+    localised name. One with neither cannot be told apart from any other, so
+    it is skipped rather than collapsing every nameless entry into one row.
+    """
     snapshot: dict[str, Commodity] = {}
     for comm_data in event.commodities:
-        name = comm_data.get("Name", "")
+        name = comm_data.get("Name") or comm_data.get("Name_Localised") or ""
+        if not name:
+            logger.warning(
+                "Depot %s lists a commodity with no name; skipped", event.market_id
+            )
+            continue
         snapshot[name] = Commodity(
             name=name,
             name_localised=comm_data.get("Name_Localised", name),

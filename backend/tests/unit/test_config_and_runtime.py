@@ -177,40 +177,6 @@ def test_runtime_reports_packaged_inside_a_flatpak(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_get_config_paths_dev_uses_backend_layout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """In non-frozen mode, get_config_paths resolves backend/config.yaml layout."""
-    monkeypatch.setattr(config_mod, "_is_frozen", lambda: False)
-
-    config_path, commander_path = config_mod.get_config_paths()
-
-    base_dir = Path(config_mod.__file__).parent.parent  # backend/
-    assert config_path == base_dir / "config.yaml"
-    assert commander_path == base_dir / "commander.yaml"
-
-
-def test_get_config_paths_frozen_uses_exe_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """In frozen mode, get_config_paths should place config next to the executable."""
-    exe = tmp_path / "EDColonisationAsst.exe"
-    exe.write_text("", encoding="utf-8")
-
-    monkeypatch.setattr(config_mod, "_is_frozen", lambda: True)
-    orig_argv0 = sys.argv[0]
-    sys.argv[0] = str(exe)
-    try:
-        config_path, commander_path = config_mod.get_config_paths()
-    finally:
-        sys.argv[0] = orig_argv0
-
-    assert config_path.parent == exe.parent
-    assert commander_path.parent == exe.parent
-    assert config_path.name == "config.yaml"
-    assert commander_path.name == "commander.yaml"
-
-
 def test_get_config_loads_yaml_and_commander_and_caches(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

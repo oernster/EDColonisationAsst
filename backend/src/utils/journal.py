@@ -138,29 +138,30 @@ def find_journal_directory() -> Path | None:
 
 def get_journal_directory() -> Path:
     """
-    Find the Elite: Dangerous journal directory.
+    Return the journal directory every view reads: the configured one.
 
-    - Windows: uses the real "Saved Games" folder (via utils.windows)
-    - Linux: attempts to locate journals under common Steam Proton / Wine prefixes
+    The configuration's own default is the detected folder (see
+    config._default_journal_directory), so a normal installation still needs
+    no setup; a folder saved on the Settings page replaces it. This used to
+    re-detect from Saved Games on every call, so the commander header and
+    the carrier views read a different folder from the colonisation watcher
+    whenever the user had set one.
+
+    A configured folder that does not exist is reported rather than swapped
+    for the detected one: two folders answering different views is the defect
+    this function exists to prevent.
 
     Raises:
-        FileNotFoundError: if no known journal directory exists.
+        FileNotFoundError: if the configured directory does not exist.
     """
-    journal_dir = find_journal_directory()
-    if journal_dir and journal_dir.is_dir():
+    # Late for the reason config.py gives: utils/__init__ imports the logger,
+    # the logger imports config, so a top-level import here is circular.
+    from ..config import get_config
+
+    journal_dir = Path(get_config().journal.directory)
+    if journal_dir.is_dir():
         return journal_dir
-
-    if os.name == "nt":
-        raise FileNotFoundError(
-            "Could not find the Saved Games directory / journal directory on Windows."
-        )
-
-    tried = "\n".join(str(p) for p in _iter_linux_journal_candidates())
-    raise FileNotFoundError(
-        "Could not auto-detect the Elite Dangerous journal directory on Linux.\n"
-        "Tried the following locations:\n"
-        f"{tried}"
-    )
+    raise FileNotFoundError(f"The journal directory does not exist: {journal_dir}")
 
 
 def get_latest_journal_file(journal_dir: Path) -> Path | None:

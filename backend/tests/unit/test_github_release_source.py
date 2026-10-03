@@ -18,16 +18,19 @@ from src.services.github_release_source import (
     RELEASES_API_URL,
     REQUEST_TIMEOUT_S,
     GitHubReleaseSource,
+    SameHostRedirectHandler,
     parse_release,
 )
 
+REPO = "https://github.com/oernster/EDColonisationAsst"
+
 PAYLOAD = {
     "tag_name": "v3.3.0",
-    "html_url": "https://example.invalid/releases/tag/v3.3.0",
+    "html_url": f"{REPO}/releases/tag/v3.3.0",
     "assets": [
         {
             "name": "EDColonisationAsstInstaller.exe",
-            "browser_download_url": "https://example.invalid/setup.exe",
+            "browser_download_url": f"{REPO}/setup.exe",
         }
     ],
 }
@@ -104,18 +107,24 @@ def test_the_request_carries_a_timeout() -> None:
     assert opener.timeout == REQUEST_TIMEOUT_S
 
 
-def test_the_default_opener_is_urlopen() -> None:
-    """Constructed with nothing, the adapter is the real thing."""
-    assert GitHubReleaseSource()._opener is urllib.request.urlopen
+def test_the_default_opener_refuses_redirects_off_host() -> None:
+    """Constructed with nothing, the adapter opens through the same-host rule."""
+    opener = GitHubReleaseSource()._opener
+
+    assert isinstance(opener.__self__, urllib.request.OpenerDirector)
+    assert any(
+        isinstance(handler, SameHostRedirectHandler)
+        for handler in opener.__self__.handlers
+    )
 
 
 def test_an_explicit_url_overrides_the_default() -> None:
     opener = FakeOpener()
-    source = GitHubReleaseSource(opener=opener, url="https://example.invalid/api")
+    source = GitHubReleaseSource(opener=opener, url=f"{REPO}/api")
 
     source.latest_release()
 
-    assert opener.request.full_url == "https://example.invalid/api"
+    assert opener.request.full_url == f"{REPO}/api"
 
 
 # ---------------------------------------------------------------- happy path
@@ -131,7 +140,7 @@ def test_a_published_release_is_read_whole() -> None:
     assert release.page_url == PAYLOAD["html_url"]
     assert len(release.assets) == 1
     assert release.assets[0].name == "EDColonisationAsstInstaller.exe"
-    assert release.assets[0].download_url == "https://example.invalid/setup.exe"
+    assert release.assets[0].download_url == f"{REPO}/setup.exe"
 
 
 # ---------------------------------------------------------------- failures
@@ -165,11 +174,11 @@ def test_a_payload_that_is_not_an_object_is_not_a_release() -> None:
 
 
 def test_a_missing_tag_is_not_a_release() -> None:
-    assert parse_release({"html_url": "https://example.invalid/x"}) is None
+    assert parse_release({"html_url": f"{REPO}/x"}) is None
 
 
 def test_an_empty_or_mistyped_tag_is_not_a_release() -> None:
-    page = "https://example.invalid/x"
+    page = f"{REPO}/x"
     assert parse_release({"tag_name": "", "html_url": page}) is None
     assert parse_release({"tag_name": 330, "html_url": page}) is None
 
@@ -184,7 +193,7 @@ def test_an_empty_or_mistyped_page_url_is_not_a_release() -> None:
 
 
 def test_a_leading_v_is_stripped_from_the_tag() -> None:
-    page = "https://example.invalid/x"
+    page = f"{REPO}/x"
 
     assert parse_release({"tag_name": "v3.3.0", "html_url": page}).version == "3.3.0"
     assert parse_release({"tag_name": "V3.3.0", "html_url": page}).version == "3.3.0"
@@ -193,7 +202,10 @@ def test_a_leading_v_is_stripped_from_the_tag() -> None:
 
 def test_a_release_with_no_assets_key_carries_none() -> None:
     release = parse_release(
-        {"tag_name": "v3.3.0", "html_url": "https://example.invalid/x"}
+        {
+            "tag_name": "v3.3.0",
+            "html_url": f"{REPO}/x",
+        }
     )
 
     assert release is not None
@@ -204,7 +216,7 @@ def test_assets_that_are_not_a_list_carry_none() -> None:
     release = parse_release(
         {
             "tag_name": "v3.3.0",
-            "html_url": "https://example.invalid/x",
+            "html_url": f"{REPO}/x",
             "assets": {"not": "a list"},
         }
     )
@@ -218,17 +230,23 @@ def test_unusable_asset_entries_are_dropped_and_the_rest_kept() -> None:
     release = parse_release(
         {
             "tag_name": "v3.3.0",
-            "html_url": "https://example.invalid/x",
+            "html_url": f"{REPO}/x",
             "assets": [
                 "not an object",
                 {"name": "no url"},
-                {"browser_download_url": "https://example.invalid/no-name"},
-                {"name": "", "browser_download_url": "https://example.invalid/empty"},
+                {"browser_download_url": f"{REPO}/no-name"},
+                {
+                    "name": "",
+                    "browser_download_url": f"{REPO}/empty",
+                },
                 {"name": "EDCA.exe", "browser_download_url": ""},
-                {"name": 7, "browser_download_url": "https://example.invalid/n"},
+                {
+                    "name": 7,
+                    "browser_download_url": f"{REPO}/n",
+                },
                 {
                     "name": "EDColonisationAsstInstaller.exe",
-                    "browser_download_url": "https://example.invalid/setup.exe",
+                    "browser_download_url": f"{REPO}/setup.exe",
                 },
             ],
         }

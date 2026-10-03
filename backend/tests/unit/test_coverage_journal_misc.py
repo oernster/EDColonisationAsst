@@ -79,19 +79,6 @@ def test_linux_candidates_include_compat_and_wineprefix(
     assert wine / "drive_c" / "users" / "steamuser" / subpath in candidates
 
 
-# ------------------------------------------------------------------
-# get_journal_directory
-
-
-def test_get_journal_directory_returns_detected_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """A detected existing directory is returned as-is."""
-    monkeypatch.setattr(journal_utils, "find_journal_directory", lambda: tmp_path)
-
-    assert journal_utils.get_journal_directory() == tmp_path
-
-
 # ------------------------------------------------------------------ InaraService
 
 

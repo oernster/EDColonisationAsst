@@ -1,9 +1,9 @@
 """Coverage tests for src/config.py.
 
 These tests target the code paths the behavioural suite does not reach:
-frozen-runtime detection edge cases, the per-user config directory helper
-on every platform combination, the argv fallback in get_config_paths and
-the defensive YAML plus journal auto-detection branches in get_config.
+the per-user config directory helper on every platform combination, the
+sandbox branch of get_config_paths and the defensive YAML plus journal
+auto-detection branches in get_config.
 
 Only pytest monkeypatch, real tmp_path files and hand-written values are
 used; no mock libraries.
@@ -18,7 +18,6 @@ scope so its module-level Path arithmetic runs before any os.name patch.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -36,50 +35,6 @@ _ConcretePath = type(Path())
 def _pin_concrete_path(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin src.config's Path name to the real platform's concrete class."""
     monkeypatch.setattr(config_mod, "Path", _ConcretePath)
-
-
-# ---------------------------------------------------------------------------
-# _is_frozen
-# ---------------------------------------------------------------------------
-
-
-def test_is_frozen_true_when_sys_frozen_flag(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A truthy sys.frozen flag marks the process as frozen."""
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-
-    assert config_mod._is_frozen() is True
-
-
-def test_is_frozen_true_for_non_python_exe_argv(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A non-Python .exe in argv[0] marks the process as frozen."""
-    monkeypatch.delattr(sys, "frozen", raising=False)
-    monkeypatch.setattr(sys, "argv", ["C:/apps/EDColonisationAsst.exe"])
-
-    assert config_mod._is_frozen() is True
-
-
-def test_is_frozen_false_for_python_exe_argv(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """python.exe in argv[0] is treated as a normal interpreter run."""
-    monkeypatch.delattr(sys, "frozen", raising=False)
-    monkeypatch.setattr(sys, "argv", ["C:/venv/Scripts/python.exe"])
-
-    assert config_mod._is_frozen() is False
-
-
-def test_is_frozen_false_when_argv_unusable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An argv[0] that cannot become a Path yields the safe False fallback."""
-    monkeypatch.delattr(sys, "frozen", raising=False)
-    monkeypatch.setattr(sys, "argv", [None])
-
-    assert config_mod._is_frozen() is False
 
 
 # ---------------------------------------------------------------------------
@@ -140,22 +95,8 @@ def test_user_config_dir_posix_without_xdg(
 
 
 # ---------------------------------------------------------------------------
-# get_config_paths fallback
+# get_config_paths inside a sandbox
 # ---------------------------------------------------------------------------
-
-
-def test_get_config_paths_frozen_argv_error_falls_back_to_source_layout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When frozen but argv[0] is unusable, the source layout is used."""
-    monkeypatch.setattr(config_mod, "_is_frozen", lambda: True)
-    monkeypatch.setattr(sys, "argv", [None])
-
-    config_path, commander_path = config_mod.get_config_paths()
-
-    expected_base = Path(config_mod.__file__).resolve().parents[2]
-    assert config_path == expected_base / "config.yaml"
-    assert commander_path == expected_base / "commander.yaml"
 
 
 def test_get_config_paths_inside_a_flatpak_uses_the_user_config_directory(

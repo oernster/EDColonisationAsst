@@ -49,6 +49,7 @@ from .carrier_events import (
     find_latest_carrier_stats_for_id,
     find_latest_carrier_stats_for_market_id,
     find_latest_docked_carrier,
+    find_own_carrier_docking,
 )
 from .carrier_fleet import build_my_carriers_response
 from .carrier_hold import derive_carrier_hold
@@ -79,6 +80,7 @@ __all__ = [
     "find_latest_carrier_stats_for_id",
     "find_latest_carrier_stats_for_market_id",
     "find_latest_docked_carrier",
+    "find_own_carrier_docking",
 ]
 
 
@@ -164,11 +166,13 @@ def build_current_carrier_state_response(
     # Where the COMMANDER is does not change what the carrier is holding, so a
     # commander docked elsewhere still gets their carrier's state, rebuilt from
     # the last time they were aboard. `commander_aboard` below is what says
-    # which of the two this is, and the UI labels it accordingly.
+    # which of the two this is; the UI labels it accordingly. Not aboard,
+    # "their carrier" is the one CarrierStats names, never merely the last
+    # carrier docked at, which may have been somebody else's.
     docked_carrier = find_current_carrier_docking(events)
     commander_aboard = docked_carrier is not None
     if docked_carrier is None:
-        docked_carrier = find_latest_docked_carrier(events)
+        docked_carrier = find_own_carrier_docking(events)
     if docked_carrier is None:
         return None
 

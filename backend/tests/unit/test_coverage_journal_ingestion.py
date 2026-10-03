@@ -17,13 +17,14 @@ from tests.unit._test_coverage_journal_ingestion_support import (
     FakeSystemTracker,
     ListParser,
     MarkerRaisingLineParser,
-    RaisingFileParser,
+    ExplodingTracker,
     RecordingCallback,
     SequencedStatPath,
     TS,
     _UndecodableBuffer,
     depot_event,
     make_handler,
+    write_journal_lines,
 )
 
 
@@ -108,7 +109,9 @@ async def test_process_file_diagnostics_failure_with_updates(tmp_path: Path) -> 
     )
     handler.explode = True
 
-    await handler._process_file(tmp_path / "Journal.missing.log")
+    await handler._process_file(
+        write_journal_lines(tmp_path / "Journal.one.log", count=1)
+    )
 
     # The depot event was still persisted despite the diagnostics failure.
     assert 1234 in repo.sites
@@ -118,16 +121,22 @@ async def test_process_file_diagnostics_failure_with_updates(tmp_path: Path) -> 
 async def test_process_file_error_and_last_error_diagnostic_failure(
     tmp_path: Path,
 ) -> None:
-    """Errors during parsing are logged even if last_error cannot be recorded."""
+    """Errors during ingestion are logged even if last_error cannot be recorded."""
     loop = asyncio.get_running_loop()
+    event = LocationEvent(
+        timestamp=TS, event="Location", star_system="Boom System", system_address=4
+    )
     handler = make_handler(
         loop,
-        parser=RaisingFileParser([]),
+        parser=ListParser([event]),
+        tracker=ExplodingTracker(),
         cls=ExplodingDiagnosticsHandler,
     )
     handler.explode = True
 
-    await handler._process_file(tmp_path / "Journal.error.log")
+    await handler._process_file(
+        write_journal_lines(tmp_path / "Journal.error.log", count=1)
+    )
 
     assert handler.last_error is None
 
@@ -274,10 +283,15 @@ async def test_process_file_incremental_decode_failure(tmp_path: Path) -> None:
     assert handler.last_events_parsed == 0
 
 
-async def test_process_file_incremental_open_failure_falls_back(
+async def test_process_file_incremental_open_failure_is_retried_later(
     tmp_path: Path,
 ) -> None:
-    """OSError while opening for a tail read falls back to a full parse."""
+    """OSError while opening for a tail read consumes nothing.
+
+    It used to fall back to a whole-file parse, which marked the offset at
+    the size measured after parsing; the state is now left untouched so the
+    next pass reads from the same place.
+    """
     loop = asyncio.get_running_loop()
     tracker = FakeSystemTracker()
     event = LocationEvent(
@@ -288,24 +302,10 @@ async def test_process_file_incremental_open_failure_falls_back(
     fake_path = SequencedStatPath("Journal.fake.log", [100, 100])
     key = str(fake_path)
     handler._tail_reader.offsets[key] = 10
+    handler._tail_reader.partials[key] = b"kept"
 
     await handler._process_file(fake_path)
 
-    assert handler._tail_reader.offsets[key] == 100
-    assert handler._tail_reader.partials[key] == b""
-    assert tracker.locations == [event]
-
-
-async def test_process_file_incremental_open_and_stat_failure(tmp_path: Path) -> None:
-    """When stat also fails after the fallback parse, the cached size is used."""
-    loop = asyncio.get_running_loop()
-    handler = make_handler(loop, parser=ListParser([]))
-
-    fake_path = SequencedStatPath("Journal.fake2.log", [64])
-    key = str(fake_path)
-    handler._tail_reader.offsets[key] = 10
-
-    await handler._process_file(fake_path)
-
-    assert handler._tail_reader.offsets[key] == 64
-    assert handler._tail_reader.partials[key] == b""
+    assert handler._tail_reader.offsets[key] == 10
+    assert handler._tail_reader.partials[key] == b"kept"
+    assert tracker.locations == []

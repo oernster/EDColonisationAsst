@@ -130,7 +130,10 @@ class JournalParser(IJournalParser):
         events: list[JournalEvent] = []
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            # errors="replace": one byte that is not UTF-8 (a character the
+            # game split mid-write, a damaged sector) costs the line it is on,
+            # which then fails to parse, rather than every event in the file.
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 for line_num, line in enumerate(f, 1):
                     line = line.strip()
                     if not line:

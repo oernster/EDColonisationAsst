@@ -276,16 +276,28 @@ async def reload_journals() -> dict:
     if _repository is None:
         raise HTTPException(status_code=500, detail="Repository not initialized")
 
-    # Clear existing data before reloading
-    await _repository.clear_all()
-
     config = get_config()
     journal_dir = Path(config.journal.directory)
 
-    if not journal_dir.exists():
+    # Both checks come BEFORE the database is cleared. Clearing first meant a
+    # reload with the folder unavailable (an unplugged drive, a moved Saved
+    # Games) deleted every site and rebuilt nothing; where old journals had
+    # been pruned the database was the only copy.
+    if not journal_dir.is_dir():
         raise HTTPException(
             status_code=404, detail=f"Journal directory not found: {journal_dir}"
         )
+
+    journal_files = sorted(
+        journal_dir.glob("Journal.*.log"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not journal_files:
+        raise HTTPException(
+            status_code=404, detail=f"No journal files found in: {journal_dir}"
+        )
+
+    await _repository.clear_all()
 
     parser = JournalParser()
     processed_files: list[str] = []
@@ -299,12 +311,6 @@ async def reload_journals() -> dict:
     # Use a single tracker/handler so system context is preserved across files
     tracker = SystemTracker()
     handler = JournalFileHandler(parser, tracker, _repository, None)
-
-    # Find all journal files
-    journal_files = sorted(
-        journal_dir.glob("Journal.*.log"),
-        key=lambda p: p.stat().st_mtime,
-    )
 
     # Process all files
     for journal_file in journal_files:
